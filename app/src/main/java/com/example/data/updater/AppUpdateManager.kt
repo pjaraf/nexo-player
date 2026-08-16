@@ -44,7 +44,7 @@ object AppUpdateManager {
     val currentVersionCode: Int = BuildConfig.VERSION_CODE
     val currentVersionName: String = BuildConfig.VERSION_NAME
 
-    private fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
+    fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
         try {
             val remoteClean = remoteVersion.trim().removePrefix("v").removePrefix("V")
             val currentClean = currentVersion.trim().removePrefix("v").removePrefix("V")
@@ -53,6 +53,9 @@ object AppUpdateManager {
             }
             val remoteParts = remoteClean.split(".").mapNotNull { it.trim().toIntOrNull() }
             val currentParts = currentClean.split(".").mapNotNull { it.trim().toIntOrNull() }
+            if (remoteParts.isEmpty() || currentParts.isEmpty()) {
+                return false
+            }
             val maxLength = maxOf(remoteParts.size, currentParts.size)
             for (i in 0 until maxLength) {
                 val r = remoteParts.getOrElse(i) { 0 }
@@ -61,7 +64,7 @@ object AppUpdateManager {
                 if (r < c) return false
             }
         } catch (e: Exception) {
-            // Fallback
+            Log.e(TAG, "Error comparing versions: ${e.message}")
         }
         return false
     }
@@ -117,10 +120,9 @@ object AppUpdateManager {
                     if (update != null && update.apkUrl.isNotBlank()) {
                         AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
                         val remoteVer = update.versionName.trim()
-                        val hasHigherVer = isVersionHigher(remoteVer, currentVersionName)
-                        val hasHigherCode = update.versionCode > currentVersionCode
+                        val isNewer = isVersionHigher(remoteVer, currentVersionName)
 
-                        if (hasHigherVer || (hasHigherCode && !remoteVer.equals(currentVersionName, ignoreCase = true))) {
+                        if (isNewer) {
                             val dismissed = AppStorage.getDismissedUpdateVersion()
                             if (dismissed == remoteVer) {
                                 Log.d(TAG, "Update v$remoteVer was previously dismissed")
@@ -128,11 +130,11 @@ object AppUpdateManager {
                                 return@withContext null
                             }
                             val normalizedUpdate = update.copy(apkUrl = normalizeUrl(update.apkUrl))
-                            Log.i(TAG, "New update found via version.json! v${normalizedUpdate.versionName} (build ${normalizedUpdate.versionCode})")
+                            Log.i(TAG, "New update found via version.json! v${normalizedUpdate.versionName}")
                             _latestUpdateInfo.value = normalizedUpdate
                             return@withContext normalizedUpdate
                         } else {
-                            Log.d(TAG, "App is up to date (current=$currentVersionName/$currentVersionCode, server=$remoteVer/${update.versionCode})")
+                            Log.d(TAG, "App is up to date (current=$currentVersionName, server=$remoteVer)")
                             _latestUpdateInfo.value = null
                             return@withContext null
                         }
@@ -162,7 +164,6 @@ object AppUpdateManager {
                     if (!ghBody.isNullOrBlank()) {
                         val jsonObject = com.google.gson.JsonParser.parseString(ghBody).asJsonObject
                         val tagName = jsonObject.get("tag_name")?.asString?.replace("v", "")?.trim() ?: ""
-                        val bodyText = jsonObject.get("body")?.asString ?: "Nueva versión disponible"
                         val assets = jsonObject.getAsJsonArray("assets")
 
                         var apkDownloadUrl: String? = null
@@ -178,12 +179,16 @@ object AppUpdateManager {
                         }
 
                         if (!apkDownloadUrl.isNullOrBlank()) {
-                            // Extract numeric version digits (e.g. "1.0.1" -> 101, "2" -> 2)
-                            val cleanTag = tagName.trim().removePrefix("v")
-                            val isHigherVersion = isVersionHigher(cleanTag, currentVersionName)
-                            val isHigherCode = cleanTag.filter { it.isDigit() }.toIntOrNull()?.let { it > currentVersionCode } ?: false
+                            val cleanTag = tagName.trim().removePrefix("v").removePrefix("V")
+                            val isNewer = isVersionHigher(cleanTag, currentVersionName)
 
-                            if (isHigherVersion || isHigherCode) {
+                            if (isNewer) {
+                                val dismissed = AppStorage.getDismissedUpdateVersion()
+                                if (dismissed == cleanTag) {
+                                    Log.d(TAG, "Update v$cleanTag was previously dismissed")
+                                    _latestUpdateInfo.value = null
+                                    return@withContext null
+                                }
                                 val updateFromGh = UpdateInfo(
                                     versionCode = currentVersionCode + 1,
                                     versionName = if (cleanTag.isNotBlank()) cleanTag else "Nueva Versión",
@@ -196,7 +201,7 @@ object AppUpdateManager {
                                 _latestUpdateInfo.value = updateFromGh
                                 return@withContext updateFromGh
                             } else {
-                                Log.d(TAG, "App is already on latest or higher version ($currentVersionName >= $cleanTag)")
+                                Log.d(TAG, "App is already on latest version ($currentVersionName >= $cleanTag)")
                             }
                         }
                     }
