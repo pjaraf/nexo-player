@@ -44,6 +44,23 @@ object AppUpdateManager {
     val currentVersionCode: Int = BuildConfig.VERSION_CODE
     val currentVersionName: String = BuildConfig.VERSION_NAME
 
+    private fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
+        try {
+            val remoteParts = remoteVersion.split(".").mapNotNull { it.trim().toIntOrNull() }
+            val currentParts = currentVersion.split(".").mapNotNull { it.trim().toIntOrNull() }
+            val maxLength = maxOf(remoteParts.size, currentParts.size)
+            for (i in 0 until maxLength) {
+                val r = remoteParts.getOrElse(i) { 0 }
+                val c = currentParts.getOrElse(i) { 0 }
+                if (r > c) return true
+                if (r < c) return false
+            }
+        } catch (e: Exception) {
+            // Fallback
+        }
+        return false
+    }
+
     /**
      * Normalizes URLs for popular hosting providers (GitHub, Dropbox)
      */
@@ -146,20 +163,25 @@ object AppUpdateManager {
                         }
 
                         if (!apkDownloadUrl.isNullOrBlank()) {
-                            // Extract numeric versionCode from tag name (e.g. "1.0.1" -> 101 or "2" -> 2)
-                            val codeDigits = tagName.filter { it.isDigit() }.toIntOrNull() ?: (currentVersionCode + 1)
-                            if (codeDigits > currentVersionCode || tagName != currentVersionName) {
+                            // Extract numeric version digits (e.g. "1.0.1" -> 101, "2" -> 2)
+                            val cleanTag = tagName.trim().removePrefix("v")
+                            val isHigherVersion = isVersionHigher(cleanTag, currentVersionName)
+                            val isHigherCode = cleanTag.filter { it.isDigit() }.toIntOrNull()?.let { it > currentVersionCode } ?: false
+
+                            if (isHigherVersion || isHigherCode) {
                                 val updateFromGh = UpdateInfo(
-                                    versionCode = if (codeDigits > currentVersionCode) codeDigits else currentVersionCode + 1,
-                                    versionName = if (tagName.isNotBlank()) tagName else "Nueva Versión",
+                                    versionCode = currentVersionCode + 1,
+                                    versionName = if (cleanTag.isNotBlank()) cleanTag else "Nueva Versión",
                                     apkUrl = apkDownloadUrl,
-                                    changelog = bodyText,
+                                    changelog = "",
                                     isMandatory = false
                                 )
                                 Log.i(TAG, "New update found via GitHub API! v${updateFromGh.versionName}")
                                 AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
                                 _latestUpdateInfo.value = updateFromGh
                                 return@withContext updateFromGh
+                            } else {
+                                Log.d(TAG, "App is already on latest or higher version ($currentVersionName >= $cleanTag)")
                             }
                         }
                     }

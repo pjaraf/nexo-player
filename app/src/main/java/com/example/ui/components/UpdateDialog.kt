@@ -103,7 +103,7 @@ fun UpdateDialog(
                             color = Color.White
                         )
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -115,11 +115,11 @@ fun UpdateDialog(
                             Text(
                                 text = "Actual: v${BuildConfig.VERSION_NAME}",
                                 color = NexusTextSecondary,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
-                        Text("➔", color = NexusTextSecondary, fontSize = 11.sp)
+                        Text("➔", color = NexusTextSecondary, fontSize = 12.sp)
                         Surface(
                             color = NexusPrimary.copy(alpha = 0.2f),
                             shape = RoundedCornerShape(6.dp),
@@ -129,34 +129,8 @@ fun UpdateDialog(
                                 text = "Nueva: v${updateInfo.versionName}",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Changelog Box
-                if (updateInfo.changelog.isNotBlank()) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = NexusBackground.copy(alpha = 0.7f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "Novedades:",
-                                color = NexusPrimary,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = updateInfo.changelog,
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
                     }
