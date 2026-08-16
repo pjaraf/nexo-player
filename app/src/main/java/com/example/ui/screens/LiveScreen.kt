@@ -126,7 +126,8 @@ private fun TvLiveFullscreenScreen(
     val loading by viewModel.liveLoading.collectAsState()
     val favorites by viewModel.favoritesList.collectAsState()
 
-    var showFloatingGuide by remember { mutableStateOf(false) }
+    // Guide visibility mode: HIDDEN (0 presses), CHANNELS_ONLY (1 press), BOTH_CATEGORIES_AND_CHANNELS (2 presses)
+    var guideMode by remember { mutableStateOf(0) } // 0 = oculto, 1 = solo canales, 2 = categorías y canales
     var selectedChannel by remember { mutableStateOf<LiveChannel?>(null) }
     var isPlayerBuffering by remember { mutableStateOf(false) }
     var playerHasError by remember { mutableStateOf(false) }
@@ -252,14 +253,18 @@ private fun TvLiveFullscreenScreen(
     }
 
     // Scroll to current channel when guide opens
-    LaunchedEffect(showFloatingGuide) {
-        if (showFloatingGuide) {
+    LaunchedEffect(guideMode) {
+        if (guideMode == 1) {
             val idx = displayedChannels.indexOfFirst { it.id == selectedChannel?.id }
             if (idx >= 0) {
                 channelsListState.scrollToItem(idx)
             }
             try {
                 channelsFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        } else if (guideMode == 2) {
+            try {
+                categoriesFocusRequester.requestFocus()
             } catch (_: Exception) {}
         } else {
             try {
@@ -283,8 +288,13 @@ private fun TvLiveFullscreenScreen(
 
     // Remote Control Back Handler
     BackHandler(enabled = true) {
-        if (showFloatingGuide) {
-            showFloatingGuide = false
+        if (guideMode == 2) {
+            guideMode = 1 // De categorías vuelve a canales
+            coroutineScope.launch {
+                try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
+            }
+        } else if (guideMode == 1) {
+            guideMode = 0 // De canales oculta la guía y vuelve a pantalla completa
         } else {
             onExitToMenu?.invoke()
         }
@@ -301,26 +311,43 @@ private fun TvLiveFullscreenScreen(
                     val code = keyEvent.nativeKeyEvent.keyCode
                     when (code) {
                         AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                            if (!showFloatingGuide) {
-                                showFloatingGuide = true
-                                true
-                            } else {
-                                false
+                            when (guideMode) {
+                                0 -> {
+                                    // 1er toque: Abre SOLO Canales
+                                    guideMode = 1
+                                    true
+                                }
+                                1 -> {
+                                    // 2do toque: Abre Categorías
+                                    guideMode = 2
+                                    true
+                                }
+                                else -> false
                             }
                         }
                         AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            if (showFloatingGuide) {
-                                showFloatingGuide = false
-                                true
-                            } else {
-                                false
+                            when (guideMode) {
+                                2 -> {
+                                    // Desde Categorías, hacia la derecha va a Canales
+                                    guideMode = 1
+                                    coroutineScope.launch {
+                                        try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
+                                    }
+                                    true
+                                }
+                                1 -> {
+                                    // Desde Canales, hacia la derecha cierra la guía
+                                    guideMode = 0
+                                    true
+                                }
+                                else -> false
                             }
                         }
                         AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                         AndroidKeyEvent.KEYCODE_ENTER,
                         AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                            if (!showFloatingGuide) {
-                                showFloatingGuide = true
+                            if (guideMode == 0) {
+                                guideMode = 1
                                 true
                             } else {
                                 false
@@ -335,7 +362,7 @@ private fun TvLiveFullscreenScreen(
                             true
                         }
                         AndroidKeyEvent.KEYCODE_DPAD_UP -> {
-                            if (!showFloatingGuide) {
+                            if (guideMode == 0) {
                                 zapChannel(1)
                                 true
                             } else {
@@ -343,7 +370,7 @@ private fun TvLiveFullscreenScreen(
                             }
                         }
                         AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
-                            if (!showFloatingGuide) {
+                            if (guideMode == 0) {
                                 zapChannel(-1)
                                 true
                             } else {
@@ -351,12 +378,18 @@ private fun TvLiveFullscreenScreen(
                             }
                         }
                         AndroidKeyEvent.KEYCODE_MENU -> {
-                            showFloatingGuide = !showFloatingGuide
+                            guideMode = if (guideMode == 0) 1 else 0
                             true
                         }
                         AndroidKeyEvent.KEYCODE_BACK -> {
-                            if (showFloatingGuide) {
-                                showFloatingGuide = false
+                            if (guideMode == 2) {
+                                guideMode = 1
+                                coroutineScope.launch {
+                                    try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
+                                }
+                                true
+                            } else if (guideMode == 1) {
+                                guideMode = 0
                                 true
                             } else {
                                 false
@@ -386,8 +419,12 @@ private fun TvLiveFullscreenScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .clickable {
-                    // Clicking screen toggles the floating guide
-                    showFloatingGuide = !showFloatingGuide
+                    // Clicking screen toggles channels
+                    guideMode = when (guideMode) {
+                        0 -> 1
+                        1 -> 2
+                        else -> 0
+                    }
                 }
         )
 
@@ -458,7 +495,7 @@ private fun TvLiveFullscreenScreen(
 
         // --- 2. REMOTE CONTROL HELPER PILL (Appears on entry or when guide is closed) ---
         AnimatedVisibility(
-            visible = showRemoteHint && !showFloatingGuide,
+            visible = showRemoteHint && guideMode == 0,
             enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
             modifier = Modifier
@@ -489,7 +526,7 @@ private fun TvLiveFullscreenScreen(
                         )
                     }
                     Text(
-                        text = "Presiona HACIA EL LADO (◀) en el control remoto para ver canales y categorías",
+                        text = "Presiona 1 vez (◀) para Canales | 2 veces (◀◀) para Categorías",
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -498,9 +535,9 @@ private fun TvLiveFullscreenScreen(
             }
         }
 
-        // --- 3. TWO FLOATING OVERLAY WINDOWS: CATEGORÍAS & CANALES ---
+        // --- 3. SEPARATED FLOATING OVERLAY WINDOWS: CATEGORÍAS (2 toques) & CANALES (1 toque) ---
         AnimatedVisibility(
-            visible = showFloatingGuide,
+            visible = guideMode > 0,
             enter = fadeIn() + slideInHorizontally(initialOffsetX = { -it }),
             exit = fadeOut() + slideOutHorizontally(targetOffsetX = { -it }),
             modifier = Modifier.fillMaxSize()
@@ -511,115 +548,121 @@ private fun TvLiveFullscreenScreen(
                     .padding(start = 24.dp, top = 24.dp, bottom = 24.dp, end = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // ==========================================
-                // VENTANA FLOTANTE 1: CATEGORÍAS (Izquierda)
-                // ==========================================
-                Surface(
-                    modifier = Modifier
-                        .width(250.dp)
-                        .fillMaxHeight()
-                        .shadow(24.dp, RoundedCornerShape(24.dp))
-                        .testTag("floating_tv_categories_window"),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color(0xFF101018).copy(alpha = 0.94f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                // ==========================================================
+                // VENTANA FLOTANTE 1: CATEGORÍAS (Aparece con 2do toque / guideMode == 2)
+                // ==========================================================
+                AnimatedVisibility(
+                    visible = guideMode == 2,
+                    enter = fadeIn() + expandHorizontally(),
+                    exit = fadeOut() + shrinkHorizontally()
                 ) {
-                    Column(
+                    Surface(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(14.dp)
+                            .width(260.dp)
+                            .fillMaxHeight()
+                            .shadow(24.dp, RoundedCornerShape(24.dp))
+                            .testTag("floating_tv_categories_window"),
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color(0xFF101018).copy(alpha = 0.96f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
                     ) {
-                        // Header
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Category,
-                                contentDescription = null,
-                                tint = NexusPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "CATEGORÍAS",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 1.5.sp
-                            )
-                        }
-
-                        HorizontalDivider(
-                            color = Color.White.copy(alpha = 0.08f),
-                            thickness = 1.dp,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        LazyColumn(
-                            state = categoriesListState,
+                        Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .focusRequester(categoriesFocusRequester),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                .padding(14.dp)
                         ) {
-                            // "TODOS LOS CANALES" item
-                            item {
-                                val isSelected = selectedCat == "ALL" && !isFavoritesCategorySelected
-                                TvCategoryFloatingItem(
-                                    title = "TODOS LOS CANALES",
-                                    icon = Icons.Outlined.Tv,
-                                    isSelected = isSelected,
-                                    onClick = {
-                                        isFavoritesCategorySelected = false
-                                        viewModel.selectLiveCategory("ALL")
-                                        coroutineScope.launch {
-                                            try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
-                                        }
-                                    }
+                            // Header
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Category,
+                                    contentDescription = null,
+                                    tint = NexusPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "CATEGORÍAS",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.5.sp
                                 )
                             }
 
-                            // "FAVORITOS" item
-                            item {
-                                val favCount = favorites.count { it.kind == "live" }
-                                TvCategoryFloatingItem(
-                                    title = "FAVORITOS ($favCount)",
-                                    icon = Icons.Default.Star,
-                                    isSelected = isFavoritesCategorySelected,
-                                    iconTint = Color(0xFFFFC107),
-                                    onClick = {
-                                        isFavoritesCategorySelected = true
-                                        coroutineScope.launch {
-                                            try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
-                                        }
-                                    }
-                                )
-                            }
+                            HorizontalDivider(
+                                color = Color.White.copy(alpha = 0.08f),
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
 
-                            // Categories from Server
-                            items(categories, key = { it.categoryId }) { cat ->
-                                val isSelected = selectedCat == cat.categoryId && !isFavoritesCategorySelected
-                                TvCategoryFloatingItem(
-                                    title = cat.categoryName.uppercase(),
-                                    icon = Icons.Default.LiveTv,
-                                    isSelected = isSelected,
-                                    onClick = {
-                                        isFavoritesCategorySelected = false
-                                        viewModel.selectLiveCategory(cat.categoryId)
-                                        coroutineScope.launch {
-                                            try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
+                            LazyColumn(
+                                state = categoriesListState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .focusRequester(categoriesFocusRequester),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                // "TODOS LOS CANALES" item
+                                item {
+                                    val isSelected = selectedCat == "ALL" && !isFavoritesCategorySelected
+                                    TvCategoryFloatingItem(
+                                        title = "TODOS LOS CANALES",
+                                        icon = Icons.Outlined.Tv,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            isFavoritesCategorySelected = false
+                                            viewModel.selectLiveCategory("ALL")
+                                            coroutineScope.launch {
+                                                try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
+
+                                // "FAVORITOS" item
+                                item {
+                                    val favCount = favorites.count { it.kind == "live" }
+                                    TvCategoryFloatingItem(
+                                        title = "FAVORITOS ($favCount)",
+                                        icon = Icons.Default.Star,
+                                        isSelected = isFavoritesCategorySelected,
+                                        iconTint = Color(0xFFFFC107),
+                                        onClick = {
+                                            isFavoritesCategorySelected = true
+                                            coroutineScope.launch {
+                                                try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
+                                            }
+                                        }
+                                    )
+                                }
+
+                                // Categories from Server
+                                items(categories, key = { it.categoryId }) { cat ->
+                                    val isSelected = selectedCat == cat.categoryId && !isFavoritesCategorySelected
+                                    TvCategoryFloatingItem(
+                                        title = cat.categoryName.uppercase(),
+                                        icon = Icons.Default.LiveTv,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            isFavoritesCategorySelected = false
+                                            viewModel.selectLiveCategory(cat.categoryId)
+                                            coroutineScope.launch {
+                                                try { channelsFocusRequester.requestFocus() } catch (_: Exception) {}
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // ==========================================
-                // VENTANA FLOTANTE 2: CANALES (Centro/Derecha)
-                // ==========================================
+                // ==========================================================
+                // VENTANA FLOTANTE 2: CANALES (Aparece con 1er toque / guideMode >= 1)
+                // ==========================================================
                 Surface(
                     modifier = Modifier
                         .width(380.dp)
@@ -773,7 +816,7 @@ private fun TvLiveFullscreenScreen(
                                         onClick = {
                                             selectedChannel = channel
                                             // Pressing a channel plays it and automatically hides guide to full screen video
-                                            showFloatingGuide = false
+                                            guideMode = 0
                                         }
                                     )
                                 }
@@ -787,14 +830,14 @@ private fun TvLiveFullscreenScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clickable { showFloatingGuide = false }
+                        .clickable { guideMode = 0 }
                 )
             }
         }
 
         // --- 4. BOTTOM OSD BANNER (Appears when channel changes or when in full screen) ---
         AnimatedVisibility(
-            visible = showOsdBanner && !showFloatingGuide,
+            visible = showOsdBanner && guideMode == 0,
             enter = fadeIn(animationSpec = androidx.compose.animation.core.tween(260)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = androidx.compose.animation.core.tween(300)),
             exit = fadeOut(animationSpec = androidx.compose.animation.core.tween(220)) + slideOutVertically(targetOffsetY = { it / 2 }, animationSpec = androidx.compose.animation.core.tween(250)),
             modifier = Modifier
