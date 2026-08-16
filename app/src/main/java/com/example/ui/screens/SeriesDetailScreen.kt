@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -61,7 +62,6 @@ import com.example.ui.components.POSTER_FALLBACK
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 
-@OptIn(UnstableApi::class)
 @Composable
 fun SeriesDetailScreen(
     seriesId: String,
@@ -80,10 +80,407 @@ fun SeriesDetailScreen(
         nextEpImage: String?
     ) -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val isTvOrLandscape = configuration.screenWidthDp >= 600
+
+    if (isTvOrLandscape) {
+        SeriesDetailTvScreen(
+            seriesId = seriesId,
+            viewModel = viewModel,
+            onBack = onBack,
+            onPlayEpisode = onPlayEpisode
+        )
+    } else {
+        SeriesDetailPhoneScreen(
+            seriesId = seriesId,
+            viewModel = viewModel,
+            onBack = onBack,
+            onPlayEpisode = onPlayEpisode
+        )
+    }
+}
+
+/**
+ * PANTALLA ORIGINAL DE TELÉFONOS MÓVILES (Vertical / Touch)
+ */
+@Composable
+private fun SeriesDetailPhoneScreen(
+    seriesId: String,
+    viewModel: MainViewModel,
+    onBack: () -> Unit,
+    onPlayEpisode: (
+        url: String,
+        title: String,
+        kind: String,
+        contentId: String,
+        image: String,
+        resumeMs: Long,
+        nextUrl: String?,
+        nextTitle: String?,
+        nextContentId: String?,
+        nextEpImage: String?
+    ) -> Unit
+) {
+    var info by remember { mutableStateOf<SeriesDetailInfo?>(null) }
+    var episodesMap by remember { mutableStateOf<Map<String, List<Episode>>>(emptyMap()) }
+    var selectedSeason by remember { mutableStateOf("1") }
+    var loading by remember { mutableStateOf(true) }
+    var isFav by remember { mutableStateOf(viewModel.isFavorite("series", seriesId)) }
+
+    LaunchedEffect(seriesId) {
+        loading = true
+        val res = XtreamApi.getSeriesDetail(seriesId)
+        info = res.first
+        episodesMap = res.second
+        if (res.second.isNotEmpty()) {
+            selectedSeason = res.second.keys.firstOrNull() ?: "1"
+        }
+        isFav = viewModel.isFavorite("series", seriesId)
+        loading = false
+    }
+
+    BackHandler(onBack = onBack)
+
+    val currentEpisodes = episodesMap[selectedSeason] ?: emptyList()
+    val seriesTitle = info?.name ?: "Serie"
+    val seriesCover = info?.cover ?: info?.backdropPath?.firstOrNull() ?: POSTER_FALLBACK
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(NexusBackground)
+            .testTag("series_detail_phone_screen")
+    ) {
+        if (loading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = NexusPrimary)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Header Backdrop
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp)
+                    ) {
+                        AsyncImage(
+                            model = seriesCover,
+                            contentDescription = seriesTitle,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f), NexusBackground)
+                                    )
+                                )
+                        )
+
+                        // Top bar buttons
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.5f))
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                            }
+                            IconButton(
+                                onClick = {
+                                    isFav = viewModel.toggleFavorite("series", seriesId, seriesTitle, seriesCover)
+                                },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.5f))
+                            ) {
+                                Icon(
+                                    imageVector = if (isFav) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                                    contentDescription = "Favorito",
+                                    tint = if (isFav) NexusPrimary else Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Info Section
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Text(
+                            text = seriesTitle,
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                            color = NexusText
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Metadata row
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val rating = info?.rating?.toString()?.takeIf { it.isNotBlank() && it != "0" }
+                            if (rating != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = NexusPrimary.copy(alpha = 0.2f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.Star, contentDescription = null, tint = NexusPrimary, modifier = Modifier.size(14.dp))
+                                        Text(rating.take(3), color = NexusPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            val year = info?.releaseDate?.take(4) ?: info?.releaseDateAlt?.take(4)
+                            if (!year.isNullOrBlank()) {
+                                Text(year, color = NexusTextSecondary, fontSize = 13.sp)
+                            }
+
+                            info?.genre?.let {
+                                Text(it, color = NexusTextSecondary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+
+                        // Plot
+                        info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = plot,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = NexusTextSecondary,
+                                lineHeight = 20.sp
+                            )
+                        }
+
+                        // Cast
+                        info?.cast?.takeIf { it.isNotBlank() }?.let { cast ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Reparto: $cast",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = NexusTextMuted
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Play first episode button
+                        if (currentEpisodes.isNotEmpty()) {
+                            val firstEp = currentEpisodes.first()
+                            val nextEp = currentEpisodes.getOrNull(1)
+                            Button(
+                                onClick = {
+                                    val url = XtreamApi.getSeriesStreamUrl(firstEp.epId, firstEp.containerExtension ?: "mp4")
+                                    val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+                                    val epImg = firstEp.info?.movieImage ?: seriesCover
+                                    val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
+                                    onPlayEpisode(
+                                        url,
+                                        "$seriesTitle - T${selectedSeason}E${firstEp.epNumber}: ${firstEp.displayTitle}",
+                                        "series",
+                                        seriesId,
+                                        epImg,
+                                        0L,
+                                        nextUrl,
+                                        nextEp?.displayTitle,
+                                        nextEp?.epId,
+                                        nextEpImg
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Reproducir T${selectedSeason}:E${firstEp.epNumber}", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(20.dp))
+                        }
+
+                        // Season Selector Tabs
+                        if (episodesMap.size > 1) {
+                            Text("Temporadas", style = MaterialTheme.typography.titleMedium, color = NexusText, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(episodesMap.keys.toList().sortedBy { it.toIntOrNull() ?: 0 }) { sKey ->
+                                    val isSelected = sKey == selectedSeason
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { selectedSeason = sKey },
+                                        label = { Text("Temporada $sKey") },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = NexusPrimary,
+                                            selectedLabelColor = Color.Black,
+                                            containerColor = NexusSurface,
+                                            labelColor = NexusTextSecondary
+                                        )
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+
+                        // Episodes Header
+                        Text("Episodios (${currentEpisodes.size})", style = MaterialTheme.typography.titleMedium, color = NexusText, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+
+                // Episode list
+                items(currentEpisodes) { ep ->
+                    val epIndex = currentEpisodes.indexOf(ep)
+                    val nextEp = currentEpisodes.getOrNull(epIndex + 1)
+                    val epImage = ep.info?.movieImage ?: seriesCover
+                    val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
+                                val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+                                onPlayEpisode(
+                                    url,
+                                    "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
+                                    "series",
+                                    seriesId,
+                                    epImage,
+                                    0L,
+                                    nextUrl,
+                                    nextEp?.displayTitle,
+                                    nextEp?.epId,
+                                    nextEpImg
+                                )
+                            },
+                        color = NexusSurface,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp, 50.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.Black)
+                            ) {
+                                AsyncImage(
+                                    model = epImage,
+                                    contentDescription = ep.displayTitle,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.PlayCircleOutline,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.8f),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${ep.epNumber}. ${ep.displayTitle}",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = NexusText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                ep.info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
+                                    Text(
+                                        text = plot,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = NexusTextSecondary,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                ep.info?.duration?.takeIf { it.isNotBlank() }?.let { duration ->
+                                    Text(
+                                        text = duration,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = NexusTextMuted
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * PANTALLA EXCLUSIVA PARA TELEVISORES (Android TV / Pantallas Grandes)
+ * Basada fielmente en el video con Mini-Reproductor y Carrusel de Números.
+ */
+@OptIn(UnstableApi::class)
+@Composable
+private fun SeriesDetailTvScreen(
+    seriesId: String,
+    viewModel: MainViewModel,
+    onBack: () -> Unit,
+    onPlayEpisode: (
+        url: String,
+        title: String,
+        kind: String,
+        contentId: String,
+        image: String,
+        resumeMs: Long,
+        nextUrl: String?,
+        nextTitle: String?,
+        nextContentId: String?,
+        nextEpImage: String?
+    ) -> Unit
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val configuration = LocalConfiguration.current
-    val isWideScreen = configuration.screenWidthDp >= 600
 
     var info by remember { mutableStateOf<SeriesDetailInfo?>(null) }
     var episodesMap by remember { mutableStateOf<Map<String, List<Episode>>>(emptyMap()) }
@@ -155,7 +552,7 @@ fun SeriesDetailScreen(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                Log.w("SeriesDetail", "Preview player error: ${error.message}")
+                Log.w("SeriesDetailTv", "Preview player error: ${error.message}")
                 isPreviewLoading = false
                 previewError = true
             }
@@ -240,7 +637,7 @@ fun SeriesDetailScreen(
                     exoPlayer.play()
                 }
             } catch (e: Exception) {
-                Log.e("SeriesDetail", "Error playing preview for ${ep.displayTitle}", e)
+                Log.e("SeriesDetailTv", "Error playing preview for ${ep.displayTitle}", e)
                 isPreviewLoading = false
                 previewError = true
             }
@@ -298,7 +695,7 @@ fun SeriesDetailScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(NexusBackground)
-            .testTag("series_detail_screen")
+            .testTag("series_detail_tv_screen")
     ) {
         // Full Backdrop Wallpaper with Dark Vignette Gradients
         Box(modifier = Modifier.fillMaxSize()) {
@@ -348,7 +745,7 @@ fun SeriesDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .padding(horizontal = if (isWideScreen) 28.dp else 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 28.dp, vertical = 12.dp)
             ) {
                 // Top Navigation Bar (Back and Favorite button)
                 Row(
@@ -424,7 +821,7 @@ fun SeriesDetailScreen(
                                 text = seriesTitle,
                                 style = MaterialTheme.typography.headlineLarge.copy(
                                     fontWeight = FontWeight.Black,
-                                    fontSize = if (isWideScreen) 28.sp else 22.sp,
+                                    fontSize = 28.sp,
                                     color = Color.White,
                                     letterSpacing = (-0.5).sp
                                 ),
@@ -592,32 +989,30 @@ fun SeriesDetailScreen(
                         }
                     }
 
-                    // Middle Poster Artwork Banner (Visible on wide screens)
-                    if (isWideScreen) {
-                        Surface(
-                            modifier = Modifier
-                                .width(120.dp)
-                                .height(175.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .shadow(16.dp, RoundedCornerShape(12.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.Black
-                        ) {
-                            AsyncImage(
-                                model = seriesCover,
-                                contentDescription = seriesTitle,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
+                    // Middle Poster Artwork Banner (TV layout)
+                    Surface(
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(175.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .shadow(16.dp, RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.Black
+                    ) {
+                        AsyncImage(
+                            model = seriesCover,
+                            contentDescription = seriesTitle,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
 
                     // Right Column: Embedded Live Video Preview Player
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(if (isWideScreen) 210.dp else 160.dp)
+                            .height(210.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(Color.Black)
                             .border(1.5.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
@@ -778,8 +1173,6 @@ fun SeriesDetailScreen(
                                 val isSelected = selectedEpisode?.epId == ep.epId
                                 var isFocused by remember { mutableStateOf(false) }
 
-                                val isHighlight = isSelected || isFocused
-
                                 Surface(
                                     modifier = Modifier
                                         .width(62.dp)
@@ -802,7 +1195,7 @@ fun SeriesDetailScreen(
                                         .testTag("episode_block_${ep.epNumber}"),
                                     shape = RoundedCornerShape(8.dp),
                                     color = if (isSelected) {
-                                        Color(0xFF007AFF) // Vibrant Blue / Cyan active block like in video
+                                        Color(0xFF007AFF) // Vibrant Blue active block
                                     } else if (isFocused) {
                                         Color.White.copy(alpha = 0.28f)
                                     } else {
@@ -942,7 +1335,7 @@ fun SeriesDetailScreen(
                                                     it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
                                                 }
                                             } catch (e: Exception) {
-                                                Log.e("SeriesDetail", "Error selecting audio track", e)
+                                                Log.e("SeriesDetailTv", "Error selecting audio track", e)
                                             }
                                         },
                                     shape = RoundedCornerShape(8.dp),
@@ -980,7 +1373,7 @@ fun SeriesDetailScreen(
                                         isSubtitlesDisabled = true
                                         availableSubtitleTracks = availableSubtitleTracks.map { it.copy(isSelected = false) }
                                     } catch (e: Exception) {
-                                        Log.e("SeriesDetail", "Error disabling subtitles", e)
+                                        Log.e("SeriesDetailTv", "Error disabling subtitles", e)
                                     }
                                 },
                             shape = RoundedCornerShape(8.dp),
@@ -1017,7 +1410,7 @@ fun SeriesDetailScreen(
                                                 it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
                                             }
                                         } catch (e: Exception) {
-                                            Log.e("SeriesDetail", "Error selecting subtitle", e)
+                                            Log.e("SeriesDetailTv", "Error selecting subtitle", e)
                                         }
                                     },
                                 shape = RoundedCornerShape(8.dp),
