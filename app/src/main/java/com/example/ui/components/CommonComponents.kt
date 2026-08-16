@@ -232,9 +232,11 @@ fun MediaPosterCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
+    val isHighlighted = isFocused || isSelected
+
     Column(
         modifier = modifier
-            .width(if (isSelected || isFocused) 138.dp else 126.dp)
+            .width(if (isHighlighted) 140.dp else 126.dp)
             .focusable()
             .onFocusChanged { state ->
                 isFocused = state.isFocused
@@ -253,8 +255,8 @@ fun MediaPosterCard(
                 .clip(RoundedCornerShape(12.dp))
                 .background(NexusSurfaceVariant)
                 .border(
-                    if (isFocused) 2.5.dp else if (isSelected) 2.dp else 1.dp,
-                    if (isFocused) Color.White else if (isSelected) NexusPrimary else NexusBorder,
+                    if (isHighlighted) 2.5.dp else 1.dp,
+                    if (isHighlighted) NexusPrimary else NexusBorder,
                     RoundedCornerShape(12.dp)
                 )
         ) {

@@ -1,7 +1,7 @@
 {
-  "versionCode": 7,
-  "versionName": "1.0.6",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.6/app-debug.apk",
-  "changelog": "Menú lateral flotante más compacto y estilizado; separación de canales y categorías",
+  "versionCode": 8,
+  "versionName": "1.0.7",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.7/app-debug.apk",
+  "changelog": "Categorías en ventana flotante lateral, eliminación de buscador y menú superior, marco rojo dinámico al navegar y apertura a doble toque",
   "isMandatory": false
 }
