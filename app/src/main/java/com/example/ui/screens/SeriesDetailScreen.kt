@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -61,6 +62,7 @@ import com.example.data.models.SeriesDetailInfo
 import com.example.ui.components.POSTER_FALLBACK
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun SeriesDetailScreen(
@@ -87,8 +89,7 @@ fun SeriesDetailScreen(
         SeriesDetailTvScreen(
             seriesId = seriesId,
             viewModel = viewModel,
-            onBack = onBack,
-            onPlayEpisode = onPlayEpisode
+            onBack = onBack
         )
     } else {
         SeriesDetailPhoneScreen(
@@ -458,26 +459,17 @@ private fun SeriesDetailPhoneScreen(
 
 /**
  * PANTALLA EXCLUSIVA PARA TELEVISORES (Android TV / Pantallas Grandes)
- * Basada fielmente en el video con Mini-Reproductor y Carrusel de Números.
+ * - Sin botones flotantes superiores (se vuelve con la tecla atrás del mando).
+ * - Botón "Pantalla completa" con el mismo estilo unificado.
+ * - Navegación D-Pad: foco AZUL (#007AFF), seleccionado ROJO (#E50914).
+ * - Pantalla completa in situ: se expande inmediatamente sin recargar ni reiniciar el reproductor.
  */
 @OptIn(UnstableApi::class)
 @Composable
 private fun SeriesDetailTvScreen(
     seriesId: String,
     viewModel: MainViewModel,
-    onBack: () -> Unit,
-    onPlayEpisode: (
-        url: String,
-        title: String,
-        kind: String,
-        contentId: String,
-        image: String,
-        resumeMs: Long,
-        nextUrl: String?,
-        nextTitle: String?,
-        nextContentId: String?,
-        nextEpImage: String?
-    ) -> Unit
+    onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -487,14 +479,20 @@ private fun SeriesDetailTvScreen(
     var selectedSeason by remember { mutableStateOf("1") }
     var selectedEpisode by remember { mutableStateOf<Episode?>(null) }
     var loading by remember { mutableStateOf(true) }
-    var isFav by remember { mutableStateOf(viewModel.isFavorite("series", seriesId)) }
 
     // Dialogs & Expanded states
     var showSeasonPicker by remember { mutableStateOf(false) }
     var showTracksDialog by remember { mutableStateOf(false) }
     var isSynopsisExpanded by remember { mutableStateOf(false) }
 
-    // Mini ExoPlayer for embedded preview
+    // Full screen in-place mode
+    var isFullScreenMode by remember { mutableStateOf(false) }
+    var showPlayerControls by remember { mutableStateOf(true) }
+    var isPlaying by remember { mutableStateOf(true) }
+    var currentPositionMs by remember { mutableLongStateOf(0L) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+
+    // ExoPlayer for continuous preview and full screen playback
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
             playWhenReady = true
@@ -505,21 +503,27 @@ private fun SeriesDetailTvScreen(
     var isPreviewLoading by remember { mutableStateOf(false) }
     var previewError by remember { mutableStateOf(false) }
 
-    // Audio & Subtitle tracks for the embedded preview
+    // Audio & Subtitle tracks
     var availableAudioTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
     var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
     var isSubtitlesDisabled by remember { mutableStateOf(false) }
 
-    // Stop playback when activity leaves foreground / dispose
+    val currentEpisodes = remember(episodesMap, selectedSeason) {
+        episodesMap[selectedSeason] ?: emptyList()
+    }
+
+    // Stop playback when leaving foreground
     DisposableEffect(lifecycleOwner, exoPlayer) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
                     exoPlayer.pause()
                     exoPlayer.playWhenReady = false
+                    isPlaying = false
                 }
                 Lifecycle.Event.ON_RESUME -> {
                     exoPlayer.playWhenReady = true
+                    isPlaying = true
                 }
                 Lifecycle.Event.ON_DESTROY -> {
                     exoPlayer.stop()
@@ -536,7 +540,7 @@ private fun SeriesDetailTvScreen(
         }
     }
 
-    // ExoPlayer event listener
+    // ExoPlayer event listener & Auto-advance next episode
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -545,14 +549,26 @@ private fun SeriesDetailTvScreen(
                     Player.STATE_READY -> {
                         isPreviewLoading = false
                         previewError = false
+                        durationMs = exoPlayer.duration.coerceAtLeast(0L)
                     }
-                    Player.STATE_ENDED -> isPreviewLoading = false
+                    Player.STATE_ENDED -> {
+                        isPreviewLoading = false
+                        // Automatically play next episode
+                        val epIndex = currentEpisodes.indexOfFirst { it.epId == selectedEpisode?.epId }
+                        if (epIndex >= 0 && epIndex + 1 < currentEpisodes.size) {
+                            selectedEpisode = currentEpisodes[epIndex + 1]
+                        }
+                    }
                     Player.STATE_IDLE -> {}
                 }
             }
 
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+
             override fun onPlayerError(error: PlaybackException) {
-                Log.w("SeriesDetailTv", "Preview player error: ${error.message}")
+                Log.w("SeriesDetailTv", "Player error: ${error.message}")
                 isPreviewLoading = false
                 previewError = true
             }
@@ -598,6 +614,23 @@ private fun SeriesDetailTvScreen(
         onDispose { exoPlayer.removeListener(listener) }
     }
 
+    // Periodic time tracker for playback position
+    LaunchedEffect(isPlaying, isFullScreenMode) {
+        while (true) {
+            currentPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+            durationMs = exoPlayer.duration.coerceAtLeast(0L)
+            delay(500)
+        }
+    }
+
+    // Auto-hide controls in full screen after 4 seconds
+    LaunchedEffect(showPlayerControls, isFullScreenMode) {
+        if (isFullScreenMode && showPlayerControls) {
+            delay(4000)
+            showPlayerControls = false
+        }
+    }
+
     // Load series details & episodes
     LaunchedEffect(seriesId) {
         loading = true
@@ -609,22 +642,17 @@ private fun SeriesDetailTvScreen(
             selectedSeason = firstSeason
             selectedEpisode = res.second[firstSeason]?.firstOrNull()
         }
-        isFav = viewModel.isFavorite("series", seriesId)
         loading = false
     }
 
-    val currentEpisodes = remember(episodesMap, selectedSeason) {
-        episodesMap[selectedSeason] ?: emptyList()
-    }
-
-    // When current season episodes update, ensure selectedEpisode is valid
+    // Ensure selectedEpisode is valid when season changes
     LaunchedEffect(currentEpisodes) {
         if (selectedEpisode == null || currentEpisodes.none { it.epId == selectedEpisode?.epId }) {
             selectedEpisode = currentEpisodes.firstOrNull()
         }
     }
 
-    // Update mini preview player when selected episode changes
+    // Update preview player media item when selected episode changes
     LaunchedEffect(selectedEpisode) {
         selectedEpisode?.let { ep ->
             try {
@@ -635,52 +663,24 @@ private fun SeriesDetailTvScreen(
                     exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
                     exoPlayer.prepare()
                     exoPlayer.play()
+                    isPlaying = true
                 }
             } catch (e: Exception) {
-                Log.e("SeriesDetailTv", "Error playing preview for ${ep.displayTitle}", e)
+                Log.e("SeriesDetailTv", "Error loading episode stream for ${ep.displayTitle}", e)
                 isPreviewLoading = false
                 previewError = true
             }
         }
     }
 
-    // Function to launch full screen playback for the currently selected episode
-    fun launchFullScreen() {
-        val ep = selectedEpisode ?: currentEpisodes.firstOrNull() ?: return
-        val epIndex = currentEpisodes.indexOf(ep)
-        val nextEp = currentEpisodes.getOrNull(epIndex + 1)
-        val image = info?.cover ?: info?.backdropPath?.firstOrNull() ?: POSTER_FALLBACK
-        val epImage = ep.info?.movieImage ?: image
-
-        val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
-        val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
-        val nextTitle = nextEp?.displayTitle
-        val nextContentId = nextEp?.epId
-        val nextEpImg = nextEp?.info?.movieImage ?: image
-
-        val seriesTitle = info?.name ?: "Serie"
-        val resumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-
-        // Pause preview before navigating to full screen
-        try {
-            exoPlayer.pause()
-        } catch (_: Exception) {}
-
-        onPlayEpisode(
-            url,
-            "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
-            "series",
-            seriesId,
-            epImage,
-            resumeMs,
-            nextUrl,
-            nextTitle,
-            nextContentId,
-            nextEpImg
-        )
+    // Handle back button on TV remote: If in full screen, collapse to detail. Otherwise exit screen.
+    BackHandler {
+        if (isFullScreenMode) {
+            isFullScreenMode = false
+        } else {
+            onBack()
+        }
     }
-
-    BackHandler(onBack = onBack)
 
     val seriesTitle = info?.name ?: "Serie"
     val seriesCover = info?.cover ?: info?.backdropPath?.firstOrNull() ?: POSTER_FALLBACK
@@ -691,544 +691,799 @@ private fun SeriesDetailTvScreen(
     val castText = info?.cast?.takeIf { it.isNotBlank() } ?: "Sebastián Martínez, Juliette Pardau, Hanny Vizcaíno, Carlos Camacho, Laura de León"
     val plotText = info?.plot?.takeIf { it.isNotBlank() } ?: "Disfruta de todos los episodios completos en alta definición y con la mejor calidad de audio."
 
+    // Unified TV Colors
+    val tvFocusBlue = Color(0xFF007AFF)      // AZUL al pasar el control remoto (Focus)
+    val tvSelectedRed = Color(0xFFE50914)    // ROJO al seleccionarlo (Active / Selected)
+    val tvButtonDefaultBg = Color.White.copy(alpha = 0.14f)
+    val tvButtonDefaultBorder = Color.White.copy(alpha = 0.22f)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(NexusBackground)
             .testTag("series_detail_tv_screen")
     ) {
-        // Full Backdrop Wallpaper with Dark Vignette Gradients
-        Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = seriesCover,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+        if (!isFullScreenMode) {
+            // Full Backdrop Wallpaper with Dark Vignette Gradients
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = seriesCover,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
 
-            // Dark Multilayer Vignette
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = 0.82f),
-                                Color(0xFF0D0E15).copy(alpha = 0.90f),
-                                Color(0xFF08090E).copy(alpha = 0.98f)
+                // Dark Multilayer Vignette
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.82f),
+                                    Color(0xFF0D0E15).copy(alpha = 0.90f),
+                                    Color(0xFF08090E).copy(alpha = 0.98f)
+                                )
                             )
                         )
-                    )
-            )
+                )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = 0.92f),
-                                Color.Black.copy(alpha = 0.65f),
-                                Color.Transparent
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.92f),
+                                    Color.Black.copy(alpha = 0.65f),
+                                    Color.Transparent
+                                )
                             )
                         )
-                    )
-            )
-        }
-
-        if (loading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NexusPrimary)
+                )
             }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(horizontal = 28.dp, vertical = 12.dp)
-            ) {
-                // Top Navigation Bar (Back and Favorite button)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        onClick = onBack,
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.Black.copy(alpha = 0.55f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                        modifier = Modifier.testTag("series_back_btn")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White, modifier = Modifier.size(18.dp))
-                            Text("Volver", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
 
-                    Surface(
-                        onClick = {
-                            isFav = viewModel.toggleFavorite("series", seriesId, seriesTitle, seriesCover)
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.Black.copy(alpha = 0.55f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                        modifier = Modifier.testTag("series_fav_btn")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isFav) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
-                                contentDescription = "Favorito",
-                                tint = if (isFav) NexusPrimary else Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(if (isFav) "Guardado" else "Añadir a Favoritos", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
+            if (loading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = tvFocusBlue)
                 }
-
-                // Main Info & Video Row (Top Half Layout matching reference video)
-                Row(
+            } else {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .padding(horizontal = 28.dp, vertical = 18.dp)
                 ) {
-                    // Left Column: Series metadata & Actions
-                    Column(
+                    // Main Info & Video Row (Top Half)
+                    Row(
                         modifier = Modifier
-                            .weight(1.1f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.Center
+                            .fillMaxWidth()
+                            .weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Title + Rating Badge (Cyan square [ 7 ])
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        // Left Column: Series metadata & Actions
+                        Column(
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Text(
-                                text = seriesTitle,
-                                style = MaterialTheme.typography.headlineLarge.copy(
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 28.sp,
-                                    color = Color.White,
-                                    letterSpacing = (-0.5).sp
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-
-                            // Cyan/Sky-blue Rating Box
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFF00B0FF),
-                                modifier = Modifier.padding(top = 2.dp)
+                            // Title + Rating Badge (Cyan square [ 7 ])
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Text(
-                                    text = cleanRatingNumber,
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    text = seriesTitle,
+                                    style = MaterialTheme.typography.headlineLarge.copy(
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 28.sp,
+                                        color = Color.White,
+                                        letterSpacing = (-0.5).sp
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
+
+                                // Cyan/Sky-blue Rating Box
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFF00B0FF),
+                                    modifier = Modifier.padding(top = 2.dp)
+                                ) {
+                                    Text(
+                                        text = cleanRatingNumber,
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Black,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
-                        // Air Date / Subtitle line: "2026-07-20 | Pa' Seguirte Queriendo (2026)"
-                        val dateLine = if (releaseYear.isNotBlank()) "$releaseYear | $seriesTitle" else seriesTitle
-                        Text(
-                            text = dateLine,
-                            color = Color.White.copy(alpha = 0.65f),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Episode Tag: "T1 - E1" in Orange / Amber
-                        val epNumber = selectedEpisode?.epNumber ?: 1
-                        Text(
-                            text = "T$selectedSeason - E$epNumber",
-                            color = Color(0xFFFF9800),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.5.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Actores
-                        Row(modifier = Modifier.fillMaxWidth()) {
+                            // Air Date / Subtitle line: "2026-07-20 | Pa' Seguirte Queriendo (2026)"
+                            val dateLine = if (releaseYear.isNotBlank()) "$releaseYear | $seriesTitle" else seriesTitle
                             Text(
-                                text = "Actores: ",
-                                color = Color.White,
+                                text = dateLine,
+                                color = Color.White.copy(alpha = 0.65f),
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = castText,
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                        }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
-                        // Sinopsis
-                        Row(modifier = Modifier.fillMaxWidth()) {
+                            // Episode Tag: "T1 - E1" in Orange / Amber
+                            val epNumber = selectedEpisode?.epNumber ?: 1
                             Text(
-                                text = "Sinopsis: ",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "T$selectedSeason - E$epNumber",
+                                color = Color(0xFFFF9800),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp
                             )
-                            Text(
-                                text = plotText,
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 12.sp,
-                                maxLines = if (isSynopsisExpanded) 4 else 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
-                        // Action Buttons: [ ⛶ Pantalla completa ] and [ 💬 Idioma y subtítulos ]
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Primary Orange Button "Pantalla completa"
-                            var isFullBtnFocused by remember { mutableStateOf(false) }
-                            Button(
-                                onClick = { launchFullScreen() },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFFF9800),
-                                    contentColor = Color.White
-                                ),
-                                border = if (isFullBtnFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null,
-                                modifier = Modifier
-                                    .height(42.dp)
-                                    .focusable()
-                                    .onFocusChanged { isFullBtnFocused = it.isFocused }
-                                    .testTag("btn_series_fullscreen")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Tv,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                            // Actores
+                            Row(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = "Pantalla completa",
+                                    text = "Actores: ",
                                     color = Color.White,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+                                Text(
+                                    text = castText,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
 
-                            // Secondary Translucent Pill Button "Idioma y subtítulos"
-                            var isTracksBtnFocused by remember { mutableStateOf(false) }
-                            Surface(
-                                onClick = { showTracksDialog = true },
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color.White.copy(alpha = 0.18f),
-                                border = if (isTracksBtnFocused) {
-                                    androidx.compose.foundation.BorderStroke(2.dp, Color.White)
-                                } else {
-                                    androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
-                                },
-                                modifier = Modifier
-                                    .height(42.dp)
-                                    .focusable()
-                                    .onFocusChanged { isTracksBtnFocused = it.isFocused }
-                                    .testTag("btn_series_tracks")
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            // Sinopsis
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "Sinopsis: ",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = plotText,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    maxLines = if (isSynopsisExpanded) 4 else 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Action Buttons: [ ⛶ Pantalla completa ] and [ 💬 Idioma y subtítulos ]
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
+                                // Button "Pantalla completa" (Same style as others, Blue on focus)
+                                var isFullBtnFocused by remember { mutableStateOf(false) }
+                                Surface(
+                                    onClick = {
+                                        isFullScreenMode = true
+                                        showPlayerControls = true
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
+                                    border = if (isFullBtnFocused) {
+                                        androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                    } else {
+                                        androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
+                                    },
                                     modifier = Modifier
-                                        .fillMaxHeight()
-                                        .padding(horizontal = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        .height(42.dp)
+                                        .focusable()
+                                        .onFocusChanged { isFullBtnFocused = it.isFocused }
+                                        .testTag("btn_series_fullscreen")
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ChatBubbleOutline,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Text(
-                                        text = "Idioma y subtítulos",
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .padding(horizontal = 14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Tv,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = "Pantalla completa",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
-                            }
-                        }
-                    }
 
-                    // Middle Poster Artwork Banner (TV layout)
-                    Surface(
-                        modifier = Modifier
-                            .width(120.dp)
-                            .height(175.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .shadow(16.dp, RoundedCornerShape(12.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.Black
-                    ) {
-                        AsyncImage(
-                            model = seriesCover,
-                            contentDescription = seriesTitle,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    // Right Column: Embedded Live Video Preview Player
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(210.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.Black)
-                            .border(1.5.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
-                            .clickable { launchFullScreen() }
-                            .testTag("series_preview_player")
-                    ) {
-                        AndroidView(
-                            factory = { ctx ->
-                                PlayerView(ctx).apply {
-                                    player = exoPlayer
-                                    useController = false
-                                    keepScreenOn = true
-                                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                    layoutParams = FrameLayout.LayoutParams(
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.MATCH_PARENT
-                                    )
-                                }
-                            },
-                            update = { playerView ->
-                                playerView.player = exoPlayer
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-
-                        // Loading spinner
-                        if (isPreviewLoading) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.4f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(color = Color(0xFFFF9800), modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
-                            }
-                        }
-
-                        // Preview Error / Fallback
-                        if (previewError) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.7f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.PlayCircleOutline, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(40.dp))
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text("Pulse para reproducir", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                // Secondary Button "Idioma y subtítulos" (Blue on focus)
+                                var isTracksBtnFocused by remember { mutableStateOf(false) }
+                                Surface(
+                                    onClick = { showTracksDialog = true },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isTracksBtnFocused) tvFocusBlue else tvButtonDefaultBg,
+                                    border = if (isTracksBtnFocused) {
+                                        androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                    } else {
+                                        androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
+                                    },
+                                    modifier = Modifier
+                                        .height(42.dp)
+                                        .focusable()
+                                        .onFocusChanged { isTracksBtnFocused = it.isFocused }
+                                        .testTag("btn_series_tracks")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .padding(horizontal = 14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ChatBubbleOutline,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                        Text(
+                                            text = "Idioma y subtítulos",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        // Fullscreen quick icon overlay in top-right
+                        // Middle Poster Artwork Banner (TV layout)
+                        Surface(
+                            modifier = Modifier
+                                .width(120.dp)
+                                .height(175.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .shadow(16.dp, RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.Black
+                        ) {
+                            AsyncImage(
+                                model = seriesCover,
+                                contentDescription = seriesTitle,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        // Right Column: Embedded Live Video Preview Player
+                        var isPreviewFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp)
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f)),
-                            contentAlignment = Alignment.Center
+                                .weight(1f)
+                                .height(210.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.Black)
+                                .border(
+                                    if (isPreviewFocused) 2.5.dp else 1.5.dp,
+                                    if (isPreviewFocused) tvFocusBlue else Color.White.copy(alpha = 0.25f),
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .focusable()
+                                .onFocusChanged { isPreviewFocused = it.isFocused }
+                                .clickable {
+                                    isFullScreenMode = true
+                                    showPlayerControls = true
+                                }
+                                .testTag("series_preview_player")
                         ) {
-                            Icon(Icons.Default.Fullscreen, contentDescription = "Pantalla completa", tint = Color.White, modifier = Modifier.size(18.dp))
+                            AndroidView(
+                                factory = { ctx ->
+                                    PlayerView(ctx).apply {
+                                        player = exoPlayer
+                                        useController = false
+                                        keepScreenOn = true
+                                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                        layoutParams = FrameLayout.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
+                                    }
+                                },
+                                update = { playerView ->
+                                    playerView.player = exoPlayer
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            // Loading spinner
+                            if (isPreviewLoading) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.4f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = tvFocusBlue, modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
+                                }
+                            }
+
+                            // Preview Error / Fallback
+                            if (previewError) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.7f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.PlayCircleOutline, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(40.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Pulse para reproducir", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            // Fullscreen quick icon overlay in top-right
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.6f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Fullscreen, contentDescription = "Pantalla completa", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Bottom Section: Season & Range Selector + Horizontal Episode Numbers Carousel
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Season and Range pill selectors
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Season Picker Button (Blue on focus)
+                            var isSeasonBtnFocused by remember { mutableStateOf(false) }
+                            Surface(
+                                onClick = {
+                                    if (episodesMap.size > 1) {
+                                        showSeasonPicker = true
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSeasonBtnFocused) tvFocusBlue else tvButtonDefaultBg,
+                                border = if (isSeasonBtnFocused) {
+                                    androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                } else {
+                                    androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
+                                },
+                                modifier = Modifier
+                                    .focusable()
+                                    .onFocusChanged { isSeasonBtnFocused = it.isFocused }
+                                    .testTag("btn_select_season")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Temporada $selectedSeason",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (episodesMap.size > 1) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDropDown,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Range pill: e.g. "1-13"
+                            if (currentEpisodes.isNotEmpty()) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = tvButtonDefaultBg,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
+                                ) {
+                                    Text(
+                                        text = "1-${currentEpisodes.size}",
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Horizontal Row of Numbered Episode Blocks:
+                        // Focus = AZUL (tvFocusBlue), Seleccionado = ROJO (tvSelectedRed)
+                        if (currentEpisodes.isEmpty()) {
+                            Text(
+                                text = "No hay episodios disponibles para esta temporada.",
+                                color = NexusTextSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
+                        } else {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(vertical = 4.dp)
+                            ) {
+                                items(currentEpisodes, key = { it.epId }) { ep ->
+                                    val isSelected = selectedEpisode?.epId == ep.epId
+                                    var isFocused by remember { mutableStateOf(false) }
+
+                                    Surface(
+                                        modifier = Modifier
+                                            .width(62.dp)
+                                            .height(50.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .focusable()
+                                            .onFocusChanged { state ->
+                                                isFocused = state.isFocused
+                                            }
+                                            .clickable {
+                                                if (isSelected) {
+                                                    // Toggle in-place full screen seamlessly
+                                                    isFullScreenMode = true
+                                                    showPlayerControls = true
+                                                } else {
+                                                    // Select this episode (turns Red and loads preview)
+                                                    selectedEpisode = ep
+                                                }
+                                            }
+                                            .testTag("episode_block_${ep.epNumber}"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = when {
+                                            isFocused -> tvFocusBlue      // Foco azul con control remoto
+                                            isSelected -> tvSelectedRed   // Seleccionado en ROJO
+                                            else -> tvButtonDefaultBg    // Por defecto
+                                        },
+                                        border = if (isFocused) {
+                                            androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                        } else if (isSelected) {
+                                            androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFF5252))
+                                        } else {
+                                            androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
+                                        }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxSize(),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Default.PlayArrow,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                            }
+                                            Text(
+                                                text = "${ep.epNumber}",
+                                                color = Color.White,
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Bottom Section: Season & Range Selector + Horizontal Episode Numbers Carousel
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Season and Range pill selectors
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            }
+        } else {
+            // ==========================================
+            // MODO PANTALLA COMPLETA IN SITU (SIN RECARGAR)
+            // ==========================================
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
                     ) {
-                        // Season Picker Button
-                        var isSeasonBtnFocused by remember { mutableStateOf(false) }
-                        Surface(
-                            onClick = {
-                                if (episodesMap.size > 1) {
-                                    showSeasonPicker = true
-                                }
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF1E202B),
-                            border = if (isSeasonBtnFocused) {
-                                androidx.compose.foundation.BorderStroke(2.dp, Color.White)
-                            } else {
-                                androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
-                            },
+                        showPlayerControls = !showPlayerControls
+                    }
+                    .testTag("tv_fullscreen_container")
+            ) {
+                // Video Player filling complete screen
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            player = exoPlayer
+                            useController = false
+                            keepScreenOn = true
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            layoutParams = FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                        }
+                    },
+                    update = { playerView ->
+                        playerView.player = exoPlayer
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Buffering indicator
+                if (isPreviewLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = tvFocusBlue, modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
+                    }
+                }
+
+                // Full Screen Controls Overlay
+                AnimatedVisibility(
+                    visible = showPlayerControls,
+                    enter = fadeIn(tween(200)),
+                    exit = fadeOut(tween(200)),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.Black.copy(alpha = 0.75f),
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.85f)
+                                    )
+                                )
+                            )
+                    ) {
+                        // Top Bar in Full Screen
+                        Row(
                             modifier = Modifier
-                                .focusable()
-                                .onFocusChanged { isSeasonBtnFocused = it.isFocused }
-                                .testTag("btn_select_season")
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 24.dp, vertical = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                Text(
-                                    text = "Temporada $selectedSeason",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                if (episodesMap.size > 1) {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowDropDown,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                // Collapse / Exit Full Screen button (Blue on focus)
+                                var isExitFocused by remember { mutableStateOf(false) }
+                                Surface(
+                                    onClick = { isFullScreenMode = false },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isExitFocused) tvFocusBlue else Color.Black.copy(alpha = 0.5f),
+                                    border = if (isExitFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                                    modifier = Modifier
+                                        .focusable()
+                                        .onFocusChanged { isExitFocused = it.isFocused }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.FullscreenExit, contentDescription = "Salir", tint = Color.White, modifier = Modifier.size(18.dp))
+                                        Text("Salir", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                Column {
+                                    Text(
+                                        text = seriesTitle,
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
+                                    selectedEpisode?.let { ep ->
+                                        Text(
+                                            text = "T${selectedSeason}:E${ep.epNumber} - ${ep.displayTitle}",
+                                            color = Color(0xFFFF9800),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Audio & Subtitles button in Full Screen (Blue on focus)
+                            var isTracksFsFocused by remember { mutableStateOf(false) }
+                            Surface(
+                                onClick = { showTracksDialog = true },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isTracksFsFocused) tvFocusBlue else Color.Black.copy(alpha = 0.5f),
+                                border = if (isTracksFsFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                                modifier = Modifier
+                                    .focusable()
+                                    .onFocusChanged { isTracksFsFocused = it.isFocused }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+                                    Text("Audio y Subtítulos", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
 
-                        // Range pill: e.g. "1-13"
-                        if (currentEpisodes.isNotEmpty()) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color.White.copy(alpha = 0.12f),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                        // Center Play / Pause and Skip 10s Controls
+                        Row(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalArrangement = Arrangement.spacedBy(28.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // -10s Rewind button
+                            var isRewindFocused by remember { mutableStateOf(false) }
+                            IconButton(
+                                onClick = {
+                                    exoPlayer.seekTo((exoPlayer.currentPosition - 10000).coerceAtLeast(0L))
+                                },
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isRewindFocused) tvFocusBlue else Color.Black.copy(alpha = 0.55f))
+                                    .border(if (isRewindFocused) 2.dp else 1.dp, Color.White, CircleShape)
+                                    .focusable()
+                                    .onFocusChanged { isRewindFocused = it.isFocused }
                             ) {
-                                Text(
-                                    text = "1-${currentEpisodes.size}",
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                Icon(Icons.Default.Replay10, contentDescription = "-10s", tint = Color.White, modifier = Modifier.size(28.dp))
+                            }
+
+                            // Play / Pause center button
+                            var isPlayCenterFocused by remember { mutableStateOf(false) }
+                            IconButton(
+                                onClick = {
+                                    if (exoPlayer.isPlaying) {
+                                        exoPlayer.pause()
+                                        isPlaying = false
+                                    } else {
+                                        exoPlayer.play()
+                                        isPlaying = true
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isPlayCenterFocused) tvFocusBlue else Color.White.copy(alpha = 0.25f))
+                                    .border(if (isPlayCenterFocused) 2.5.dp else 1.5.dp, Color.White, CircleShape)
+                                    .focusable()
+                                    .onFocusChanged { isPlayCenterFocused = it.isFocused }
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(38.dp)
                                 )
                             }
+
+                            // +10s Forward button
+                            var isForwardFocused by remember { mutableStateOf(false) }
+                            IconButton(
+                                onClick = {
+                                    val d = exoPlayer.duration.coerceAtLeast(0L)
+                                    val target = if (d > 0) (exoPlayer.currentPosition + 10000).coerceAtMost(d) else (exoPlayer.currentPosition + 10000)
+                                    exoPlayer.seekTo(target)
+                                },
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isForwardFocused) tvFocusBlue else Color.Black.copy(alpha = 0.55f))
+                                    .border(if (isForwardFocused) 2.dp else 1.dp, Color.White, CircleShape)
+                                    .focusable()
+                                    .onFocusChanged { isForwardFocused = it.isFocused }
+                            ) {
+                                Icon(Icons.Default.Forward10, contentDescription = "+10s", tint = Color.White, modifier = Modifier.size(28.dp))
+                            }
                         }
-                    }
 
-                    // Horizontal Row of Numbered Episode Blocks (like [ ▶ 1 ], [ 2 ], [ 3 ], etc.)
-                    if (currentEpisodes.isEmpty()) {
-                        Text(
-                            text = "No hay episodios disponibles para esta temporada.",
-                            color = NexusTextSecondary,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(vertical = 12.dp)
-                        )
-                    } else {
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(vertical = 4.dp)
+                        // Bottom Timeline & Next Episode Bar
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(horizontal = 28.dp, vertical = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(currentEpisodes, key = { it.epId }) { ep ->
-                                val isSelected = selectedEpisode?.epId == ep.epId
-                                var isFocused by remember { mutableStateOf(false) }
+                            // Progress bar
+                            val progress = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = tvFocusBlue,
+                                trackColor = Color.White.copy(alpha = 0.3f)
+                            )
 
-                                Surface(
-                                    modifier = Modifier
-                                        .width(62.dp)
-                                        .height(50.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .focusable()
-                                        .onFocusChanged { state ->
-                                            isFocused = state.isFocused
-                                            if (state.isFocused) {
-                                                selectedEpisode = ep
-                                            }
-                                        }
-                                        .clickable {
-                                            if (isSelected) {
-                                                launchFullScreen()
-                                            } else {
-                                                selectedEpisode = ep
-                                            }
-                                        }
-                                        .testTag("episode_block_${ep.epNumber}"),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) {
-                                        Color(0xFF007AFF) // Vibrant Blue active block
-                                    } else if (isFocused) {
-                                        Color.White.copy(alpha = 0.28f)
-                                    } else {
-                                        Color.White.copy(alpha = 0.12f)
-                                    },
-                                    border = if (isFocused) {
-                                        androidx.compose.foundation.BorderStroke(2.dp, Color.White)
-                                    } else if (isSelected) {
-                                        androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF64B5F6))
-                                    } else {
-                                        androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
-                                    }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${formatPlaybackTime(currentPositionMs)} / ${formatPlaybackTime(durationMs)}",
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                // Next episode quick button in full screen
+                                val currentIdx = currentEpisodes.indexOfFirst { it.epId == selectedEpisode?.epId }
+                                if (currentIdx >= 0 && currentIdx + 1 < currentEpisodes.size) {
+                                    val nextEp = currentEpisodes[currentIdx + 1]
+                                    var isNextEpFocused by remember { mutableStateOf(false) }
+                                    Surface(
+                                        onClick = {
+                                            selectedEpisode = nextEp
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isNextEpFocused) tvFocusBlue else Color.White.copy(alpha = 0.18f),
+                                        border = if (isNextEpFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null,
+                                        modifier = Modifier
+                                            .focusable()
+                                            .onFocusChanged { isNextEpFocused = it.isFocused }
                                     ) {
-                                        if (isSelected) {
-                                            Icon(
-                                                imageVector = Icons.Default.PlayArrow,
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(16.dp)
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "Siguiente: E${nextEp.epNumber}",
+                                                color = Color.White,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
                                             )
-                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                         }
-                                        Text(
-                                            text = "${ep.epNumber}",
-                                            color = Color.White,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Black
-                                        )
                                     }
                                 }
                             }
@@ -1264,7 +1519,11 @@ private fun SeriesDetailTvScreen(
                                         showSeasonPicker = false
                                     },
                                 shape = RoundedCornerShape(10.dp),
-                                color = if (isRowFocused) Color(0xFFFF9800) else if (isCurrent) Color(0xFF007AFF) else Color.White.copy(alpha = 0.1f),
+                                color = when {
+                                    isRowFocused -> tvFocusBlue      // Foco azul
+                                    isCurrent -> tvSelectedRed       // Seleccionado en rojo
+                                    else -> Color.White.copy(alpha = 0.1f)
+                                },
                                 border = if (isRowFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
                             ) {
                                 Row(
@@ -1292,7 +1551,7 @@ private fun SeriesDetailTvScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = { showSeasonPicker = false }) {
-                        Text("Cerrar", color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                        Text("Cerrar", color = tvFocusBlue, fontWeight = FontWeight.Bold)
                     }
                 }
             )
@@ -1319,10 +1578,13 @@ private fun SeriesDetailTvScreen(
                             Text("Audio predeterminado", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
                         } else {
                             availableAudioTracks.forEach { track ->
+                                var isTrackFocused by remember { mutableStateOf(false) }
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
+                                        .focusable()
+                                        .onFocusChanged { isTrackFocused = it.isFocused }
                                         .clickable {
                                             try {
                                                 val override = TrackSelectionOverride(track.trackGroup.mediaTrackGroup, listOf(track.trackIndex))
@@ -1339,7 +1601,12 @@ private fun SeriesDetailTvScreen(
                                             }
                                         },
                                     shape = RoundedCornerShape(8.dp),
-                                    color = if (track.isSelected) Color(0xFF007AFF) else Color.White.copy(alpha = 0.1f)
+                                    color = when {
+                                        isTrackFocused -> tvFocusBlue
+                                        track.isSelected -> tvSelectedRed
+                                        else -> Color.White.copy(alpha = 0.1f)
+                                    },
+                                    border = if (isTrackFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1360,10 +1627,13 @@ private fun SeriesDetailTvScreen(
                         // Subtítulos
                         Text("SUBTÍTULOS", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                         // Desactivar Subtítulos Option
+                        var isDisableSubFocused by remember { mutableStateOf(false) }
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
+                                .focusable()
+                                .onFocusChanged { isDisableSubFocused = it.isFocused }
                                 .clickable {
                                     try {
                                         exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
@@ -1377,7 +1647,12 @@ private fun SeriesDetailTvScreen(
                                     }
                                 },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (isSubtitlesDisabled) Color(0xFF007AFF) else Color.White.copy(alpha = 0.1f)
+                            color = when {
+                                isDisableSubFocused -> tvFocusBlue
+                                isSubtitlesDisabled -> tvSelectedRed
+                                else -> Color.White.copy(alpha = 0.1f)
+                            },
+                            border = if (isDisableSubFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1392,10 +1667,14 @@ private fun SeriesDetailTvScreen(
                         }
 
                         availableSubtitleTracks.forEach { track ->
+                            var isSubFocused by remember { mutableStateOf(false) }
+                            val isChosen = track.isSelected && !isSubtitlesDisabled
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
+                                    .focusable()
+                                    .onFocusChanged { isSubFocused = it.isFocused }
                                     .clickable {
                                         try {
                                             val override = TrackSelectionOverride(track.trackGroup.mediaTrackGroup, listOf(track.trackIndex))
@@ -1414,7 +1693,12 @@ private fun SeriesDetailTvScreen(
                                         }
                                     },
                                 shape = RoundedCornerShape(8.dp),
-                                color = if (track.isSelected && !isSubtitlesDisabled) Color(0xFF007AFF) else Color.White.copy(alpha = 0.1f)
+                                color = when {
+                                    isSubFocused -> tvFocusBlue
+                                    isChosen -> tvSelectedRed
+                                    else -> Color.White.copy(alpha = 0.1f)
+                                },
+                                border = if (isSubFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1422,7 +1706,7 @@ private fun SeriesDetailTvScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(track.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                    if (track.isSelected && !isSubtitlesDisabled) {
+                                    if (isChosen) {
                                         Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     }
                                 }
@@ -1432,10 +1716,22 @@ private fun SeriesDetailTvScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = { showTracksDialog = false }) {
-                        Text("Aceptar", color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                        Text("Aceptar", color = tvFocusBlue, fontWeight = FontWeight.Bold)
                     }
                 }
             )
         }
+    }
+}
+
+private fun formatPlaybackTime(ms: Long): String {
+    val totalSeconds = (ms / 1000).coerceAtLeast(0)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        String.format("%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
     }
 }
