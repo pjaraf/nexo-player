@@ -45,7 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Fullscreen / Large Dialog shown on the TV when requesting Quick Login via Phone / QR Code.
+ * Fullscreen / Large Dialog shown on the TV when requesting Quick Login via Phone with PIN code (No QR).
  */
 @Composable
 fun TvQrLoginDialog(
@@ -53,26 +53,12 @@ fun TvQrLoginDialog(
     onLoginSuccess: (serverUrl: String, user: String, pass: String) -> Unit
 ) {
     var pinCode by remember { mutableStateOf("") }
-    var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var webUrl by remember { mutableStateOf("") }
     var isSuccess by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
 
-    // Pulse animation for waiting state
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
     DisposableEffect(Unit) {
-        val (pin, url) = TvLinkManager.startTvPairingServer { serverUrl, user, pass ->
+        val (pin, _) = TvLinkManager.startTvPairingServer { serverUrl, user, pass ->
             isSuccess = true
             coroutineScope.launch {
                 delay(1200)
@@ -80,14 +66,6 @@ fun TvQrLoginDialog(
             }
         }
         pinCode = pin
-        webUrl = url
-
-        coroutineScope.launch(Dispatchers.IO) {
-            val bitmap = TvLinkManager.generateQrCodeBitmap(url, size = 480)
-            withContext(Dispatchers.Main) {
-                qrBitmap = bitmap
-            }
-        }
 
         onDispose {
             TvLinkManager.stopTvPairingServer()
@@ -111,12 +89,12 @@ fun TvQrLoginDialog(
                 border = BorderStroke(1.5.dp, NexusPrimary.copy(alpha = 0.5f)),
                 shadowElevation = 24.dp,
                 modifier = Modifier
-                    .widthIn(max = 820.dp)
+                    .widthIn(max = 680.dp)
                     .fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(32.dp)
+                        .padding(horizontal = 36.dp, vertical = 28.dp)
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -138,7 +116,7 @@ fun TvQrLoginDialog(
                                     .clip(CircleShape)
                             )
                             Text(
-                                text = "INICIAR SESIÓN DESDE EL TELÉFONO",
+                                text = "INICIAR SESIÓN CON CÓDIGO",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Black,
                                     letterSpacing = 1.sp,
@@ -157,14 +135,14 @@ fun TvQrLoginDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     if (isSuccess) {
                         // Success View
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(vertical = 40.dp)
+                            modifier = Modifier.padding(vertical = 32.dp)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -199,143 +177,105 @@ fun TvQrLoginDialog(
                             CircularProgressIndicator(color = NexusPrimary, modifier = Modifier.size(24.dp))
                         }
                     } else {
-                        // Main Pairing UI (Side-by-side or stacked)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(32.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        // Main Code Box
+                        Text(
+                            text = "INGRESA ESTE CÓDIGO EN TU TELÉFONO:",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                letterSpacing = 2.sp,
+                                color = NexusTextSecondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Large PIN Badge Display
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = NexusSurfaceVariant,
+                            border = BorderStroke(2.dp, NexusPrimary),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
                         ) {
-                            // Left: QR Code
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 20.dp, horizontal = 24.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = Color.White,
-                                    modifier = Modifier
-                                        .size(220.dp)
-                                        .scale(pulseScale)
-                                        .padding(12.dp)
-                                ) {
-                                    if (qrBitmap != null) {
-                                        Image(
-                                            bitmap = qrBitmap!!.asImageBitmap(),
-                                            contentDescription = "Código QR de Vinculación",
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            CircularProgressIndicator(color = Color.Black)
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
+                                val formattedPin = if (pinCode.length >= 6) {
+                                    "${pinCode.substring(0, 3)}   ${pinCode.substring(3)}"
+                                } else pinCode
 
                                 Text(
-                                    text = "1. Escanea con la cámara de tu celular",
-                                    color = NexusTextSecondary,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-
-                            // Right: PIN and instructions
-                            Column(
-                                horizontalAlignment = Alignment.Start,
-                                modifier = Modifier.weight(1.3f)
-                            ) {
-                                Text(
-                                    text = "O INGRESA ESTE CÓDIGO:",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        letterSpacing = 2.sp,
-                                        color = NexusTextSecondary,
-                                        fontWeight = FontWeight.Bold
+                                    text = formattedPin.ifBlank { "· · ·   · · ·" },
+                                    style = MaterialTheme.typography.displayMedium.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 8.sp,
+                                        color = Color.White,
+                                        fontSize = 44.sp
                                     )
                                 )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // PIN Badge
-                                Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = NexusSurfaceVariant,
-                                    border = BorderStroke(1.5.dp, NexusPrimary),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 16.dp, horizontal = 20.dp),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        val formattedPin = if (pinCode.length >= 6) {
-                                            "${pinCode.substring(0, 3)}  ${pinCode.substring(3)}"
-                                        } else pinCode
-
-                                        Text(
-                                            text = formattedPin,
-                                            style = MaterialTheme.typography.displaySmall.copy(
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = FontWeight.Black,
-                                                letterSpacing = 6.sp,
-                                                color = Color.White
-                                            )
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(18.dp))
-
-                                // Instructions List
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    InstructionItem(
-                                        number = "1",
-                                        text = "Abre Nexo en tu teléfono móvil."
-                                    )
-                                    InstructionItem(
-                                        number = "2",
-                                        text = "Ve a Mi Perfil y pulsa 'Vincular Televisor'."
-                                    )
-                                    InstructionItem(
-                                        number = "3",
-                                        text = "Escribe el código PIN de arriba para entrar al instante."
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier
-                                        .background(
-                                            NexusPrimary.copy(alpha = 0.12f),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                                ) {
-                                    CircularProgressIndicator(
-                                        color = NexusPrimary,
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = "Esperando confirmación desde tu teléfono...",
-                                        color = NexusPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(28.dp))
+                        Spacer(modifier = Modifier.height(22.dp))
+
+                        // Instructions
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color.White.copy(alpha = 0.04f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(18.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                InstructionItem(
+                                    number = "1",
+                                    text = "Abre Nexo en tu teléfono móvil con tu sesión iniciada."
+                                )
+                                InstructionItem(
+                                    number = "2",
+                                    text = "Entra a Mi Perfil y pulsa 'Vincular Televisor'."
+                                )
+                                InstructionItem(
+                                    number = "3",
+                                    text = "Escribe los 6 dígitos del código de arriba para entrar de inmediato."
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .background(
+                                    NexusPrimary.copy(alpha = 0.12f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = NexusPrimary,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Esperando confirmación desde tu teléfono...",
+                                color = NexusPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(22.dp))
 
                         // Switch back to manual keyboard
                         OutlinedButton(

@@ -14,9 +14,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -474,7 +472,7 @@ fun LoginScreen(
                     if (isTv) {
                         Spacer(modifier = Modifier.height(if (isLargeTv) 8.dp else 14.dp))
 
-                        // TV Quick Login via Mobile / QR Box (Shown ONLY on Smart TV / Google TV)
+                        // TV Quick Login via Mobile Code / PIN Box (Shown ONLY on Smart TV / Google TV)
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Color(0xFF222232).copy(alpha = 0.8f),
@@ -503,21 +501,21 @@ fun LoginScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            Icons.Default.QrCode,
-                                            contentDescription = "Código QR",
+                                            Icons.Default.Lock,
+                                            contentDescription = "Código PIN",
                                             tint = Color(0xFFE50914),
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
                                     Column {
                                         Text(
-                                            text = "Iniciar con Código QR / PIN",
+                                            text = "Iniciar con Código PIN",
                                             color = Color.White,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
                                         )
                                         Text(
-                                            text = "Vincula desde tu teléfono al instante",
+                                            text = "Ingresa el código desde tu teléfono",
                                             color = Color(0xFFAAAAAA),
                                             fontSize = 11.sp
                                         )
