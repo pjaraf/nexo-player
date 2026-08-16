@@ -244,8 +244,8 @@ fun MainTabsScreen(
                 ) {
                     Surface(
                         modifier = Modifier
-                            .padding(start = 24.dp, top = 20.dp, bottom = 20.dp)
-                            .width(260.dp)
+                            .padding(start = 20.dp, top = 20.dp, bottom = 20.dp)
+                            .width(190.dp)
                             .fillMaxHeight()
                             .shadow(24.dp, RoundedCornerShape(24.dp))
                             .testTag("floating_tv_sidebar"),
@@ -256,24 +256,24 @@ fun MainTabsScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 16.dp, vertical = 20.dp),
+                                .padding(horizontal = 10.dp, vertical = 18.dp),
                             horizontalAlignment = Alignment.Start,
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 // Nexo Logo & TV Header
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier
-                                        .padding(horizontal = 10.dp, vertical = 12.dp)
+                                        .padding(horizontal = 6.dp, vertical = 8.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(40.dp)
+                                            .size(34.dp)
                                             .clip(CircleShape)
                                             .background(
                                                 Brush.linearGradient(
@@ -285,7 +285,7 @@ fun MainTabsScreen(
                                         Text(
                                             text = "N",
                                             color = Color.White,
-                                            fontSize = 22.sp,
+                                            fontSize = 18.sp,
                                             fontWeight = FontWeight.Black,
                                             fontFamily = FontFamily.SansSerif
                                         )
@@ -293,7 +293,7 @@ fun MainTabsScreen(
                                     Text(
                                         text = "NEXO",
                                         color = Color.White,
-                                        fontSize = 22.sp,
+                                        fontSize = 18.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         letterSpacing = 2.sp
                                     )
@@ -302,7 +302,7 @@ fun MainTabsScreen(
                                 Divider(
                                     color = Color.White.copy(alpha = 0.1f),
                                     thickness = 1.dp,
-                                    modifier = Modifier.padding(bottom = 8.dp)
+                                    modifier = Modifier.padding(bottom = 6.dp)
                                 )
 
                                 // Lateral Nav Items
@@ -322,26 +322,26 @@ fun MainTabsScreen(
                             // Bottom info in floating bar
                             Surface(
                                 color = Color.White.copy(alpha = 0.05f),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 8.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(8.dp)
+                                            .size(7.dp)
                                             .clip(CircleShape)
                                             .background(Color(0xFF4CAF50))
                                     )
                                     Text(
                                         text = "Control Remoto Activo",
                                         color = Color(0xFFA0A0AB),
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -451,21 +451,21 @@ private fun TvSidebarNavItem(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp),
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Icon(
                 imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
                 contentDescription = tab.title,
                 tint = contentColor,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
 
             Text(
                 text = tab.title,
                 color = contentColor,
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium
             )
         }

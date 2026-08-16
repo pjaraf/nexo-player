@@ -1,7 +1,7 @@
 {
-  "versionCode": 6,
-  "versionName": "1.0.5",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.5/app-debug.apk",
-  "changelog": "Separación de canales y categorías: 1 toque abre canales, 2 toques abre categorías",
+  "versionCode": 7,
+  "versionName": "1.0.6",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.6/app-debug.apk",
+  "changelog": "Menú lateral flotante más compacto y estilizado; separación de canales y categorías",
   "isMandatory": false
 }
