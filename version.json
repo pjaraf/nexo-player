@@ -1,7 +1,7 @@
 {
-  "versionCode": 4,
-  "versionName": "1.0.3",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.3/app-debug.apk",
-  "changelog": "Ajuste de inicio de sesión con código PIN directo en Smart TV",
+  "versionCode": 5,
+  "versionName": "1.0.4",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.4/app-debug.apk",
+  "changelog": "Diseño más limpio sin logo circular sobre formulario de acceso",
   "isMandatory": false
 }

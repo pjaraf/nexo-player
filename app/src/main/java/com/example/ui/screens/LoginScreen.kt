@@ -248,17 +248,6 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // App Logo Medallion
-            Image(
-                painter = painterResource(id = R.drawable.ic_nexus_logo),
-                contentDescription = "Nexo Logo",
-                modifier = Modifier
-                    .size(if (isLargeTv) 56.dp else 64.dp)
-                    .clip(CircleShape)
-            )
-
-            Spacer(modifier = Modifier.height(if (isLargeTv) 10.dp else 14.dp))
-
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = Color.Black.copy(alpha = 0.55f),
