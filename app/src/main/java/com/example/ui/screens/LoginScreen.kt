@@ -97,6 +97,9 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val isTv = remember { DeviceUtils.isTelevision(context) }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isWideScreen = configuration.screenWidthDp >= 600 || isTv
+    val isLargeTv = isTv || configuration.screenWidthDp >= 900
     var username by remember { mutableStateOf(AppStorage.getUsername()) }
     var password by remember { mutableStateOf(AppStorage.getPassword()) }
     var showPassword by remember { mutableStateOf(false) }
@@ -200,27 +203,31 @@ fun LoginScreen(
                 )
         )
 
-        // --- 3. Top-Left Brand Logo (Exact placement as Netflix header in reference photo) ---
+        // --- 3. Top-Left Brand Logo (Exact placement with safe TV margins) ---
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
                 .statusBarsPadding()
-                .padding(start = 28.dp, top = 20.dp, bottom = 12.dp)
+                .padding(
+                    start = if (isLargeTv) 36.dp else 24.dp,
+                    top = if (isLargeTv) 24.dp else 16.dp,
+                    bottom = 12.dp
+                )
                 .align(Alignment.TopStart)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.ic_nexus_logo),
                 contentDescription = "Nexo Logo",
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(if (isLargeTv) 44.dp else 38.dp)
                     .clip(CircleShape)
             )
 
             Text(
                 text = "NEXO",
                 style = MaterialTheme.typography.headlineLarge.copy(
-                    fontSize = 32.sp,
+                    fontSize = if (isLargeTv) 34.sp else 30.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 4.sp,
                     color = Color(0xFFE50914),
@@ -229,29 +236,30 @@ fun LoginScreen(
             )
         }
 
-        // --- 4. Centered Login Form Card (Exact reproduction of the modal in photo) ---
+        // --- 4. Centered Login Form Card (Optimized for 1080p/4K TVs to fit completely on-screen) ---
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 24.dp),
+                .padding(
+                    horizontal = if (isLargeTv) 32.dp else 20.dp,
+                    vertical = if (isLargeTv) 16.dp else 20.dp
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
-
             // App Logo Medallion
             Image(
                 painter = painterResource(id = R.drawable.ic_nexus_logo),
                 contentDescription = "Nexo Logo",
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(if (isLargeTv) 56.dp else 64.dp)
                     .clip(CircleShape)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(if (isLargeTv) 10.dp else 14.dp))
 
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -259,22 +267,25 @@ fun LoginScreen(
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
                 shadowElevation = 8.dp,
                 modifier = Modifier
-                    .widthIn(max = 440.dp)
+                    .widthIn(max = if (isLargeTv) 460.dp else 440.dp)
                     .fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 36.dp, vertical = 42.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.padding(
+                        horizontal = if (isLargeTv) 32.dp else 28.dp,
+                        vertical = if (isLargeTv) 24.dp else 32.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(if (isLargeTv) 12.dp else 14.dp)
                 ) {
                     // Header Title
                     Text(
                         text = "Iniciar sesión",
                         style = MaterialTheme.typography.headlineMedium.copy(
-                            fontSize = 32.sp,
+                            fontSize = if (isLargeTv) 28.sp else 30.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         ),
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 2.dp)
                     )
 
                     // Offline warning banner
@@ -319,7 +330,7 @@ fun LoginScreen(
                             Text(
                                 text = "Usuario",
                                 color = Color(0xFFB3B3B3),
-                                fontSize = 14.sp
+                                fontSize = if (isLargeTv) 13.sp else 14.sp
                             )
                         },
                         singleLine = true,
@@ -339,7 +350,7 @@ fun LoginScreen(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .height(if (isLargeTv) 50.dp else 56.dp)
                             .testTag("login_input_username")
                     )
 
@@ -351,13 +362,13 @@ fun LoginScreen(
                             Text(
                                 text = "Contraseña",
                                 color = Color(0xFFB3B3B3),
-                                fontSize = 14.sp
+                                fontSize = if (isLargeTv) 13.sp else 14.sp
                             )
                         },
                         trailingIcon = {
                             TextButton(
                                 onClick = { showPassword = !showPassword },
-                                contentPadding = PaddingValues(horizontal = 12.dp)
+                                contentPadding = PaddingValues(horizontal = 10.dp)
                             ) {
                                 Text(
                                     text = if (showPassword) "OCULTAR" else "MOSTRAR",
@@ -390,11 +401,11 @@ fun LoginScreen(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .height(if (isLargeTv) 50.dp else 56.dp)
                             .testTag("login_input_password")
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(if (isLargeTv) 4.dp else 8.dp))
 
                     // Primary Login Button (Netflix Solid Red)
                     Button(
@@ -410,20 +421,20 @@ fun LoginScreen(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
+                            .height(if (isLargeTv) 46.dp else 50.dp)
                             .testTag("login_submit_btn")
                     ) {
                         if (loading) {
                             CircularProgressIndicator(
                                 color = Color.White,
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.5.dp
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
                             )
                         } else {
                             Text(
                                 text = "Iniciar sesión",
                                 color = Color.White,
-                                fontSize = 16.sp,
+                                fontSize = if (isLargeTv) 15.sp else 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -433,7 +444,7 @@ fun LoginScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp),
+                            .padding(top = 2.dp),
                         horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -449,19 +460,19 @@ fun LoginScreen(
                                     uncheckedColor = Color(0xFF737373),
                                     checkmarkColor = Color.White
                                 ),
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Recuérdame",
                                 color = Color(0xFFB3B3B3),
-                                fontSize = 13.sp
+                                fontSize = if (isLargeTv) 12.sp else 13.sp
                             )
                         }
                     }
 
                     if (isTv) {
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(if (isLargeTv) 8.dp else 14.dp))
 
                         // TV Quick Login via Mobile / QR Box (Shown ONLY on Smart TV / Google TV)
                         Surface(
@@ -474,7 +485,10 @@ fun LoginScreen(
                                 .testTag("login_tv_qr_btn")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                modifier = Modifier.padding(
+                                    horizontal = 14.dp,
+                                    vertical = if (isLargeTv) 8.dp else 12.dp
+                                ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
