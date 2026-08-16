@@ -46,8 +46,13 @@ object AppUpdateManager {
 
     private fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
         try {
-            val remoteParts = remoteVersion.split(".").mapNotNull { it.trim().toIntOrNull() }
-            val currentParts = currentVersion.split(".").mapNotNull { it.trim().toIntOrNull() }
+            val remoteClean = remoteVersion.trim().removePrefix("v").removePrefix("V")
+            val currentClean = currentVersion.trim().removePrefix("v").removePrefix("V")
+            if (remoteClean.equals(currentClean, ignoreCase = true)) {
+                return false
+            }
+            val remoteParts = remoteClean.split(".").mapNotNull { it.trim().toIntOrNull() }
+            val currentParts = currentClean.split(".").mapNotNull { it.trim().toIntOrNull() }
             val maxLength = maxOf(remoteParts.size, currentParts.size)
             for (i in 0 until maxLength) {
                 val r = remoteParts.getOrElse(i) { 0 }
@@ -111,13 +116,23 @@ object AppUpdateManager {
 
                     if (update != null && update.apkUrl.isNotBlank()) {
                         AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                        if (update.versionCode > currentVersionCode) {
+                        val remoteVer = update.versionName.trim()
+                        val hasHigherVer = isVersionHigher(remoteVer, currentVersionName)
+                        val hasHigherCode = update.versionCode > currentVersionCode
+
+                        if (hasHigherVer || (hasHigherCode && !remoteVer.equals(currentVersionName, ignoreCase = true))) {
+                            val dismissed = AppStorage.getDismissedUpdateVersion()
+                            if (dismissed == remoteVer) {
+                                Log.d(TAG, "Update v$remoteVer was previously dismissed")
+                                _latestUpdateInfo.value = null
+                                return@withContext null
+                            }
                             val normalizedUpdate = update.copy(apkUrl = normalizeUrl(update.apkUrl))
                             Log.i(TAG, "New update found via version.json! v${normalizedUpdate.versionName} (build ${normalizedUpdate.versionCode})")
                             _latestUpdateInfo.value = normalizedUpdate
                             return@withContext normalizedUpdate
                         } else {
-                            Log.d(TAG, "App is up to date (current=$currentVersionCode, server=${update.versionCode})")
+                            Log.d(TAG, "App is up to date (current=$currentVersionName/$currentVersionCode, server=$remoteVer/${update.versionCode})")
                             _latestUpdateInfo.value = null
                             return@withContext null
                         }
@@ -327,6 +342,10 @@ object AppUpdateManager {
     }
 
     fun dismissUpdate() {
+        val current = _latestUpdateInfo.value
+        if (current != null) {
+            AppStorage.setDismissedUpdateVersion(current.versionName)
+        }
         _latestUpdateInfo.value = null
         _downloadState.value = UpdateDownloadState.Idle
     }

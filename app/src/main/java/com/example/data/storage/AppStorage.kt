@@ -272,4 +272,16 @@ object AppStorage {
     fun setLastUpdateCheckTime(timeMs: Long) {
         prefs.edit().putLong("last_update_check_time", timeMs).apply()
     }
+
+    fun getDismissedUpdateVersion(): String? {
+        return prefs.getString("dismissed_update_version", null)
+    }
+
+    fun setDismissedUpdateVersion(version: String?) {
+        if (version == null) {
+            prefs.edit().remove("dismissed_update_version").apply()
+        } else {
+            prefs.edit().putString("dismissed_update_version", version).apply()
+        }
+    }
 }
