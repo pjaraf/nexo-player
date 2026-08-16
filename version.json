@@ -1,7 +1,7 @@
 {
-  "versionCode": 9,
-  "versionName": "1.0.8",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.8/app-debug.apk",
-  "changelog": "Nuevo diseño interactivo de Series para TV idéntico al video: carátula con reproductor en vivo integrado, botones Pantalla Completa e Idioma/Subtítulos, y carrusel de números de episodios con selección rápida",
+  "versionCode": 10,
+  "versionName": "1.0.9",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.9/app-debug.apk",
+  "changelog": "Navegación con control remoto optimizada (foco azul y selección roja), mejoras en visualización de canales en vivo y estabilidad general.",
   "isMandatory": false
 }
