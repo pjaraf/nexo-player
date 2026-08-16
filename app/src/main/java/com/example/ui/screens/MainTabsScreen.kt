@@ -38,6 +38,7 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
+import com.example.data.storage.AppStorage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,6 +75,12 @@ fun MainTabsScreen(
     val isTv = remember { DeviceUtils.isTelevision(context) }
     var currentTab by remember { mutableStateOf(MainTab.HOME) }
     var isSidebarOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (AppStorage.isAutoCheckUpdatesEnabled()) {
+            viewModel.checkForUpdates(manual = false)
+        }
+    }
 
     // Intercept BACK button when sidebar is open on TV
     BackHandler(enabled = isTv && isSidebarOpen) {
