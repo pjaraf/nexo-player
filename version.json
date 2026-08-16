@@ -1,7 +1,7 @@
 {
-  "versionCode": 2,
-  "versionName": "1.0.1",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.1/app-debug.apk",
+  "versionCode": 3,
+  "versionName": "1.0.2",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.2/app-debug.apk",
   "changelog": "",
   "isMandatory": false
 }
