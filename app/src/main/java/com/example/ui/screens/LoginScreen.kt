@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -310,6 +312,7 @@ fun LoginScreen(
                     }
 
                     // Username input field
+                    var isUsernameFocused by remember { mutableStateOf(false) }
                     TextField(
                         value = username,
                         onValueChange = { username = it },
@@ -328,7 +331,7 @@ fun LoginScreen(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
                             cursorColor = Color.White,
-                            focusedIndicatorColor = Color.Transparent,
+                            focusedIndicatorColor = TvFocusBlue,
                             unfocusedIndicatorColor = Color.Transparent
                         ),
                         keyboardOptions = KeyboardOptions(
@@ -338,10 +341,17 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(if (isLargeTv) 50.dp else 56.dp)
+                            .onFocusChanged { isUsernameFocused = it.isFocused }
+                            .border(
+                                width = if (isUsernameFocused) 2.dp else 1.dp,
+                                color = if (isUsernameFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(6.dp)
+                            )
                             .testTag("login_input_username")
                     )
 
                     // Password input field
+                    var isPasswordFocused by remember { mutableStateOf(false) }
                     TextField(
                         value = password,
                         onValueChange = { password = it },
@@ -374,7 +384,7 @@ fun LoginScreen(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
                             cursorColor = Color.White,
-                            focusedIndicatorColor = Color.Transparent,
+                            focusedIndicatorColor = TvFocusBlue,
                             unfocusedIndicatorColor = Color.Transparent
                         ),
                         keyboardOptions = KeyboardOptions(
@@ -389,12 +399,19 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(if (isLargeTv) 50.dp else 56.dp)
+                            .onFocusChanged { isPasswordFocused = it.isFocused }
+                            .border(
+                                width = if (isPasswordFocused) 2.dp else 1.dp,
+                                color = if (isPasswordFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(6.dp)
+                            )
                             .testTag("login_input_password")
                     )
 
                     Spacer(modifier = Modifier.height(if (isLargeTv) 4.dp else 8.dp))
 
-                    // Primary Login Button (Netflix Solid Red)
+                    // Primary Login Button (Blue on Focus, Red on select / normal)
+                    var isLoginBtnFocused by remember { mutableStateOf(false) }
                     Button(
                         onClick = {
                             viewModel.login(username, password, onLoginSuccess)
@@ -402,13 +419,19 @@ fun LoginScreen(
                         enabled = !loading,
                         shape = RoundedCornerShape(6.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE50914),
+                            containerColor = if (isLoginBtnFocused) TvFocusBlue else TvSelectedRed,
                             contentColor = Color.White,
                             disabledContainerColor = Color(0xFFE50914).copy(alpha = 0.5f)
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(if (isLargeTv) 46.dp else 50.dp)
+                            .onFocusChanged { isLoginBtnFocused = it.isFocused }
+                            .border(
+                                width = if (isLoginBtnFocused) 2.dp else 0.dp,
+                                color = if (isLoginBtnFocused) Color.White else Color.Transparent,
+                                shape = RoundedCornerShape(6.dp)
+                            )
                             .testTag("login_submit_btn")
                     ) {
                         if (loading) {

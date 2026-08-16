@@ -878,8 +878,8 @@ private fun TvCategoryFloatingItem(
     var isFocused by remember { mutableStateOf(false) }
 
     val bg = when {
-        isSelected -> NexusPrimary
-        isFocused -> Color.White.copy(alpha = 0.22f)
+        isFocused -> TvFocusBlue
+        isSelected -> TvSelectedRed
         else -> Color.Transparent
     }
 
@@ -890,7 +890,7 @@ private fun TvCategoryFloatingItem(
         border = if (isFocused) {
             androidx.compose.foundation.BorderStroke(2.dp, Color.White)
         } else if (isSelected) {
-            androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+            androidx.compose.foundation.BorderStroke(1.5.dp, Color.White.copy(alpha = 0.5f))
         } else null,
         modifier = Modifier
             .fillMaxWidth()
@@ -939,8 +939,8 @@ private fun TvChannelFloatingItem(
     val formattedIndex = String.format("%03d", index)
 
     val bg = when {
-        isCurrentPlaying -> NexusPrimary.copy(alpha = 0.4f)
-        isFocused -> Color.White.copy(alpha = 0.22f)
+        isFocused -> TvFocusBlue
+        isCurrentPlaying -> TvSelectedRed
         else -> Color.Transparent
     }
 
@@ -951,7 +951,7 @@ private fun TvChannelFloatingItem(
         border = if (isFocused) {
             androidx.compose.foundation.BorderStroke(2.dp, Color.White)
         } else if (isCurrentPlaying) {
-            androidx.compose.foundation.BorderStroke(1.5.dp, NexusPrimary)
+            androidx.compose.foundation.BorderStroke(1.5.dp, Color.White.copy(alpha = 0.5f))
         } else null,
         modifier = Modifier
             .fillMaxWidth()

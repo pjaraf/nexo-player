@@ -29,6 +29,10 @@ val NexusTextMuted = Color(0xFF707080)
 val NexusBorder = Color(0x1FFFFFFF)
 val NexusCardBg = Color(0xFF161622)
 
+// TV Remote focus and selection colors
+val TvFocusBlue = Color(0xFF007AFF)      // Blue focus on remote hover
+val TvSelectedRed = Color(0xFFE50914)    // Red on active / selection
+
 private val DarkColorScheme = darkColorScheme(
     primary = NexusPrimary,
     onPrimary = Color.White,

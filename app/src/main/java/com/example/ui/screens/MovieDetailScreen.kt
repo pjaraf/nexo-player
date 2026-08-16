@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -205,24 +206,34 @@ fun MovieDetailScreen(
                     }
 
                     // Play Button
+                    var isPlayBtnFocused by remember { mutableStateOf(false) }
                     Button(
                         onClick = {
                             val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
                             val resumeMs = savedProgress?.positionMs ?: 0L
                             onPlay(streamUrl, title, "movie", movieId, image, resumeMs)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isPlayBtnFocused) TvFocusBlue else Color.White,
+                            contentColor = if (isPlayBtnFocused) Color.White else Color.Black
+                        ),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
+                            .onFocusChanged { isPlayBtnFocused = it.isFocused }
                             .testTag("movie_play_btn")
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(24.dp))
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = if (isPlayBtnFocused) Color.White else Color.Black,
+                            modifier = Modifier.size(24.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (savedProgress != null && savedProgress.positionMs > 5000) "Reanudar Reproducción" else "Reproducir Película",
-                            color = Color.Black,
+                            color = if (isPlayBtnFocused) Color.White else Color.Black,
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontWeight = FontWeight.Black,
                                 fontSize = 14.sp

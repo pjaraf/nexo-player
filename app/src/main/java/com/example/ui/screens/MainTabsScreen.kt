@@ -392,8 +392,8 @@ private fun TvSidebarNavItem(
 
     val backgroundColor by animateColorAsState(
         targetValue = when {
-            isSelected -> NexusPrimary
-            isFocused -> Color.White.copy(alpha = 0.15f)
+            isSelected -> TvSelectedRed
+            isFocused -> TvFocusBlue
             else -> Color.Transparent
         },
         label = "tab_bg"
@@ -401,8 +401,7 @@ private fun TvSidebarNavItem(
 
     val contentColor by animateColorAsState(
         targetValue = when {
-            isSelected -> Color.White
-            isFocused -> Color.White
+            isSelected || isFocused -> Color.White
             else -> NexusTextSecondary
         },
         label = "tab_content_color"
@@ -413,9 +412,9 @@ private fun TvSidebarNavItem(
         shape = RoundedCornerShape(14.dp),
         color = backgroundColor,
         border = if (isFocused && !isSelected) {
-            androidx.compose.foundation.BorderStroke(1.5.dp, Color.White.copy(alpha = 0.6f))
+            androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
         } else if (isSelected) {
-            androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+            androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
         } else null,
         modifier = Modifier
             .fillMaxWidth()

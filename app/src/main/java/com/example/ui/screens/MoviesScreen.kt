@@ -246,6 +246,7 @@ fun MoviesScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        var isPlayBtnFocused by remember { mutableStateOf(false) }
                         Button(
                             onClick = {
                                 if (onPlayDirect != null) {
@@ -256,19 +257,40 @@ fun MoviesScreen(
                                 }
                             },
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                            modifier = Modifier.height(38.dp)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isPlayBtnFocused) TvFocusBlue else Color.White,
+                                contentColor = if (isPlayBtnFocused) Color.White else Color.Black
+                            ),
+                            modifier = Modifier
+                                .height(38.dp)
+                                .onFocusChanged { isPlayBtnFocused = it.isFocused }
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = if (isPlayBtnFocused) Color.White else Color.Black,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Reproducir", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(
+                                "Reproducir",
+                                color = if (isPlayBtnFocused) Color.White else Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
                         }
 
+                        var isDetailBtnFocused by remember { mutableStateOf(false) }
                         Button(
                             onClick = { onNavigateMovie(active.id) },
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
-                            modifier = Modifier.height(38.dp)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isDetailBtnFocused) TvFocusBlue else Color.White.copy(alpha = 0.2f),
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier
+                                .height(38.dp)
+                                .onFocusChanged { isDetailBtnFocused = it.isFocused }
                         ) {
                             Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))

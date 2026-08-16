@@ -19,6 +19,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -1274,14 +1276,26 @@ fun PlayerScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // Botón Idiomas y Subtítulos
+                                        var isAudioBtnFocused by remember { mutableStateOf(false) }
+                                        val isAudioActive = !isSubtitlesDisabled && availableSubtitleTracks.isNotEmpty()
+                                        val audioBgColor = when {
+                                            isAudioBtnFocused -> TvFocusBlue
+                                            isAudioActive -> TvSelectedRed
+                                            else -> Color.White.copy(alpha = 0.15f)
+                                        }
+                                        val audioBorder = when {
+                                            isAudioBtnFocused -> androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
+                                            isAudioActive -> androidx.compose.foundation.BorderStroke(1.5.dp, TvSelectedRed)
+                                            else -> androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                                        }
+
                                         Surface(
                                             shape = RoundedCornerShape(999.dp),
-                                            color = if (!isSubtitlesDisabled && availableSubtitleTracks.isNotEmpty()) NexusPrimary else Color.White.copy(alpha = 0.15f),
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                1.dp,
-                                                if (!isSubtitlesDisabled && availableSubtitleTracks.isNotEmpty()) NexusPrimary else Color.White.copy(alpha = 0.25f)
-                                            ),
+                                            color = audioBgColor,
+                                            border = audioBorder,
                                             modifier = Modifier
+                                                .focusable()
+                                                .onFocusChanged { isAudioBtnFocused = it.isFocused }
                                                 .clickable { showAudioSubtitlesDialog = true }
                                                 .testTag("player_audio_subtitles_btn")
                                         ) {
@@ -1305,15 +1319,27 @@ fun PlayerScreen(
                                             }
                                         }
 
-                                        // Botón Expandir Pantalla Completa (Aspect Ratio)
+                                        // Botón Expandir Pantalla Completa (Aspect Ratio - mismo estilo que los otros botones)
+                                        var isResizeBtnFocused by remember { mutableStateOf(false) }
+                                        val isResizeActive = currentResizeMode != ScreenResizeMode.FIT
+                                        val resizeBgColor = when {
+                                            isResizeBtnFocused -> TvFocusBlue
+                                            isResizeActive -> TvSelectedRed
+                                            else -> Color.White.copy(alpha = 0.15f)
+                                        }
+                                        val resizeBorder = when {
+                                            isResizeBtnFocused -> androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
+                                            isResizeActive -> androidx.compose.foundation.BorderStroke(1.5.dp, TvSelectedRed)
+                                            else -> androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                                        }
+
                                         Surface(
                                             shape = RoundedCornerShape(999.dp),
-                                            color = if (currentResizeMode != ScreenResizeMode.FIT) NexusPrimary else Color.White.copy(alpha = 0.15f),
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                1.dp,
-                                                if (currentResizeMode != ScreenResizeMode.FIT) NexusPrimary else Color.White.copy(alpha = 0.25f)
-                                            ),
+                                            color = resizeBgColor,
+                                            border = resizeBorder,
                                             modifier = Modifier
+                                                .focusable()
+                                                .onFocusChanged { isResizeBtnFocused = it.isFocused }
                                                 .clickable { cycleResizeMode() }
                                                 .testTag("player_expand_fullscreen_btn")
                                         ) {
@@ -1343,11 +1369,23 @@ fun PlayerScreen(
 
                                         // Botón Siguiente Episodio (si es serie)
                                         if (kind == "series" && (currentEpisodeIndex + 1 < seriesEpisodes.size || !nextUrl.isNullOrBlank())) {
+                                            var isNextBtnFocused by remember { mutableStateOf(false) }
+                                            val nextBgColor = when {
+                                                isNextBtnFocused -> TvFocusBlue
+                                                else -> Color.White.copy(alpha = 0.15f)
+                                            }
+                                            val nextBorder = when {
+                                                isNextBtnFocused -> androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
+                                                else -> androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                                            }
+
                                             Surface(
                                                 shape = RoundedCornerShape(999.dp),
-                                                color = Color.White.copy(alpha = 0.15f),
-                                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                                color = nextBgColor,
+                                                border = nextBorder,
                                                 modifier = Modifier
+                                                    .focusable()
+                                                    .onFocusChanged { isNextBtnFocused = it.isFocused }
                                                     .clickable { playNextEpisode() }
                                                     .testTag("player_skip_next_episode_bottom_btn")
                                             ) {

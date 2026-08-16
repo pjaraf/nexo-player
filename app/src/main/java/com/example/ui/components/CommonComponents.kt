@@ -194,12 +194,28 @@ fun CategoryChipsRow(
     ) {
         items(categories, key = { it.first }) { (id, label) ->
             val isSelected = id == selectedId
+            var isFocused by remember { mutableStateOf(false) }
+
+            val chipBg = when {
+                isSelected -> TvSelectedRed
+                isFocused -> TvFocusBlue
+                else -> NexusSurfaceVariant
+            }
+
+            val chipBorder = when {
+                isSelected -> androidx.compose.foundation.BorderStroke(1.5.dp, TvSelectedRed)
+                isFocused -> androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
+                else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
+            }
+
             Surface(
                 shape = RoundedCornerShape(999.dp),
-                color = if (isSelected) Color.White else NexusSurfaceVariant,
-                border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
+                color = chipBg,
+                border = chipBorder,
                 modifier = Modifier
                     .height(36.dp)
+                    .focusable()
+                    .onFocusChanged { isFocused = it.isFocused }
                     .clickable { onSelect(id) }
                     .testTag("category_chip_$id")
             ) {
@@ -209,8 +225,8 @@ fun CategoryChipsRow(
                 ) {
                     Text(
                         text = label,
-                        color = if (isSelected) Color.Black else NexusTextSecondary,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected || isFocused) Color.White else NexusTextSecondary,
+                        fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
                         fontSize = 13.sp
                     )
                 }
@@ -234,6 +250,12 @@ fun MediaPosterCard(
 
     val isHighlighted = isFocused || isSelected
 
+    val borderColor = when {
+        isSelected -> TvSelectedRed
+        isFocused -> TvFocusBlue
+        else -> NexusBorder
+    }
+
     Column(
         modifier = modifier
             .width(if (isHighlighted) 140.dp else 126.dp)
@@ -256,7 +278,7 @@ fun MediaPosterCard(
                 .background(NexusSurfaceVariant)
                 .border(
                     if (isHighlighted) 2.5.dp else 1.dp,
-                    if (isHighlighted) NexusPrimary else NexusBorder,
+                    borderColor,
                     RoundedCornerShape(12.dp)
                 )
         ) {
@@ -339,12 +361,21 @@ fun LiveChannelCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    val borderStroke = when {
+        isFocused -> androidx.compose.foundation.BorderStroke(2.dp, TvFocusBlue)
+        else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
+    }
+
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = NexusSurfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
+        color = if (isFocused) Color(0xFF1E2638) else NexusSurfaceVariant,
+        border = borderStroke,
         modifier = modifier
             .fillMaxWidth()
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
             .clickable { onClick() }
             .testTag("live_channel_${channel.id}")
     ) {
@@ -361,7 +392,7 @@ fun LiveChannelCard(
                     .size(54.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color.Black.copy(alpha = 0.5f))
-                    .border(1.dp, NexusBorder, RoundedCornerShape(8.dp)),
+                    .border(1.dp, if (isFocused) TvFocusBlue else NexusBorder, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
@@ -445,16 +476,25 @@ fun ContinueWatchingCard(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+
     val progress = if (item.durationMs > 0) {
         (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
+    val borderStroke = when {
+        isFocused -> androidx.compose.foundation.BorderStroke(2.dp, TvFocusBlue)
+        else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
+    }
+
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = NexusSurfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
+        color = if (isFocused) Color(0xFF1E2638) else NexusSurfaceVariant,
+        border = borderStroke,
         modifier = modifier
             .width(200.dp)
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
             .clickable { onClick() }
             .testTag("continue_card_${item.key}")
     ) {

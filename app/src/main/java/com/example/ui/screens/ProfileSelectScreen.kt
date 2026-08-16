@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -17,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -115,11 +117,14 @@ fun ProfileSelectScreen(
                     } catch (e: Exception) {
                         NexusPrimary
                     }
+                    var isProfileFocused by remember { mutableStateOf(false) }
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier
+                            .onFocusChanged { isProfileFocused = it.isFocused }
+                            .focusable()
                             .clickable {
                                 viewModel.selectProfile(profile)
                                 val hasPin = AppStorage.hasPin()
@@ -129,10 +134,14 @@ fun ProfileSelectScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(100.dp)
+                                .size(if (isProfileFocused) 108.dp else 100.dp)
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(avatarColor)
-                                .border(2.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp)),
+                                .border(
+                                    width = if (isProfileFocused) 3.dp else 2.dp,
+                                    color = if (isProfileFocused) TvFocusBlue else Color.White.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(20.dp)
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             if (profile.isKids) {
@@ -171,9 +180,9 @@ fun ProfileSelectScreen(
                         Text(
                             text = profile.name,
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = Color.White
+                                fontWeight = if (isProfileFocused) FontWeight.ExtraBold else FontWeight.Bold,
+                                fontSize = if (isProfileFocused) 15.sp else 14.sp,
+                                color = if (isProfileFocused) TvFocusBlue else Color.White
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -183,29 +192,32 @@ fun ProfileSelectScreen(
 
                 // Add Profile Item
                 item {
+                    var isAddFocused by remember { mutableStateOf(false) }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier
+                            .onFocusChanged { isAddFocused = it.isFocused }
+                            .focusable()
                             .clickable { onManageProfiles() }
                             .testTag("profile_add_btn")
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(100.dp)
+                                .size(if (isAddFocused) 108.dp else 100.dp)
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(NexusSurfaceVariant)
                                 .border(
-                                    1.5.dp,
-                                    NexusBorder,
-                                    RoundedCornerShape(20.dp)
+                                    width = if (isAddFocused) 3.dp else 1.5.dp,
+                                    color = if (isAddFocused) TvFocusBlue else NexusBorder,
+                                    shape = RoundedCornerShape(20.dp)
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "Añadir",
-                                tint = NexusTextSecondary,
+                                tint = if (isAddFocused) TvFocusBlue else NexusTextSecondary,
                                 modifier = Modifier.size(44.dp)
                             )
                         }
@@ -213,9 +225,9 @@ fun ProfileSelectScreen(
                         Text(
                             text = "Añadir",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = NexusTextSecondary
+                                fontWeight = if (isAddFocused) FontWeight.ExtraBold else FontWeight.Bold,
+                                fontSize = if (isAddFocused) 15.sp else 14.sp,
+                                color = if (isAddFocused) TvFocusBlue else NexusTextSecondary
                             )
                         )
                     }
@@ -223,11 +235,17 @@ fun ProfileSelectScreen(
             }
 
             // Bottom manage button
+            var isManageFocused by remember { mutableStateOf(false) }
             Surface(
                 shape = RoundedCornerShape(999.dp),
-                color = NexusSurfaceVariant,
-                border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
+                color = if (isManageFocused) TvFocusBlue else NexusSurfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.5.dp,
+                    if (isManageFocused) TvFocusBlue else NexusBorder
+                ),
                 modifier = Modifier
+                    .onFocusChanged { isManageFocused = it.isFocused }
+                    .focusable()
                     .clickable { onManageProfiles() }
                     .testTag("manage_profiles_btn")
             ) {
@@ -239,14 +257,14 @@ fun ProfileSelectScreen(
                     Icon(
                         imageVector = Icons.Outlined.Settings,
                         contentDescription = null,
-                        tint = NexusTextSecondary,
+                        tint = if (isManageFocused) Color.White else NexusTextSecondary,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "Administrar perfiles",
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontSize = 13.sp,
-                            color = NexusTextSecondary
+                            color = if (isManageFocused) Color.White else NexusTextSecondary
                         )
                     )
                 }

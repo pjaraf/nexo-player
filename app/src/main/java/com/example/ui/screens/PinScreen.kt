@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -205,12 +207,21 @@ fun PinScreen(
                     when (key) {
                         "" -> Box(modifier = Modifier.size(72.dp))
                         "back" -> {
+                            var isFocused by remember { mutableStateOf(false) }
+                            val borderStroke = when {
+                                isFocused -> androidx.compose.foundation.BorderStroke(2.dp, TvFocusBlue)
+                                else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
+                            }
+                            val bgColor = if (isFocused) Color(0xFF1E2638) else NexusSurfaceVariant
+
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
-                                color = NexusSurfaceVariant,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
+                                color = bgColor,
+                                border = borderStroke,
                                 modifier = Modifier
                                     .size(72.dp)
+                                    .focusable()
+                                    .onFocusChanged { isFocused = it.isFocused }
                                     .clickable { onBackspace() }
                                     .testTag("pin_backspace_btn")
                             ) {
@@ -218,19 +229,28 @@ fun PinScreen(
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.Backspace,
                                         contentDescription = "Borrar",
-                                        tint = Color.White,
+                                        tint = if (isFocused) TvFocusBlue else Color.White,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
                             }
                         }
                         else -> {
+                            var isFocused by remember { mutableStateOf(false) }
+                            val borderStroke = when {
+                                isFocused -> androidx.compose.foundation.BorderStroke(2.dp, TvFocusBlue)
+                                else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
+                            }
+                            val bgColor = if (isFocused) Color(0xFF1E2638) else NexusSurfaceVariant
+
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
-                                color = NexusSurfaceVariant,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
+                                color = bgColor,
+                                border = borderStroke,
                                 modifier = Modifier
                                     .size(72.dp)
+                                    .focusable()
+                                    .onFocusChanged { isFocused = it.isFocused }
                                     .clickable { onKeyPress(key) }
                                     .testTag("pin_key_$key")
                             ) {
@@ -240,7 +260,7 @@ fun PinScreen(
                                         style = MaterialTheme.typography.titleLarge.copy(
                                             fontSize = 24.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White
+                                            color = if (isFocused) Color.White else Color.White
                                         )
                                     )
                                 }

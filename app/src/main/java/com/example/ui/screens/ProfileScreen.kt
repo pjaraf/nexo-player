@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -619,12 +621,19 @@ private fun MenuOptionCard(
     onClick: () -> Unit,
     testTag: String
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = NexusSurface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
+        color = if (isFocused) TvFocusBlue.copy(alpha = 0.25f) else NexusSurface,
+        border = androidx.compose.foundation.BorderStroke(
+            if (isFocused) 2.dp else 1.dp,
+            if (isFocused) TvFocusBlue else NexusBorder
+        ),
         modifier = Modifier
             .fillMaxWidth()
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
             .clickable { onClick() }
             .testTag(testTag)
     ) {
@@ -637,7 +646,7 @@ private fun MenuOptionCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(NexusSurfaceVariant),
+                    .background(if (isFocused) TvFocusBlue else NexusSurfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -654,13 +663,18 @@ private fun MenuOptionCard(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        color = NexusTextSecondary,
+                        color = if (isFocused) Color.White.copy(alpha = 0.8f) else NexusTextSecondary,
                         fontSize = 11.sp
                     )
                 )
             }
 
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = NexusTextSecondary, modifier = Modifier.size(20.dp))
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = if (isFocused) TvFocusBlue else NexusTextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
