@@ -104,7 +104,80 @@ object AppUpdateManager {
         val targetUrl = "$normalized$cacheBuster"
 
         try {
-            Log.d(TAG, "Checking update at: $targetUrl")
+            Log.d(TAG, "Checking update. Current version: $currentVersionName (code $currentVersionCode). URL: $targetUrl")
+
+            // 1. Direct GitHub Releases API Check (Instant, 0s cache delay)
+            if (targetUrl.contains("pjaraf/nexo-player") || targetUrl.contains("pjaraf/nexo-app") || targetUrl.contains("pjaraf/nexo-updates") || targetUrl.contains("github.com")) {
+                try {
+                    val githubApiUrl = if (targetUrl.contains("nexo-updates")) {
+                        "https://api.github.com/repos/pjaraf/nexo-updates/releases/latest"
+                    } else if (targetUrl.contains("nexo-app")) {
+                        "https://api.github.com/repos/pjaraf/nexo-app/releases/latest"
+                    } else {
+                        "https://api.github.com/repos/pjaraf/nexo-player/releases/latest"
+                    }
+                    Log.d(TAG, "Querying GitHub Releases API: $githubApiUrl")
+                    val ghRequest = Request.Builder()
+                        .url(githubApiUrl)
+                        .header("User-Agent", "Nexo-Updater/${currentVersionName}")
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                        .header("Pragma", "no-cache")
+                        .build()
+
+                    val ghResponse = httpClient.newCall(ghRequest).execute()
+                    if (ghResponse.isSuccessful) {
+                        val ghBody = ghResponse.body?.string()
+                        if (!ghBody.isNullOrBlank()) {
+                            val jsonObject = com.google.gson.JsonParser.parseString(ghBody).asJsonObject
+                            val tagName = jsonObject.get("tag_name")?.asString?.replace("v", "")?.trim() ?: ""
+                            val releaseBody = jsonObject.get("body")?.asString ?: ""
+                            val assets = jsonObject.getAsJsonArray("assets")
+
+                            var apkDownloadUrl: String? = null
+                            if (assets != null) {
+                                for (element in assets) {
+                                    val assetObj = element.asJsonObject
+                                    val name = assetObj.get("name")?.asString ?: ""
+                                    if (name.endsWith(".apk", ignoreCase = true)) {
+                                        apkDownloadUrl = assetObj.get("browser_download_url")?.asString
+                                        break
+                                    }
+                                }
+                            }
+
+                            if (!apkDownloadUrl.isNullOrBlank()) {
+                                val cleanTag = tagName.trim().removePrefix("v").removePrefix("V")
+                                val isNewer = isVersionHigher(cleanTag, currentVersionName)
+
+                                if (isNewer) {
+                                    val dismissed = AppStorage.getDismissedUpdateVersion()
+                                    if (!force && dismissed == cleanTag) {
+                                        Log.d(TAG, "Update v$cleanTag was previously dismissed")
+                                        _latestUpdateInfo.value = null
+                                        return@withContext null
+                                    }
+                                    val updateFromGh = UpdateInfo(
+                                        versionCode = currentVersionCode + 1,
+                                        versionName = if (cleanTag.isNotBlank()) cleanTag else "Nueva Versión",
+                                        apkUrl = apkDownloadUrl,
+                                        changelog = if (releaseBody.isNotBlank()) releaseBody else "Nueva versión disponible en GitHub",
+                                        isMandatory = false
+                                    )
+                                    Log.i(TAG, "New update found via GitHub API! v${updateFromGh.versionName}")
+                                    AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
+                                    _latestUpdateInfo.value = updateFromGh
+                                    return@withContext updateFromGh
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "GitHub Releases API check error: ${e.message}")
+                }
+            }
+
+            // 2. Check version.json as primary/fallback source
             val request = Request.Builder()
                 .url(targetUrl)
                 .header("User-Agent", "Nexo-Updater/${currentVersionName}")
@@ -115,7 +188,7 @@ object AppUpdateManager {
             val response = httpClient.newCall(request).execute()
             if (response.isSuccessful) {
                 val body = response.body?.string()
-                Log.d(TAG, "Update response: $body")
+                Log.d(TAG, "Update response from version.json: $body")
                 if (!body.isNullOrBlank()) {
                     val update = try {
                         gson.fromJson(body, UpdateInfo::class.java)
@@ -144,76 +217,6 @@ object AppUpdateManager {
                             Log.i(TAG, "New update found via version.json! v${normalizedUpdate.versionName} (code=${normalizedUpdate.versionCode})")
                             _latestUpdateInfo.value = normalizedUpdate
                             return@withContext normalizedUpdate
-                        } else {
-                            Log.d(TAG, "App is up to date (current=$currentVersionName code=$currentVersionCode, server=$remoteVer code=${update.versionCode})")
-                            _latestUpdateInfo.value = null
-                            return@withContext null
-                        }
-                    }
-                }
-            }
-
-            // Fallback: If version.json failed and repo is GitHub, check GitHub Releases API directly
-            if (targetUrl.contains("pjaraf/nexo-player") || targetUrl.contains("pjaraf/nexo-app") || targetUrl.contains("pjaraf/nexo-updates") || targetUrl.contains("github")) {
-                val githubApiUrl = if (targetUrl.contains("nexo-updates")) {
-                    "https://api.github.com/repos/pjaraf/nexo-updates/releases/latest"
-                } else if (targetUrl.contains("nexo-app")) {
-                    "https://api.github.com/repos/pjaraf/nexo-app/releases/latest"
-                } else {
-                    "https://api.github.com/repos/pjaraf/nexo-player/releases/latest"
-                }
-                Log.d(TAG, "Attempting GitHub Releases API fallback: $githubApiUrl")
-                val ghRequest = Request.Builder()
-                    .url(githubApiUrl)
-                    .header("User-Agent", "Nexo-Updater/${currentVersionName}")
-                    .header("Accept", "application/vnd.github.v3+json")
-                    .build()
-
-                val ghResponse = httpClient.newCall(ghRequest).execute()
-                if (ghResponse.isSuccessful) {
-                    val ghBody = ghResponse.body?.string()
-                    if (!ghBody.isNullOrBlank()) {
-                        val jsonObject = com.google.gson.JsonParser.parseString(ghBody).asJsonObject
-                        val tagName = jsonObject.get("tag_name")?.asString?.replace("v", "")?.trim() ?: ""
-                        val assets = jsonObject.getAsJsonArray("assets")
-
-                        var apkDownloadUrl: String? = null
-                        if (assets != null) {
-                            for (element in assets) {
-                                val assetObj = element.asJsonObject
-                                val name = assetObj.get("name")?.asString ?: ""
-                                if (name.endsWith(".apk", ignoreCase = true)) {
-                                    apkDownloadUrl = assetObj.get("browser_download_url")?.asString
-                                    break
-                                }
-                            }
-                        }
-
-                        if (!apkDownloadUrl.isNullOrBlank()) {
-                            val cleanTag = tagName.trim().removePrefix("v").removePrefix("V")
-                            val isNewer = isVersionHigher(cleanTag, currentVersionName)
-
-                            if (isNewer) {
-                                val dismissed = AppStorage.getDismissedUpdateVersion()
-                                if (dismissed == cleanTag) {
-                                    Log.d(TAG, "Update v$cleanTag was previously dismissed")
-                                    _latestUpdateInfo.value = null
-                                    return@withContext null
-                                }
-                                val updateFromGh = UpdateInfo(
-                                    versionCode = currentVersionCode + 1,
-                                    versionName = if (cleanTag.isNotBlank()) cleanTag else "Nueva Versión",
-                                    apkUrl = apkDownloadUrl,
-                                    changelog = "",
-                                    isMandatory = false
-                                )
-                                Log.i(TAG, "New update found via GitHub API! v${updateFromGh.versionName}")
-                                AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                                _latestUpdateInfo.value = updateFromGh
-                                return@withContext updateFromGh
-                            } else {
-                                Log.d(TAG, "App is already on latest version ($currentVersionName >= $cleanTag)")
-                            }
                         }
                     }
                 }
