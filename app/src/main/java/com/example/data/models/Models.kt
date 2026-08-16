@@ -141,8 +141,11 @@ data class SeriesDetailInfo(
     val name: String? = null,
     val cover: String? = null,
     val plot: String? = null,
+    val cast: String? = null,
+    val director: String? = null,
     val genre: String? = null,
     @SerializedName("release_date") val releaseDate: String? = null,
+    @SerializedName("releasedate") val releaseDateAlt: String? = null,
     val rating: Any? = null,
     @SerializedName("backdrop_path") val backdropPath: List<String>? = null
 )
