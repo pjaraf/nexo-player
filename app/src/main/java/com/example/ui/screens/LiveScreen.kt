@@ -58,6 +58,7 @@ import coil.compose.AsyncImage
 import com.example.data.api.XtreamApi
 import com.example.data.models.LiveCategory
 import com.example.data.models.LiveChannel
+import com.example.ui.components.BreakingNewsTvBanner
 import com.example.ui.components.CHANNEL_FALLBACK
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
@@ -794,99 +795,28 @@ private fun TvLiveFullscreenScreen(
         // --- 4. BOTTOM OSD BANNER (Appears when channel changes or when in full screen) ---
         AnimatedVisibility(
             visible = showOsdBanner && !showFloatingGuide,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            enter = fadeIn(animationSpec = androidx.compose.animation.core.tween(260)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = androidx.compose.animation.core.tween(300)),
+            exit = fadeOut(animationSpec = androidx.compose.animation.core.tween(220)) + slideOutVertically(targetOffsetY = { it / 2 }, animationSpec = androidx.compose.animation.core.tween(250)),
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 28.dp)
+                .align(Alignment.BottomStart)
+                .padding(start = 32.dp, bottom = 28.dp)
+                .testTag("tv_breaking_news_live_banner")
         ) {
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = Color(0xFF10101A).copy(alpha = 0.92f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                shadowElevation = 16.dp,
-                modifier = Modifier
-                    .widthIn(max = 620.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    // Logo Box
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF1B1B26))
-                            .border(1.dp, Color(0xFF333344), RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AsyncImage(
-                            model = selectedChannel?.streamIcon?.takeIf { it.isNotBlank() } ?: CHANNEL_FALLBACK,
-                            contentDescription = selectedChannel?.name,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(4.dp)
-                        )
-                    }
+            val currentChIndex = displayedChannels.indexOfFirst { it.id == selectedChannel?.id }
+            val chNum = com.example.data.models.cleanId(selectedChannel?.num).takeIf { it.isNotBlank() } ?: if (currentChIndex >= 0) "${currentChIndex + 1}" else "1"
+            val catTitle = selectedChannel?.groupName?.takeIf { it.isNotBlank() }
+                ?: if (isFavoritesCategorySelected) "FAVORITOS"
+                else (categories.find { it.categoryId == selectedCat }?.categoryName ?: "EN VIVO")
 
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = NexusPrimary
-                            ) {
-                                Text(
-                                    text = "EN VIVO",
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                            Text(
-                                text = "TV EN DIRECTO",
-                                color = Color(0xFFA0A0AB),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Text(
-                            text = selectedChannel?.name?.uppercase() ?: "CANAL",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    // Remote Hint inside OSD
-                    Surface(
-                        color = Color.White.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "◀ Canales",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
+            BreakingNewsTvBanner(
+                channelName = selectedChannel?.name ?: "CANAL EN VIVO",
+                channelNumber = chNum,
+                categoryName = catTitle,
+                channelLogoUrl = selectedChannel?.streamIcon,
+                directionLabel = null,
+                totalChannels = displayedChannels.size,
+                currentIndex = if (currentChIndex >= 0) currentChIndex + 1 else 1
+            )
         }
     }
 }
