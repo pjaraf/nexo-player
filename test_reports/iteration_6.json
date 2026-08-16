@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 6: bug fix 'No carga ningún canal de tv en vivo' end-to-end VERIFIED. Backend: 28/28 pytest tests PASS against the public preview URL. Direct API probe confirms GET /api/live/categories returns TV CHILE (id=3, name '🇨🇱 TV CHILE') as position 0, followed by 🇨🇱 DEPORTES CHILE, 🇨🇱 REGIONALES CHILE, 🇦🇷 DEPORTES ARGENTINA, etc.; total=112 categories. GET /api/live/channels?category=3&limit=5 returns 39 total channels all in group '🇨🇱 TV CHILE' (TVN 01/02/03, MEGA 01/02). All other endpoints regress cleanly. Frontend (mobile viewport 390x844, real Xtream provider, live URL): logged in with 1q1q1q1q/1q1q1q1q → single profile picked → landed on Inicio → tapped 'En Vivo' tab. Header count shows exactly '39 canales' (NOT 3867) — the race-condition bug is confirmed FIXED. The active chip on first visit is `[data-testid=\"live-chip-3\"]` = '🇨🇱 TV CHILE' with the white/active background; first three channel rows (803392, 614187, 803393) render with logo images, name text ('CH | TVN • 01' etc.), group '🇨🇱 TV CHILE' and the 'EN VIVO' badge. Manual chip switching validated: tap TODOS → count updates to '3867 canales', chip-ALL becomes active; tap DEPORTES CHILE (id 656) → count updates to '12 canales', chip-656 becomes active. Session persistence validated: leave En Vivo → Inicio → return to En Vivo, count STAYS at '12 canales' and chip-656 STAYS active — the initialActiveSetRef gate correctly prevents auto-reset to TV CHILE on re-focus, as designed. Kids-profile branch verified via code review only (no kids profile exists on the seed account): isKidsCategoryName() keyword list ['infantil','niños','ninos','kids','dibujo','cartoon','disney jr','disney junior','nick jr','nickelodeon','baby','senpai','anim'] does not match 'tv chile', so live.tsx:60 `cats.find(...tv chile)` returns undefined and setActive falls back to 'ALL' (live.tsx:61) — no infinite spinner path is possible. No React 'Cannot read property' / 'undefined is not an object' / red-screen errors were emitted during the full flow. Console noise (53 entries) is exclusively net::ERR_CONNECTION_REFUSED / ERR_NAME_NOT_RESOLVED / 404 from upstream http:// logo URLs (onerestream.us, novatv.us) — pre-existing Mixed-Content cosmetic issue on the HTTPS web preview, does not affect the native APK and unrelated to this fix.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "En Vivo (/live)", "issues": ["Pre-existing (carried from iteration 5): channel logo URLs served over http:// are blocked as Mixed Content on the HTTPS web preview. Cosmetic on web only, works on native APK."]}
+    ],
+    "react_native_issues": [
+      {"component": "player.tsx (circleBtnFocused / pillBtnFocused)", "issue": "Pre-existing (carried): 'shadow*' style props are deprecated on RN Web; consider migrating to 'boxShadow' via Platform.select. Not blocking."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "No code changes required — the Live-tab race-condition fix is verified end-to-end. Bug 'No carga ningún canal de tv en vivo' can be closed and the APK republished.",
+    "Optional (carried over): proxy or rewrite http:// logo URLs to https:// to eliminate Mixed-Content console noise on the web preview.",
+    "Optional (carried over): migrate deprecated 'shadow*' style props in player.tsx to 'boxShadow'."
+  ],
+  "critical_code_review_comments": [
+    "live.tsx:35 `useState<string>(\"\")` for `active` plus the guard at line 104 `if (!active) return;` correctly prevents the initial loadChannels('ALL', …) firing before loadCats decides the target category — this is the exact race the bug reported.",
+    "live.tsx:38 `initialActiveSetRef = useRef(false)` and lines 58-62 guarantee the TV-CHILE auto-select fires exactly ONCE per tab lifetime, so a user's manual chip choice is preserved when the tab loses/regains focus — validated end-to-end.",
+    "live.tsx:63-69 error path also sets initialActiveSetRef=true and defaults active='ALL' so a categories fetch failure cannot leave the tab stuck on the empty string (which would produce the reported infinite spinner). Good defensive branch.",
+    "live.tsx:80 kidsMode filter runs client-side after fetching /live/channels?category=ALL — this loads 3867 channels then filters to kids. Not the target of this bug but flagged: for very large channel counts this could be moved to the backend as a `?kids=true` query param to reduce payload on the Kids profile. Non-blocking optimization.",
+    "server.py:174-198 priority ordering unchanged — TV CHILE remains at index 0, exactly what the frontend needs for the auto-select fallback."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "100% (5/5 acceptance criteria verified: initial count=39, TV CHILE active on load, channels render, TODOS→3867 works, chip switching + session persistence + no JS errors)"},
+  "seed_data_creation": "None. Tests exercise the live Xtream provider zone593.com:8443 with credentials from /app/memory/test_credentials.md. Kids-profile scenario verified by code review only (seed account has no kids profile).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Bug 'No carga ningún canal de tv en vivo' is FIXED in /app/frontend/app/(tabs)/live.tsx. Key contract for future regression testing: on first entry to the En Vivo tab, `[data-testid=\"live-title\"]` sibling text must read '39 canales' and `[data-testid=\"live-chip-3\"]` must have backgroundColor rgb(255,255,255). If either is wrong the race condition has regressed. Use `document.querySelector('[data-testid=\"live-chip-<catId>\"]').click()` (JS click, not Playwright click) to switch chips reliably — the horizontal ScrollView can hide chips off-screen and Playwright click will land on the FlatList row below. Test creds unchanged: 1q1q1q1q/1q1q1q1q at https://channel-streamer-6.preview.emergentagent.com. Backend suite: `pytest /app/backend/tests/ -v` — 28 tests, ~9s. Playback in the browser still shows 'Este contenido no se puede reproducir' (Chromium HLS limitation, out of scope).",
+  "rca_of_issue": "Root cause: previous implementation initialised `active` with 'ALL' as the useState default. The first loadChannels effect therefore fired immediately with cat='ALL' (fetching the full 3867-channel list). loadCats then completed a moment later and called setActive(tvChile.id=3) which triggered a SECOND loadChannels(3, …). Because of network jitter the ALL response occasionally arrived AFTER the TV-CHILE response, so the stale 3867-channel list clobbered the fresh 39-channel list and the tab appeared to 'not load' the intended TV CHILE channels (or displayed 3867 with no error). Fix: (1) initial `active` is now empty string; (2) the loadChannels useEffect early-returns while `active === ''`; (3) loadCats sets active to the found TV CHILE id (or 'ALL' fallback) and toggles a ref so subsequent focuses preserve the user's choice. This makes the auto-select deterministic and one-shot. Verified: header count is '39 canales' on first load, chip-3 is white/active, and TVN/MEGA/CHV rows render — the exact expected UX."
+}

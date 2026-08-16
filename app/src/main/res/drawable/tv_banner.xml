@@ -1,0 +1,128 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <!-- Background 16:9 Dark Cinematic Canvas -->
+    <path
+        android:pathData="M0,0h320v180H0z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="320"
+                android:endY="180"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#2A0409" />
+                <item android:offset="0.5" android:color="#140205" />
+                <item android:offset="1.0" android:color="#080002" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Subtle Red Ambient Glow behind logo on Left -->
+    <path
+        android:pathData="M90,90m-80,0a80,80 0,1 1,160 0a80,80 0,1 1,-160 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="90"
+                android:centerY="90"
+                android:gradientRadius="80"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#44E50914" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Circular Badge Medallion on Left (Center at x=88, y=90, r=58) -->
+    <group
+        android:scaleX="0.23"
+        android:scaleY="0.23"
+        android:translateX="29.12"
+        android:translateY="31.12">
+
+        <!-- Outer Shadow / Dark Crimson Rim -->
+        <path
+            android:fillColor="#4D050D"
+            android:pathData="M256,256m-250,0a250,250 0,1 1,500 0a250,250 0,1 1,-500 0" />
+
+        <!-- Concentric Outer Ring -->
+        <path
+            android:fillColor="#680914"
+            android:pathData="M256,256m-234,0a234,234 0,1 1,468 0a234,234 0,1 1,-468 0" />
+
+        <!-- Concentric Mid Ring -->
+        <path
+            android:fillColor="#780C19"
+            android:pathData="M256,256m-212,0a212,212 0,1 1,424 0a212,212 0,1 1,-424 0" />
+
+        <!-- Concentric Inner Ring -->
+        <path
+            android:fillColor="#880E1D"
+            android:pathData="M256,256m-190,0a190,190 0,1 1,380 0a190,190 0,1 1,-380 0" />
+
+        <!-- Center Crimson Gradient Badge -->
+        <path
+            android:pathData="M256,256m-172,0a172,172 0,1 1,344 0a172,172 0,1 1,-344 0">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerX="220"
+                    android:centerY="220"
+                    android:gradientRadius="180"
+                    android:type="radial">
+                    <item android:offset="0.0" android:color="#AB1225" />
+                    <item android:offset="0.7" android:color="#910F1F" />
+                    <item android:offset="1.0" android:color="#780C19" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Center Letter "N" in crisp White -->
+        <!-- Left Column -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M165,148 L207,148 L207,364 L165,364 Z" />
+
+        <!-- Right Column -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M305,148 L347,148 L347,364 L305,364 Z" />
+
+        <!-- Diagonal Stroke -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M165,148 L207,148 L347,364 L305,364 Z" />
+
+        <!-- Golden Yellow Play Triangle Accent -->
+        <path
+            android:fillColor="#FFB300"
+            android:pathData="M306,298 L306,346 L348,322 Z" />
+    </group>
+
+    <!-- Branding Text "NEXO" on Right -->
+    <!-- Letter N -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M165,70 h7.5 l18,28.5 V70 h7.5 v40 h-7.5 l-18,-28.5 V110 H165 Z" />
+    <!-- Letter E -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M205,70 h23 v6.5 h-15.5 v10.2 h13.5 v6.3 h-13.5 v10.5 H228 V110 H205 Z" />
+    <!-- Letter X -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M234,70 h8.2 l9,18.5 l9,-18.5 h8.2 l-12.8,20 l13.4,20 h-8.4 l-9.4,-18.5 l-9.4,18.5 h-8.4 l13.4,-20 Z" />
+    <!-- Letter O (Red Nexo signature) -->
+    <path
+        android:fillColor="#E50914"
+        android:pathData="M285,70 c-8.5,0 -15.5,6.5 -15.5,20 s7,20 15.5,20 s15.5,-6.5 15.5,-20 s-7,-20 -15.5,-20 Z M285,77 c4.5,0 8,5.5 8,13 s-3.5,13 -8,13 s-8,-5.5 -8,-13 s3.5,-13 8,-13 Z" />
+
+    <!-- Subtitle "TV PLAYER" accent line -->
+    <path
+        android:fillColor="#A0A0B0"
+        android:pathData="M165,122 h140 v1.5 H165 Z" />
+
+</vector>

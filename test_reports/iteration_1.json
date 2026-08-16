@@ -1,0 +1,35 @@
+{
+  "summary": "First iteration of ZapingX IPTV clone tested end-to-end. Backend: 22/22 pytest cases pass after a small fix (invalid credentials now return 401 instead of 500). All required endpoints work against real Xtream server (auth, live categories/channels/play with hidden URL, VOD categories/streams/info, series categories/list/info with per-episode URLs) and all authenticated endpoints reject requests without an Authorization header. Frontend: Login → tabs navigation works; Home hero + 3 rows (Live/Movies/Series) render; Live tab shows 224 channels with working search; Movies shows real posters and reports 29,769 titles; Series tab loads; Profile shows correct username 1q1q1q1q and Logout returns to Login. No deprecated Expo packages (expo-video used instead of expo-av). No SafeAreaView misuse. No React Native red screens.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional: verify live video playback on a native build (expo-video on web may not play some HLS/UA-gated streams — expected per E1 note)."
+  ],
+  "critical_code_review_comments": [
+    "server.py login() did not wrap the JSON parse from Xtream, so invalid credentials caused a 500 due to JSONDecodeError. Fixed by catching JSONDecodeError/ValueError and non-dict responses → returning 401.",
+    "In-memory M3U cache (30 min TTL) is fine for single-instance deployment; will need shared cache if scaled horizontally.",
+    "verify=False on the Xtream httpx client disables TLS validation — acceptable because the provider uses a self-signed cert, but worth documenting."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (login: added JSONDecodeError/ValueError → 401 handling)",
+    "/app/backend/tests/backend_test.py (new pytest suite, 22 tests)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. Live data comes from Xtream/M3U.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Frontend uses EXPO_PUBLIC_BACKEND_URL (not EXPO_BACKEND_URL) in /app/frontend/.env. Xtream credentials in /app/memory/test_credentials.md (1q1q1q1q/1q1q1q1q). Base test file: /app/backend/tests/backend_test.py. React Native TextInput on web preview must be filled with keyboard.type() after clicking – fill() does not update state.",
+  "rca_of_issue": "Invalid-credentials 500: Xtream returns a non-JSON response body (empty/HTML) when auth fails; httpx r.json() raised JSONDecodeError which propagated as 500. Root cause: login() only caught httpx.HTTPError, missing JSON decode error path. Mitigation applied: catch JSONDecodeError/ValueError and non-dict payloads and return 401 with the standard message."
+}

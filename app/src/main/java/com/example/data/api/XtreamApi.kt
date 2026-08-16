@@ -1,0 +1,470 @@
+package com.example.data.api
+
+import android.util.Log
+import com.example.data.models.*
+import com.example.data.storage.AppStorage
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+
+object XtreamApi {
+    private const val TAG = "XtreamApi"
+    var SERVER_HOST = "http://eliteplusec.com:8080"
+    val baseUrl: String
+        get() = SERVER_HOST.trimEnd('/')
+
+    private const val DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 VLC/3.0.18 LibVLC/3.0.18"
+
+    private val gson = Gson()
+
+    private val httpClient: OkHttpClient by lazy {
+        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        })
+
+        val sslContext = SSLContext.getInstance("SSL")
+        sslContext.init(null, trustAllCerts, SecureRandom())
+
+        OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+            .hostnameVerifier { _, _ -> true }
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
+
+    // In-memory caching for faster screen transitions
+    private val memoryCache = mutableMapOf<String, Any>()
+
+    // Dedicated M3U Playlist for Live TV
+    const val LIVE_PLAYLIST_URL = "https://www.dropbox.com/scl/fi/c13v3nfgw2x81qfy0v1i6/CLIENTES.txt?rlkey=ge7xlg9kew1iaslgj68cgn59h&st=18m5wcdh&dl=1"
+    private var parsedLiveChannels: List<LiveChannel>? = null
+    private var parsedLiveCategories: List<LiveCategory>? = null
+
+    fun clearCache() {
+        memoryCache.clear()
+        parsedLiveChannels = null
+        parsedLiveCategories = null
+    }
+
+    private suspend fun fetch(
+        action: String? = null,
+        extraParams: Map<String, String> = emptyMap(),
+        customUser: String? = null,
+        customPass: String? = null
+    ): String? = withContext(Dispatchers.IO) {
+        val username = customUser ?: AppStorage.getUsername()
+        val password = customPass ?: AppStorage.getPassword()
+
+        if (username.isBlank() || password.isBlank()) {
+            return@withContext null
+        }
+
+        val urlBuilder = "$baseUrl/player_api.php".toHttpUrlOrNull()?.newBuilder()
+            ?: return@withContext null
+
+        urlBuilder.addQueryParameter("username", username)
+        urlBuilder.addQueryParameter("password", password)
+
+        action?.let { urlBuilder.addQueryParameter("action", it) }
+        extraParams.forEach { (k, v) -> urlBuilder.addQueryParameter(k, v) }
+
+        val request = Request.Builder()
+            .url(urlBuilder.build())
+            .header("User-Agent", DEFAULT_UA)
+            .build()
+
+        try {
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                response.body?.string()
+            } else {
+                Log.w(TAG, "Fetch failed for action=$action code=${response.code}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Network error for action=$action: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun login(username: String, pass: String): LoginResponse? {
+        val json = fetch(customUser = username, customPass = pass) ?: return null
+        return try {
+            val res = gson.fromJson(json, LoginResponse::class.java)
+            val userInfo = res.userInfo
+            if (userInfo == null) return null
+
+            val authRaw = userInfo.auth?.toString()?.trim()
+            val status = userInfo.status?.trim()
+            val user = userInfo.username?.trim()
+
+            // Verify authentication explicitly
+            val isAuthPositive = authRaw == "1" || authRaw == "1.0" || authRaw.equals("true", ignoreCase = true)
+            val isAuthNegative = authRaw == "0" || authRaw == "0.0" || authRaw.equals("false", ignoreCase = true)
+            val isStatusDisabled = status.equals("Disabled", ignoreCase = true) ||
+                    status.equals("Banned", ignoreCase = true) ||
+                    status.equals("Expired", ignoreCase = true)
+
+            if (!isAuthNegative && !isStatusDisabled && !user.isNullOrBlank() && (isAuthPositive || status.equals("Active", ignoreCase = true) || status.equals("Trial", ignoreCase = true))) {
+                res
+            } else {
+                Log.w(TAG, "Login rejected by server validation. auth=$authRaw, status=$status, user=$user")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Login parse error", e)
+            null
+        }
+    }
+
+    // --- Live TV from Custom Dropbox Playlist / Xtream Server ---
+    private suspend fun fetchLiveM3uContent(): String? = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(LIVE_PLAYLIST_URL)
+                .header("User-Agent", DEFAULT_UA)
+                .build()
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                response.body?.string()
+            } else {
+                Log.w(TAG, "Failed to download M3U live list code=${response.code}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error downloading M3U live list", e)
+            null
+        }
+    }
+
+    private suspend fun parseAndCacheLiveList(): List<LiveChannel> = withContext(Dispatchers.IO) {
+        parsedLiveChannels?.let { return@withContext it }
+
+        val content = fetchLiveM3uContent()
+        if (content.isNullOrBlank()) {
+            // Try fetching live streams from server Xtream API
+            val xtreamJson = fetch(action = "get_live_streams")
+            if (!xtreamJson.isNullOrBlank()) {
+                try {
+                    val type = object : TypeToken<List<LiveChannel>>() {}.type
+                    val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
+                    if (list.isNotEmpty()) {
+                        parsedLiveChannels = list
+                        return@withContext list
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to parse xtream live streams", e)
+                }
+            }
+            return@withContext emptyList()
+        }
+
+        val entries = content.split("#EXTINF:")
+        val channels = mutableListOf<LiveChannel>()
+        val groupCategoriesMap = linkedMapOf<String, String>()
+
+        val logoRegex = Regex("""tvg-logo=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+        val groupRegex = Regex("""group-title=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+        val urlRegex = Regex("""(https?://[^\s\r\n"'<>]+)""", RegexOption.IGNORE_CASE)
+
+        for ((idx, entry) in entries.drop(1).withIndex()) {
+            val trimmed = entry.trim()
+            if (trimmed.isEmpty()) continue
+
+            val logoMatch = logoRegex.find(trimmed)
+            val logo = logoMatch?.groupValues?.get(1)?.trim().orEmpty()
+
+            val groupMatch = groupRegex.find(trimmed)
+            val rawGroup = groupMatch?.groupValues?.get(1)?.trim()
+            val group = if (rawGroup.isNullOrBlank()) "GENERAL" else rawGroup
+
+            val commaIdx = trimmed.indexOf(',')
+            var name = "Canal ${idx + 1}"
+            var streamUrl = ""
+
+            if (commaIdx != -1) {
+                val afterComma = trimmed.substring(commaIdx + 1).trim()
+                val urlMatch = urlRegex.find(afterComma)
+                if (urlMatch != null) {
+                    streamUrl = urlMatch.groupValues[1].trim()
+                    name = afterComma.substring(0, urlMatch.range.first).trim()
+                } else {
+                    name = afterComma.lines().firstOrNull()?.trim() ?: name
+                }
+            }
+
+            name = name.replace(Regex("""https?://.*"""), "").trim()
+            if (name.isBlank()) name = "Canal ${idx + 1}"
+
+            val categorySlug = group.lowercase()
+                .replace(" ", "_")
+                .replace("/", "_")
+                .replace("&", "_")
+                .replace("á", "a")
+                .replace("é", "e")
+                .replace("í", "i")
+                .replace("ó", "o")
+                .replace("ú", "u")
+
+            groupCategoriesMap[group] = categorySlug
+
+            channels.add(
+                LiveChannel(
+                    streamId = "live_${idx + 1}",
+                    num = idx + 1,
+                    name = name,
+                    streamIcon = logo.ifBlank { null },
+                    categoryId = categorySlug,
+                    groupName = group,
+                    directStreamUrl = streamUrl
+                )
+            )
+        }
+
+        parsedLiveChannels = channels
+
+        val cats = groupCategoriesMap.map { (grp, slug) ->
+            LiveCategory(categoryId = slug, categoryName = grp)
+        }
+        parsedLiveCategories = sortCategories(cats)
+
+        return@withContext channels
+    }
+
+    suspend fun getLiveCategories(): List<LiveCategory> {
+        parsedLiveCategories?.let { return it }
+
+        // Attempt live categories from xtream server first if present
+        val json = fetch(action = "get_live_categories")
+        if (!json.isNullOrBlank()) {
+            try {
+                val type = object : TypeToken<List<LiveCategory>>() {}.type
+                val list: List<LiveCategory> = gson.fromJson(json, type) ?: emptyList()
+                if (list.isNotEmpty()) {
+                    val sorted = sortCategories(list)
+                    parsedLiveCategories = sorted
+                    return sorted
+                }
+            } catch (_: Exception) {}
+        }
+
+        parseAndCacheLiveList()
+        return parsedLiveCategories ?: emptyList()
+    }
+
+    private fun sortCategories(list: List<LiveCategory>): List<LiveCategory> {
+        val priorityKeywords = listOf(
+            "nacionales", "chile", "futbol", "fútbol", "espn", "tnt sports",
+            "deportes motor", "tyc", "otros deportes", "cine premium", "hbo",
+            "universal", "sony", "starz", "fox", "cine y series", "24/7",
+            "cine 24/7", "infantil", "entretenimiento", "cultura", "musica", "música",
+            "emisora", "eventos", "dgo", "claro", "fmh", "freetv"
+        )
+        return list.sortedWith(compareBy<LiveCategory> { cat ->
+            val low = cat.categoryName.lowercase()
+            val idx = priorityKeywords.indexOfFirst { low.contains(it) }
+            if (idx >= 0) idx else priorityKeywords.size + 1
+        }.thenBy { it.categoryName.lowercase() })
+    }
+
+    suspend fun getLiveChannels(categoryId: String? = null): List<LiveChannel> {
+        val allChannels = parseAndCacheLiveList()
+        return if (categoryId.isNullOrBlank() || categoryId == "ALL") {
+            allChannels
+        } else {
+            allChannels.filter { it.categoryId == categoryId }
+        }
+    }
+
+    suspend fun getVodCategories(): List<VodCategory> {
+        val cacheKey = "vod_cats"
+        (memoryCache[cacheKey] as? List<VodCategory>)?.let { return it }
+
+        val json = fetch(action = "get_vod_categories") ?: return emptyList()
+        val result = try {
+            val type = object : TypeToken<List<VodCategory>>() {}.type
+            val list: List<VodCategory> = gson.fromJson(json, type) ?: emptyList()
+            list
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing vod categories", e)
+            emptyList()
+        }
+
+        if (result.isNotEmpty()) {
+            memoryCache[cacheKey] = result
+        }
+        return result
+    }
+
+    suspend fun getVodStreams(categoryId: String? = null): List<VodStream> {
+        val cacheKey = "vod_streams_${categoryId ?: "ALL"}"
+        (memoryCache[cacheKey] as? List<VodStream>)?.let { return it }
+
+        val params = mutableMapOf<String, String>()
+        if (!categoryId.isNullOrBlank() && categoryId != "ALL") {
+            params["category_id"] = categoryId
+        }
+
+        val json = fetch(action = "get_vod_streams", extraParams = params) ?: return emptyList()
+        val result = try {
+            val type = object : TypeToken<List<VodStream>>() {}.type
+            val list: List<VodStream> = gson.fromJson(json, type) ?: emptyList()
+            list
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing vod streams", e)
+            emptyList()
+        }
+
+        if (result.isNotEmpty()) {
+            memoryCache[cacheKey] = result
+        }
+        return result
+    }
+
+    suspend fun getVodDetail(streamId: String): VodDetailResponse? {
+        val json = fetch(action = "get_vod_info", extraParams = mapOf("vod_id" to streamId)) ?: return null
+        return try {
+            gson.fromJson(json, VodDetailResponse::class.java)
+        } catch (e: Exception) {
+            Log.w(TAG, "VodDetail parse error: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun getSeriesCategories(): List<SeriesCategory> {
+        val cacheKey = "series_cats"
+        (memoryCache[cacheKey] as? List<SeriesCategory>)?.let { return it }
+
+        val json = fetch(action = "get_series_categories") ?: return emptyList()
+        val result = try {
+            val type = object : TypeToken<List<SeriesCategory>>() {}.type
+            val list: List<SeriesCategory> = gson.fromJson(json, type) ?: emptyList()
+            list
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing series categories", e)
+            emptyList()
+        }
+
+        if (result.isNotEmpty()) {
+            memoryCache[cacheKey] = result
+        }
+        return result
+    }
+
+    suspend fun getSeriesList(categoryId: String? = null): List<SeriesItem> {
+        val cacheKey = "series_list_${categoryId ?: "ALL"}"
+        (memoryCache[cacheKey] as? List<SeriesItem>)?.let { return it }
+
+        val params = mutableMapOf<String, String>()
+        if (!categoryId.isNullOrBlank() && categoryId != "ALL") {
+            params["category_id"] = categoryId
+        }
+
+        val json = fetch(action = "get_series", extraParams = params) ?: return emptyList()
+        val result = try {
+            val type = object : TypeToken<List<SeriesItem>>() {}.type
+            val list: List<SeriesItem> = gson.fromJson(json, type) ?: emptyList()
+            list
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing series list", e)
+            emptyList()
+        }
+
+        if (result.isNotEmpty()) {
+            memoryCache[cacheKey] = result
+        }
+        return result
+    }
+
+    suspend fun getSeriesDetail(seriesId: String): Pair<SeriesDetailInfo?, Map<String, List<Episode>>> {
+        val json = fetch(action = "get_series_info", extraParams = mapOf("series_id" to seriesId)) ?: return Pair(null, emptyMap())
+        return try {
+            val jsonObj = gson.fromJson(json, JsonObject::class.java)
+            val infoObj = jsonObj.getAsJsonObject("info")
+            val info = infoObj?.let { gson.fromJson(it, SeriesDetailInfo::class.java) }
+
+            val episodesMap = mutableMapOf<String, List<Episode>>()
+            val epObj = jsonObj.getAsJsonObject("episodes")
+            if (epObj != null) {
+                for (seasonKey in epObj.keySet()) {
+                    val seasonArr = epObj.getAsJsonArray(seasonKey)
+                    val type = object : TypeToken<List<Episode>>() {}.type
+                    val list: List<Episode> = gson.fromJson(seasonArr, type) ?: emptyList()
+                    episodesMap[seasonKey] = list
+                }
+            }
+            Pair(info, episodesMap)
+        } catch (e: Exception) {
+            Log.w(TAG, "SeriesDetail parse error: ${e.message}")
+            Pair(null, emptyMap())
+        }
+    }
+
+    // --- Real Stream URLs ---
+    fun getLiveStreamUrl(channelId: String): String {
+        val cid = cleanId(channelId)
+        val ch = parsedLiveChannels?.find { it.id == cid || it.streamId?.toString() == cid || it.name == cid }
+        if (ch != null && !ch.directStreamUrl.isNullOrBlank()) {
+            return ch.directStreamUrl!!
+        }
+        val u = AppStorage.getUsername()
+        val p = AppStorage.getPassword()
+        if (u.isNotBlank() && p.isNotBlank() && cid.isNotBlank()) {
+            return "$baseUrl/live/$u/$p/$cid.ts"
+        }
+        return ""
+    }
+
+    fun getLiveStreamCandidates(channelId: String): List<String> {
+        val cid = cleanId(channelId)
+        val ch = parsedLiveChannels?.find { it.id == cid || it.streamId?.toString() == cid || it.name == cid }
+        val list = mutableListOf<String>()
+        if (ch != null && !ch.directStreamUrl.isNullOrBlank()) {
+            list.add(ch.directStreamUrl!!)
+        }
+        val u = AppStorage.getUsername()
+        val p = AppStorage.getPassword()
+        if (u.isNotBlank() && p.isNotBlank() && cid.isNotBlank()) {
+            list.add("$baseUrl/live/$u/$p/$cid.m3u8")
+            list.add("$baseUrl/live/$u/$p/$cid.ts")
+            list.add("$baseUrl/$u/$p/$cid")
+        }
+        return list
+    }
+
+    fun getVodStreamUrl(streamId: String, extension: String = "mp4"): String {
+        val sid = cleanId(streamId)
+        val u = AppStorage.getUsername()
+        val p = AppStorage.getPassword()
+        val ext = extension.ifBlank { "mp4" }
+        if (u.isBlank() || p.isBlank() || sid.isBlank()) {
+            return ""
+        }
+        return "$baseUrl/movie/$u/$p/$sid.$ext"
+    }
+
+    fun getSeriesStreamUrl(episodeId: String, extension: String = "mp4"): String {
+        val eid = cleanId(episodeId)
+        val u = AppStorage.getUsername()
+        val p = AppStorage.getPassword()
+        val ext = extension.ifBlank { "mp4" }
+        if (u.isBlank() || p.isBlank() || eid.isBlank()) {
+            return ""
+        }
+        return "$baseUrl/series/$u/$p/$eid.$ext"
+    }
+}

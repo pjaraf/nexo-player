@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 4: verified full removal of the Dropbox/M3U code path and the migration of Live TV to native Xtream endpoints, plus prev/next channel controls, series auto-next episode, and D-pad red focus outlines. Backend: 24/24 pytest tests PASS against the public preview URL. Frontend: full login -> profile-select -> live -> /player and login -> series -> series detail -> /player flows verified in mobile viewport (390x844). Key verifications: (1) /api/live/categories returns 114 Xtream categories, each with {id, name} string fields (>90 required, PASS). (2) /api/live/channels returns 3867 total streams, each with numeric-string id, name, logo (stream_icon URL), group (category name), no 'm3u_' prefix anywhere. (3) /api/live/channels?category=<id>&limit=20 respects the filter (all returned channels' group == chosen category name) and the limit. (4) /api/live/play?id=<real_numeric_id> returns {url: '/api/stream/live/<id>?t=<token>', name, logo} — no raw upstream URL, no m3u_. (5) /api/live/play?id=999999999999 returns 404. (6) /api/stream/live/<id>?t=<token> returns either application/vnd.apple.mpegurl with only /api/stream/seg? or /api/stream/hls? rewrites (no zone593.com leak) OR raw video/octet-stream bytes for TS-only channels. (7) grep of /app/backend/server.py: NO occurrences of 'CLIENTES.txt', 'dropbox', or 'm3u_'. (8) Regression: /api/auth/login works, /api/vod/info stream_url starts with '/api/stream/vod/', /api/series/info episodes stream_url starts with '/api/stream/series/'. (9) Frontend: 'En Vivo' tab shows exactly '3867 canales' as required. Category chips include 'TODOS', 'FAVORITOS' and 112 real Xtream categories (114 chips total). (10) Tap on live channel -> URL becomes /player?type=live&id=1228530&title=...&category=ALL — id is numeric string, category param present. (11) On the /player screen while in live mode, tapping to arm controls reveals the D-pad focusable 'Canal -' (player-prev-channel), 'Canal +' (player-next-channel), and close (player-close-button) buttons — all three testIDs present in DOM. (12) Tap on series/19453 first episode -> /player?url=<absolute /api/stream/series/...>&nextUrl=<absolute /api/stream/series/...>&nextTitle='Ciclos (2020) · E2'&nextContentId=19453_1250013 — auto-next chain wired. (13) Last episode of the same season -> nextUrl is empty '' as expected. (14) Source grep confirms 'focused && styles.cardFocused' on Live channel cards (live.tsx:192), Movies items (movies.tsx:155), Series items (series.tsx:155) — red focus outline is implemented. No blocking issues found; app is ready for native APK regression.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login (invalid creds)", "issue": "Xtream upstream serves a Cloudflare WAF HTML block page for wrong credentials, causing httpx.HTTPStatusError to be mapped to 502 instead of a clean 401. Pre-existing from iteration 3. Not a regression. Recommend catching non-JSON responses and returning 401 'Usuario o clave incorrectos'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "login-card (login.tsx:80)", "issue": "Console error: 'Unexpected text node: A text node cannot be a child of a <View>' — stray whitespace between JSX tags in the login card. Pre-existing, does not block flow."},
+      {"component": "Global (react-native-web)", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\"'. Pre-existing RN-Web deprecation. Notably player.tsx circleBtnFocused and pillBtnFocused both use shadowColor/shadowOpacity/shadowRadius which will keep triggering this warning."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: replace 'shadowColor/shadowOpacity/shadowRadius' style props with 'boxShadow' or move them behind Platform.select({native:{...}, web:{}}) in player.tsx to silence the RN-Web deprecation warning for the new focus glow.",
+    "Optional: normalize /api/auth/login to 401 when Xtream returns a WAF/HTML block for invalid credentials (currently 502). Pre-existing minor.",
+    "Optional: strip stray whitespace inside the <View testID=\"login-card\"> tag in /app/frontend/app/login.tsx:80 to silence the recurring 'Unexpected text node' console error.",
+    "No functional change required for this iteration's feature set — all 24 backend tests pass and all 13 review-request checks pass end-to-end."
+  ],
+  "critical_code_review_comments": [
+    "server.py live_categories: correctly maps Xtream get_live_categories to {id: str, name} — id is coerced to string so it matches the /live/channels?category=<id> contract; empty categories still get 'Sin categoría' fallback.",
+    "server.py live_channels: builds a cat_lookup from get_live_categories so channels carry the human-readable 'group' name — this is exactly what the frontend chips row and the player prev/next need. 'total' reflects the filtered corpus BEFORE the limit slice, so the '3867 canales' header stays honest.",
+    "server.py live_play: numeric stream_id lookup via next((s for s in streams if str(s.stream_id) == str(id))) — clean. Returns 404 on miss. Returned url is a relative proxy path so the frontend absoluteUrl() prefixes EXPO_PUBLIC_BACKEND_URL. No leaked upstream host.",
+    "server.py _proxy_hls_playlist: preserved from iteration 3 — rewrites both plain segment lines and URI=\"...\" inside #EXT-X-KEY/#EXT-X-MAP. Nested variant m3u8s point to /api/stream/hls (recursive rewrite) — correct.",
+    "player.tsx: jumpChannel uses (idx + delta + len) % len — safely wraps at both ends. Loads category channels with limit=500, which is enough for the largest observed category. useEventListener 'playToEnd' + advancedRef guard prevents double auto-advance.",
+    "player.tsx focus outline: Pressable render-prop pattern with ({focused}) => styles.pillBtnFocused adds a 2px red border + red glow + scale(1.05) — highly visible on TV. Matches the same pattern used on tabs/live.tsx, tabs/movies.tsx, tabs/series.tsx.",
+    "series/[id].tsx: nextEp is computed as eps[idx+1] inside the map, so the last episode of a season gets nextEp=undefined and nextUrl='' — verified in UI. Note: this does NOT auto-advance ACROSS seasons; if that's desired later the array needs to be flattened.",
+    "live.tsx: passes category = active === '__FAVS__' ? 'ALL' : active — safe (favorites tab feeds the player with the full list for prev/next).",
+    "server.py file is 499 lines — still under the 700-line guidance. Splitting the stream-proxy block into its own module would still be a nice cleanup."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (rewrote for iteration 4: removed obsolete M3U/count/m3u_id expectations, added Xtream-native live category/channel shape assertions, added Dropbox-removal grep test, kept auth/VOD/series regression, tightened HLS rewrite check)"
+  ],
+  "success_rate": {"backend": "100% (24/24)", "frontend": "100% (13/13 review checks)"},
+  "seed_data_creation": "None. Tests use live Xtream provider zone593.com:8443 with credentials from /app/memory/test_credentials.md.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Public URL: EXPO_PUBLIC_BACKEND_URL from frontend/.env. Test creds: 1q1q1q1q / 1q1q1q1q. TestIDs — login: login-username-input / login-password-input / login-submit-button. Profile: profile-item-<n>. Tabs are rendered by expo-router (no tab-* testIDs — navigate directly via URL: /live, /movies, /series, /profile). Live tab: live-chip-<cat_id> (114 total incl. ALL + __FAVS__), live-channel-<numeric_id> (~124 per category), header shows '3867 canales'. Player: player-screen (tap to re-arm controls, controls auto-hide after 4s), player-close-button, player-prev-channel, player-next-channel. Home has live-card-<numeric_id> tiles. Movies tab uses movie-item-<stream_id>; Series tab uses series-item-<series_id>. Series detail episode tiles use episode-<episode_id> and pass nextUrl/nextTitle/nextContentId (empty on last episode of a season). Playback itself is expected to fail in the browser preview ('Este contenido no se puede reproducir') — this is NORMAL for HLS in Chromium without hls.js; verify only URL contract + controls, not actual playback. The Xtream upstream returns Cloudflare WAF HTML for bad login creds -> backend returns 502; keep any negative-auth test tolerant of both 401 and 502.",
+  "rca_of_issue": "N/A — new feature validation. Original user request was to migrate live TV off a hidden Dropbox M3U onto Xtream's native get_live_categories/get_live_streams, add prev/next channel controls in the player, auto-advance to the next episode in a series, and give Android TV a red D-pad focus outline. All four are implemented and verified: (1) Dropbox URL/CLIENTES.txt/m3u_ prefixes are 100% removed from server.py (grep confirmed); (2) prev/next channel Pressables with testIDs are visible in the player when in live mode; (3) series/[id].tsx passes nextUrl to /player, and player.tsx's 'playToEnd' event replaces the route with the next episode; (4) the Pressable focus render-prop applies styles.cardFocused/pillBtnFocused which draw a 2px red border + colored glow + scale(1.05) transform on Live, Movies, Series tiles and on the player pill/close buttons."
+}

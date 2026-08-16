@@ -1,0 +1,87 @@
+{
+  "theme": "dark",
+  "app_type": "streaming_iptv",
+  "typography": {
+    "fonts": {
+      "headings": "Outfit, sans-serif",
+      "body": "Manrope, sans-serif"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-black",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "body": "text-base leading-relaxed",
+      "labels": "text-xs tracking-[0.2em] uppercase font-bold"
+    },
+    "strategy": "High contrast, geometric for headings to give a cinematic modern vibe. Legible, clean sans for the body text to ensure readability on small screens and at 10-foot TV distances."
+  },
+  "colors": {
+    "background": "#050505",
+    "surface": "#14141E",
+    "surface_glass": "bg-black/60 backdrop-blur-2xl border border-white/10",
+    "primary": "#E50914",
+    "primary_hover": "#F41B35",
+    "accent": "#00E5FF",
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A0A0B0",
+      "muted": "#707080"
+    }
+  },
+  "layouts": {
+    "general": "Mobile-first responsive. Dark theme exclusively. Cinematic and immersive.",
+    "hero": "Edge-to-edge carousel. 80vh height on mobile. `bg-gradient-to-t from-[#050505] via-[#050505]/50 to-transparent` overlay.",
+    "content_rows": "Horizontal scroll containers. `flex overflow-x-auto snap-x snap-mandatory gap-4 px-4 pb-4`. Use `scrollbar-hide` utility.",
+    "grid": "Used for 'All Movies' or 'All Series'. `grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4`.",
+    "tv_optimization": "Large touch targets (`min-h-[48px]`). Elements MUST have explicit `focus:` states for Android TV D-pad navigation."
+  },
+  "components": {
+    "login_screen": "Cinematic background (blurred movie poster). Central glassmorphic card (`bg-black/60 backdrop-blur-xl border border-white/10`). Native-feeling inputs.",
+    "movie_poster": "Aspect ratio 2:3. `rounded-xl`. Image object-cover. Must include focus/hover scaling.",
+    "live_tv_card": "Aspect ratio 16:9 for channel thumbnails. `rounded-lg`. Overlay with channel logo/name.",
+    "category_chips": "Pill-shaped `rounded-full px-6 py-2`. Default `bg-[#14141E] text-white/70`, Active `bg-white text-black font-bold`.",
+    "video_player": "Full screen absolute layout. Custom controls overlay `bg-gradient-to-t from-black/80 to-transparent`. Large intuitive play/pause icons.",
+    "bottom_nav": "Fixed bottom. Glassmorphism `bg-black/80 backdrop-blur-xl border-t border-white/10`. Only visible on mobile/tablets, convert to sidebar on TV/Desktop."
+  },
+  "motion": {
+    "interactions": "All interactive elements (posters, buttons, chips) MUST have `transition-transform duration-300 ease-out`.",
+    "hover": "`hover:scale-105 hover:z-10`",
+    "focus": "CRITICAL for Google TV: `focus:scale-105 focus:ring-4 focus:ring-white/80 focus:outline-none focus:z-10`"
+  },
+  "accessibility": {
+    "contrast": "Ensure text over images has sufficient shadow or gradient backdrop.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., `data-testid=\"login-form-submit-button\"`, `data-testid=\"movie-poster-card\"`)."
+  },
+  "media": {
+    "image_urls": {
+      "hero": [
+        "https://images.unsplash.com/photo-1614020661498-fef5b2293108?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwyfHxkYXJrJTIwc3RyZWFtaW5nJTIwaW50ZXJmYWNlfGVufDB8fHx8MTc4NDE3NTc4Nnww&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1671368913134-c211bc02487f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxsaXZlJTIwc3BvcnRzJTIwYnJvYWRjYXN0fGVufDB8fHx8MTc4NDE3NTc4Nnww&ixlib=rb-4.1.0&q=85"
+      ],
+      "movies": [
+        "https://images.pexels.com/photos/12838778/pexels-photo-12838778.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "https://images.unsplash.com/photo-1782020934325-cfe4cea4fd9c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwyfHxjaW5lbWF0aWMlMjBtb3ZpZSUyMHBvc3RlciUyMGRhcmt8ZW58MHx8fHwxNzg0MTE0NjI2fDA&ixlib=rb-4.1.0&q=85"
+      ],
+      "series": [
+        "https://images.pexels.com/photos/3137890/pexels-photo-3137890.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHwyfHx0diUyMHNob3clMjBwb3N0ZXJ8ZW58MHx8fHwxNzg0MTc1Nzg2fDA&ixlib=rb-4.1.0&q=85"
+      ],
+      "live_tv": [
+        "https://images.unsplash.com/photo-1693328394659-e0782c606d25?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwyfHxsaXZlJTIwc3BvcnRzJTIwYnJvYWRjYXN0fGVufDB8fHx8MTc4NDE3NTc4Nnww&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1641135698530-8d919344c0e5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwzfHxsaXZlJTIwc3BvcnRzJTIwYnJvYWRjYXN0fGVufDB8fHx8MTc4NDE3NTc4Nnww&ixlib=rb-4.1.0&q=85"
+      ]
+    }
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not use generic centered layouts. Use modern, sweeping edge-to-edge layouts.",
+    "Do not use `transition: all`. Specify properties e.g., `transition-transform duration-300 ease-out`.",
+    "Ensure `data-testid` is added to EVERY interactive element.",
+    "Install and use `@phosphor-icons/react` for icons.",
+    "Never use fully transparent backgrounds under text. Always use a solid color or glassmorphism (e.g., bg-black/60 backdrop-blur-md).",
+    "Hide scrollbars on horizontal lists using custom CSS (`::-webkit-scrollbar { display: none; }`).",
+    "Do not invent placeholder image URLs; use the provided image URLs.",
+    "Create dynamic, immersive hero sections with heavy gradient overlays (e.g., from-black to-transparent) to make text readable.",
+    "Write `.js` or `.jsx` components. Do not use `.tsx` as per the environment rules.",
+    "Ensure large touch targets (min-h-12 or p-4) to remain completely compatible with Mobile and Android TV/Google TV environments."
+  ]
+}

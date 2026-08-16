@@ -1,0 +1,38 @@
+{
+  "summary": "Regression testing for expo-build-properties plugin change in /app/frontend/app.json (adds android.usesCleartextTraffic:true for production APK HTTP streaming). Verified: (1) app.json is valid JSON and plugin block is present with exact expected shape. (2) expo-build-properties@~1.0.10 is already declared in package.json and installed in node_modules. (3) Backend regression: POST /api/auth/login with 1q1q1q1q/1q1q1q1q returns 200 with token and user, GET /api/live/channels returns 224 channels (>200). Full pytest suite 22/22 passing. (4) Frontend regression: /login screen loads via Expo web preview, testIDs render, credentials submit navigates to /profile-select (verified by URL + screenshot showing 'Nexus ¿Quién está viendo?' with the 1q1q1q1q profile). Zero JS page errors and Expo/Metro bundler running fine. The actual production-APK HTTP streaming fix cannot be validated in Expo Go/web preview (as noted by main agent) — it only takes effect after native prebuild+APK rebuild via Publish, which is out-of-scope for this environment.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "login-card / login.tsx", "issue": "Repeated 'Unexpected text node: A text node cannot be a child of a <View>' console errors, caused by stray whitespace between JSX tags on same line in login.tsx around line 80 (e.g. `<View style={styles.card} testID=\"login-card\">              <Text ...>`). Pre-existing before this change; does not block navigation but pollutes the console. Reference: /app/frontend/app/login.tsx:80"},
+      {"component": "login-card container", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\"' — RN Web deprecation, pre-existing."},
+      {"component": "TouchableOpacity / Pressable", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' — pre-existing."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None blocking for the current change — the plugin config is correct and no regression detected.",
+    "For the user to see HTTP streams working, they must click Publish on Emergent to trigger a fresh Android prebuild + APK build (this will bake usesCleartextTraffic=true into AndroidManifest.xml via expo-build-properties).",
+    "Optional cleanup: in /app/frontend/app/login.tsx around line 80, remove the trailing whitespace between `<View ...>` and `<Text ...>` on the same line to eliminate the 'Unexpected text node' console noise."
+  ],
+  "critical_code_review_comments": [
+    "app.json plugin block for expo-build-properties uses the correct tuple form ['expo-build-properties', { android: { usesCleartextTraffic: true } }] — this is the officially recommended way and will inject android:usesCleartextTraffic=\"true\" into <application> in AndroidManifest.xml at prebuild time.",
+    "expo-build-properties@~1.0.10 is compatible with expo@54.0.35 (SDK 54).",
+    "AndroidManifest already has INTERNET and ACCESS_NETWORK_STATE permissions — no additional permissions needed for HTTP streaming."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "app.json is protected (per Kubernetes rules metro.config/app.json/babel.config are protected) but the main agent modified it intentionally for the native cleartext fix — this is expected. Verified change is valid. If further app.json edits are made, re-run: (1) `python -c 'import json;json.load(open(\"/app/frontend/app.json\"))'` for JSON validity, (2) pytest /app/backend/tests/backend_test.py, (3) Playwright login→profile-select flow using testIDs login-username-input, login-password-input, login-submit-button. Frontend .env uses EXPO_PUBLIC_BACKEND_URL (not EXPO_BACKEND_URL). Test creds: 1q1q1q1q/1q1q1q1q.",
+  "rca_of_issue": "N/A for this iteration — verifying an infra/config change (expo-build-properties plugin) that only manifests in the native Android build. Preview environment cannot reproduce the actual HTTP streaming failure (Expo web + Expo Go do not enforce Android network-security-config cleartext restrictions). Fix will land in the next APK build produced via prebuild; no code change needed on the JS/backend side."
+}

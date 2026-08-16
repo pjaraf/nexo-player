@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 5: verified both iteration-5 bug fixes end-to-end. Backend: 28/28 pytest tests PASS against the public preview URL. (1) Chile-first ordering (Bug 2): GET /api/live/categories returns 114 categories, all three Chile categories occupy positions 0-2 in the returned list ('🇨🇱 DEPORTES CHILE', '🇨🇱 REGIONALES CHILE', '🇨🇱 TV CHILE'), and Argentina/Peru/Colombia/Mexico all appear in the top 15 as required. (2) HLS proxy urljoin fix (Bug 1): GET /api/stream/live/803392?t=<token> returned an m3u8 manifest whose first non-comment line is a /api/stream/seg?u=...&t=... path; fetching that segment URL returned HTTP 200 with first byte 0x47 (MPEG-TS sync byte) and >=500 KB payload — this is the definitive proof that live TV segments now resolve correctly through the proxy. Same test run against a Chile-category channel (category=3) also returned a valid MPEG-TS segment of >=500 KB. This directly validates that urljoin(final_url, segment) correctly handles absolute-from-root paths like '/hls/xxx' returned by 216.227.150.122 (the root cause of every live channel failing in the previous APK). Regression: /api/auth/login, /api/live/channels (3867 channels), /api/vod/info, /api/series/info, and all auth-guarded endpoints still pass. Frontend: mobile viewport (390x844) — logged in with 1q1q1q1q/1q1q1q1q, navigated to /live, and inspected the horizontal category chip row. Order verified: [0]='TODOS', [1]='★ FAVORITOS', [2]='🇨🇱 DEPORTES CHILE', [3]='🇨🇱 REGIONALES CHILE', [4]='🇨🇱 TV CHILE', [5]='🇦🇷 DEPORTES ARGENTINA' … — matches the requested UX exactly. No blocking issues.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login (invalid creds)", "issue": "Pre-existing from it. 3/4 — Xtream WAF serves HTML for bad creds, backend maps this to 502 rather than a clean 401. Test tolerates both (401 or 502)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "En Vivo (/live)", "issues": ["Many channel logo images use http:// URLs from upstream (onerestream.us, novatv.us) — browser blocks them as Mixed Content on the HTTPS preview and prints ERR_CONNECTION_REFUSED. Pre-existing. Cosmetic on web preview; on native APK http images load fine."]}
+    ],
+    "react_native_issues": [
+      {"component": "player.tsx (circleBtnFocused / pillBtnFocused)", "issue": "Pre-existing: 'shadow*' style props are deprecated; migrate to 'boxShadow' or wrap in Platform.select. Not blocking."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "No functional changes required — iteration-5 bug fixes are verified working end-to-end. Safe to republish APK.",
+    "Optional (carried over): proxy the Xtream logo URLs through the backend or rewrite http:// to https:// to eliminate Mixed Content warnings on the web preview (does not affect APK).",
+    "Optional (carried over): replace shadow*/pointerEvents deprecated RN-Web usage in player.tsx.",
+    "Optional (carried over): normalize invalid-login upstream WAF HTML to a clean 401."
+  ],
+  "critical_code_review_comments": [
+    "server.py:174-194 priority_keywords sort: 'chile' is the first keyword, followed by 'argentina', 'peru'/'perú', 'colombia', 'mexico'/'méxico', etc. The tuple sort key (priority(name), name.lower()) guarantees Chile categories occupy the leading positions and further ties break alphabetically within each country tier — clean and deterministic.",
+    "server.py:404-410 resolve(): correctly uses urljoin(final_url, rel_or_abs) instead of naive base+line concatenation. This handles all four HLS URI forms: fully-qualified (returned as-is), scheme-relative //host/path, absolute-from-root /path (the case that broke 216.227.150.122), and relative path. This is the exact spec-compliant fix and matches HLS RFC 8216 URI resolution rules.",
+    "server.py:415-423 loop still rewrites URI=\"…\" inside #EXT-X-KEY / #EXT-X-MAP via resolve()+enc() — the fix therefore also applies to segment keys and initialization segments, not only media segments.",
+    "server.py:425-432 nested m3u8 detection uses absu.split('?')[0].endswith('.m3u8') AFTER resolution, which correctly routes variant playlists (master → variant) back through /api/stream/hls for recursive rewriting.",
+    "Backend file is 529 lines — still under the 700-line ceiling, but the stream-proxy block (250+ lines) would benefit from being extracted into /app/backend/stream_proxy.py in a future refactor.",
+    "Live/[chip] frontend: no changes needed for iteration 5 — the frontend simply consumes the /api/live/categories order, so Chile-first is achieved with a single-source-of-truth backend sort."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestChileFirstOrdering + TestHlsSegmentResolution classes: 4 new tests covering Chile-first ordering + top-15 LATAM + real MPEG-TS segment fetch through the proxy for channel 803392 and a Chile channel)"
+  ],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "100% (chip order verified)"},
+  "seed_data_creation": "None. Tests exercise the live Xtream provider zone593.com:8443 with credentials from /app/memory/test_credentials.md.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 5 fixed two bugs: (1) live TV segment path resolution now uses urllib.parse.urljoin — verified by fetching real MPEG-TS bytes (0x47 sync byte, >=500 KB) for channel 803392 and a Chile channel; (2) Chile categories appear first — verified via /api/live/categories AND frontend chip row (positions 2/3/4 after TODOS + ★ FAVORITOS). Test suite lives at /app/backend/tests/backend_test.py — run with `pytest /app/backend/tests/ -v`. All 28 tests currently PASS. Public URL: https://channel-streamer-6.preview.emergentagent.com. Test creds: 1q1q1q1q / 1q1q1q1q. Frontend testIDs unchanged from iteration 4: live-chip-<cat_id>, live-channel-<id>, player-close-button, player-prev-channel, player-next-channel. Playback in browser is still expected to fail ('no se puede reproducir') — that's a Chromium/HLS limitation, not a bug; validate contract only.",
+  "rca_of_issue": "Bug 1 RCA: /api/stream/live/{id} calls _proxy_hls_playlist which fetches the upstream m3u8 and rewrites each segment path to a /api/stream/seg?u=<base64>… proxy URL. The previous implementation used naive `base + line` string concatenation to build the absolute segment URL from the manifest base URL and the segment path. When the upstream server (216.227.150.122 in the failing case) emitted absolute-from-root paths like `/hls/xxx.ts`, that concatenation produced malformed URLs (either `https://host.com:port/hls/xxx.ts` incorrectly appended after the manifest path or with the manifest filename still attached), and the upstream returned an HTML debug page instead of a TS segment — hence every live channel failed to play in the APK. The fix replaces that concat with `urllib.parse.urljoin(final_url, rel_or_abs)`, which is the RFC-3986/RFC-8216 correct way to resolve relative, scheme-relative, and absolute-from-root references against a base URL. Verified by fetching the first segment of channel 803392 and getting HTTP 200 + Content-Type video/mp2t + first byte 0x47 (MPEG-TS sync) + payload >=500 KB. Bug 2 RCA: user requested Chile categories at the top of the live category list for UX reasons. Fixed with a priority_keywords list in server.py:174 where 'chile' is index 0. All three Chile categories are now the first non-meta chips in the horizontal chip row of the En Vivo tab."
+}

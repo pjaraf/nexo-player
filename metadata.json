@@ -1,0 +1,8 @@
+{
+  "name": "Nexo",
+  "description": "Mobile and TV streaming application for live channels, movies, and series with multi-profile and parental controls",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
