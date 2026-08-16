@@ -109,11 +109,13 @@ object AppUpdateManager {
             }
 
             // Fallback: If version.json failed and repo is GitHub, check GitHub Releases API directly
-            if (targetUrl.contains("pjaraf/nexo-app") || targetUrl.contains("pjaraf/nexo-updates") || targetUrl.contains("github")) {
+            if (targetUrl.contains("pjaraf/nexo-player") || targetUrl.contains("pjaraf/nexo-app") || targetUrl.contains("pjaraf/nexo-updates") || targetUrl.contains("github")) {
                 val githubApiUrl = if (targetUrl.contains("nexo-updates")) {
                     "https://api.github.com/repos/pjaraf/nexo-updates/releases/latest"
-                } else {
+                } else if (targetUrl.contains("nexo-app")) {
                     "https://api.github.com/repos/pjaraf/nexo-app/releases/latest"
+                } else {
+                    "https://api.github.com/repos/pjaraf/nexo-player/releases/latest"
                 }
                 Log.d(TAG, "Attempting GitHub Releases API fallback: $githubApiUrl")
                 val ghRequest = Request.Builder()
