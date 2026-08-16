@@ -138,9 +138,12 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
                 if (manual) _updateStatusMessage.value = "Sin conexión a internet"
                 return@launch
             }
+            if (manual) {
+                AppStorage.setDismissedUpdateVersion(null)
+            }
             _isCheckingUpdates.value = true
             if (manual) _updateStatusMessage.value = "Buscando actualizaciones..."
-            val result = AppUpdateManager.checkForUpdates(customUrl)
+            val result = AppUpdateManager.checkForUpdates(customUrl, force = manual)
             _isCheckingUpdates.value = false
             if (result != null) {
                 if (manual) {

@@ -97,19 +97,25 @@ object AppUpdateManager {
      * Checks the remote server/GitHub for a newer version.
      * Returns the UpdateInfo if a newer version is available, or null if up to date.
      */
-    suspend fun checkForUpdates(customUrl: String? = null): UpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(customUrl: String? = null, force: Boolean = false): UpdateInfo? = withContext(Dispatchers.IO) {
         val rawUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
-        val targetUrl = normalizeUrl(rawUrl)
+        val normalized = normalizeUrl(rawUrl)
+        val cacheBuster = if (normalized.contains("?")) "&_cb=${System.currentTimeMillis()}" else "?_cb=${System.currentTimeMillis()}"
+        val targetUrl = "$normalized$cacheBuster"
+
         try {
             Log.d(TAG, "Checking update at: $targetUrl")
             val request = Request.Builder()
                 .url(targetUrl)
                 .header("User-Agent", "Nexo-Updater/${currentVersionName}")
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .header("Pragma", "no-cache")
                 .build()
 
             val response = httpClient.newCall(request).execute()
             if (response.isSuccessful) {
                 val body = response.body?.string()
+                Log.d(TAG, "Update response: $body")
                 if (!body.isNullOrBlank()) {
                     val update = try {
                         gson.fromJson(body, UpdateInfo::class.java)
@@ -117,24 +123,29 @@ object AppUpdateManager {
                         null
                     }
 
-                    if (update != null && update.apkUrl.isNotBlank()) {
+                    if (update != null) {
                         AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
                         val remoteVer = update.versionName.trim()
-                        val isNewer = isVersionHigher(remoteVer, currentVersionName)
+                        val isNewer = isVersionHigher(remoteVer, currentVersionName) || (update.versionCode > currentVersionCode)
 
                         if (isNewer) {
                             val dismissed = AppStorage.getDismissedUpdateVersion()
-                            if (dismissed == remoteVer) {
+                            if (!force && dismissed == remoteVer) {
                                 Log.d(TAG, "Update v$remoteVer was previously dismissed")
                                 _latestUpdateInfo.value = null
                                 return@withContext null
                             }
-                            val normalizedUpdate = update.copy(apkUrl = normalizeUrl(update.apkUrl))
-                            Log.i(TAG, "New update found via version.json! v${normalizedUpdate.versionName}")
+                            val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
+                                normalizeUrl(update.apkUrl)
+                            } else {
+                                "https://github.com/pjaraf/nexo-player/releases/download/v$remoteVer/app-debug.apk"
+                            }
+                            val normalizedUpdate = update.copy(apkUrl = resolvedApkUrl)
+                            Log.i(TAG, "New update found via version.json! v${normalizedUpdate.versionName} (code=${normalizedUpdate.versionCode})")
                             _latestUpdateInfo.value = normalizedUpdate
                             return@withContext normalizedUpdate
                         } else {
-                            Log.d(TAG, "App is up to date (current=$currentVersionName, server=$remoteVer)")
+                            Log.d(TAG, "App is up to date (current=$currentVersionName code=$currentVersionCode, server=$remoteVer code=${update.versionCode})")
                             _latestUpdateInfo.value = null
                             return@withContext null
                         }
