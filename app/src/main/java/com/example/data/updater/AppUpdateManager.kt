@@ -46,25 +46,48 @@ object AppUpdateManager {
     val currentVersionName: String = BuildConfig.VERSION_NAME
 
     /**
-     * Accurately compares two semantic versions (e.g. "1.1.16" > "1.1.15")
+     * Compares two semantic version strings (e.g., "1.1.16" vs "1.1.14").
+     * Returns > 0 if v1 > v2, < 0 if v1 < v2, and 0 if v1 == v2.
      */
-    fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
-        val remoteClean = remoteVersion.trim().removePrefix("v").removePrefix("V")
-        val currentClean = currentVersion.trim().removePrefix("v").removePrefix("V")
-        if (remoteClean.isBlank() || currentClean.isBlank()) return false
-        if (remoteClean.equals(currentClean, ignoreCase = true)) return false
+    fun compareVersions(v1: String, v2: String): Int {
+        val clean1 = v1.trim().removePrefix("v").removePrefix("V")
+        val clean2 = v2.trim().removePrefix("v").removePrefix("V")
+        if (clean1.equals(clean2, ignoreCase = true)) return 0
 
-        val remoteParts = remoteClean.split(".").mapNotNull { it.trim().toIntOrNull() }
-        val currentParts = currentClean.split(".").mapNotNull { it.trim().toIntOrNull() }
+        val parts1 = clean1.split(".").map { it.trim().toIntOrNull() ?: 0 }
+        val parts2 = clean2.split(".").map { it.trim().toIntOrNull() ?: 0 }
 
-        val maxLen = maxOf(remoteParts.size, currentParts.size)
+        val maxLen = maxOf(parts1.size, parts2.size)
         for (i in 0 until maxLen) {
-            val r = remoteParts.getOrElse(i) { 0 }
-            val c = currentParts.getOrElse(i) { 0 }
-            if (r > c) return true
-            if (r < c) return false
+            val p1 = parts1.getOrElse(i) { 0 }
+            val p2 = parts2.getOrElse(i) { 0 }
+            if (p1 != p2) {
+                return p1.compareTo(p2)
+            }
         }
-        return false
+        return 0
+    }
+
+    /**
+     * Returns true ONLY if the remote version is strictly newer than the current version.
+     */
+    fun isUpdateNewer(
+        remoteVersionName: String,
+        remoteVersionCode: Int,
+        currentVersionName: String,
+        currentVersionCode: Int
+    ): Boolean {
+        if (remoteVersionName.isBlank()) return false
+        val comparison = compareVersions(remoteVersionName, currentVersionName)
+        return when {
+            comparison > 0 -> true // Newer semantic version (e.g. 1.1.17 > 1.1.16)
+            comparison == 0 -> remoteVersionCode > currentVersionCode // Same version name, newer build code
+            else -> false // Older version (e.g. 1.1.14 < 1.1.16) -> DO NOT UPDATE
+        }
+    }
+
+    fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
+        return compareVersions(remoteVersion, currentVersion) > 0
     }
 
     /**
@@ -101,8 +124,12 @@ object AppUpdateManager {
             // 1. First attempt: Check version.json
             val versionInfo = fetchFromVersionJson(customUrl)
             if (versionInfo != null) {
-                val isNewer = (versionInfo.versionCode > currentVersionCode) ||
-                        isVersionHigher(versionInfo.versionName, currentVersionName)
+                val isNewer = isUpdateNewer(
+                    remoteVersionName = versionInfo.versionName,
+                    remoteVersionCode = versionInfo.versionCode,
+                    currentVersionName = currentVersionName,
+                    currentVersionCode = currentVersionCode
+                )
 
                 if (isNewer) {
                     val dismissed = AppStorage.getDismissedUpdateVersion()
@@ -121,8 +148,12 @@ object AppUpdateManager {
             // 2. Second attempt: Check GitHub Releases API directly if version.json didn't yield an update
             val releaseInfo = fetchFromGitHubReleases()
             if (releaseInfo != null) {
-                val isNewer = (releaseInfo.versionCode > currentVersionCode) ||
-                        isVersionHigher(releaseInfo.versionName, currentVersionName)
+                val isNewer = isUpdateNewer(
+                    remoteVersionName = releaseInfo.versionName,
+                    remoteVersionCode = releaseInfo.versionCode,
+                    currentVersionName = currentVersionName,
+                    currentVersionCode = currentVersionCode
+                )
 
                 if (isNewer) {
                     val dismissed = AppStorage.getDismissedUpdateVersion()
@@ -218,7 +249,7 @@ object AppUpdateManager {
 
                     if (tagName.isNotBlank()) {
                         return UpdateInfo(
-                            versionCode = currentVersionCode + 1,
+                            versionCode = 0,
                             versionName = tagName,
                             apkUrl = downloadUrl,
                             changelog = releaseNotes,
