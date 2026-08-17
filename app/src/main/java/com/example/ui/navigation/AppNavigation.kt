@@ -26,6 +26,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 object Routes {
+    const val SPLASH = "splash"
     const val LOGIN = "login"
     const val PROFILE_SELECT = "profile_select"
     const val MANAGE_PROFILES = "manage_profiles"
@@ -87,17 +88,23 @@ fun AppNavigation(
         )
     }
 
-    val startDestination = if (!AppStorage.isLoggedIn()) {
-        Routes.LOGIN
-    } else {
-        Routes.TABS
-    }
+    val startDestination = Routes.SPLASH
 
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = startDestination
         ) {
+        composable(Routes.SPLASH) {
+            SplashScreen(
+                onSplashFinished = {
+                    val nextScreen = if (!AppStorage.isLoggedIn()) Routes.LOGIN else Routes.TABS
+                    navController.navigate(nextScreen) {
+                        popUpTo(Routes.SPLASH) { inclusive = true }
+                    }
+                }
+            )
+        }
         composable(Routes.LOGIN) {
             LoginScreen(
                 viewModel = mainViewModel,
