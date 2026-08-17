@@ -23,9 +23,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.zIndex
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.R
+import com.example.utils.DeviceUtils
 import com.example.data.models.LiveChannel
 import com.example.data.models.ProgressItem
 import com.example.data.models.VodStream
@@ -246,19 +251,27 @@ fun MediaPosterCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val isTv = remember { DeviceUtils.isTelevision(context) }
     var isFocused by remember { mutableStateOf(false) }
 
     val isHighlighted = isFocused || isSelected
 
     val borderColor = when {
+        isTv && isHighlighted -> TvSelectedRed
         isSelected -> TvSelectedRed
         isFocused -> TvFocusBlue
         else -> NexusBorder
     }
+    
+    val targetScale = if (isTv && isHighlighted) 1.08f else 1f
+    val scale by animateFloatAsState(targetValue = targetScale, label = "card_scale")
 
     Column(
         modifier = modifier
-            .width(if (isHighlighted) 140.dp else 126.dp)
+            .width(if (isHighlighted && !isTv) 140.dp else 126.dp)
+            .scale(scale)
+            .zIndex(if (isHighlighted) 1f else 0f)
             .focusable()
             .onFocusChanged { state ->
                 isFocused = state.isFocused

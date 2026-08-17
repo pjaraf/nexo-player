@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +41,7 @@ import com.example.data.models.VodStream
 import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
+import com.example.utils.DeviceUtils
 
 // Data class to unify selected active highlight across Movies & Series
 data class FocusedMedia(
@@ -108,7 +110,9 @@ fun HomeScreen(
     }
 
     val configuration = LocalConfiguration.current
-    val isWideScreen = configuration.screenWidthDp >= 600
+    val context = LocalContext.current
+    val isTv = remember { DeviceUtils.isTelevision(context) }
+    val isWideScreen = configuration.screenWidthDp >= 600 || isTv
 
     Scaffold(
         containerColor = NexusBackground,
@@ -339,7 +343,7 @@ fun HomeScreen(
                     }
 
                     // --- Series Destacadas ---
-                    if (seriesRow.isNotEmpty()) {
+                    if (seriesRow.isNotEmpty() && !isTv) {
                         item {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(
