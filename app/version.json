@@ -1,7 +1,7 @@
 {
-  "versionCode": 25,
-  "versionName": "1.1.14",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.14/app-debug.apk",
-  "changelog": "Actualización forzada instantánea y mejoras generales en la app.",
+  "versionCode": 26,
+  "versionName": "1.1.15",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.15/app-debug.apk",
+  "changelog": "Actualización automática v1.1.15 para asegurar el aviso de actualización.",
   "isMandatory": true
 }
