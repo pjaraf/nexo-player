@@ -1,7 +1,7 @@
 {
-  "versionCode": 20,
-  "versionName": "1.1.9",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.9/app-debug.apk",
-  "changelog": "Nuevo fondo cinemático en la pantalla de inicio y mejoras generales.",
+  "versionCode": 21,
+  "versionName": "1.1.10",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.10/app-debug.apk",
+  "changelog": "Fondo cinemático con collage de pósters en la pantalla de inicio y mejoras generales.",
   "isMandatory": false
 }
