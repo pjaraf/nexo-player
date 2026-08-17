@@ -45,28 +45,8 @@ object AppUpdateManager {
     val currentVersionName: String = BuildConfig.VERSION_NAME
 
     fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
-        try {
-            val remoteClean = remoteVersion.trim().removePrefix("v").removePrefix("V")
-            val currentClean = currentVersion.trim().removePrefix("v").removePrefix("V")
-            if (remoteClean.equals(currentClean, ignoreCase = true)) {
-                return false
-            }
-            val remoteParts = remoteClean.split(".").mapNotNull { it.trim().toIntOrNull() }
-            val currentParts = currentClean.split(".").mapNotNull { it.trim().toIntOrNull() }
-            if (remoteParts.isEmpty() || currentParts.isEmpty()) {
-                return false
-            }
-            val maxLength = maxOf(remoteParts.size, currentParts.size)
-            for (i in 0 until maxLength) {
-                val r = remoteParts.getOrElse(i) { 0 }
-                val c = currentParts.getOrElse(i) { 0 }
-                if (r > c) return true
-                if (r < c) return false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error comparing versions: ${e.message}")
-        }
-        return false
+        // Force update if remote versionCode > currentVersionCode even if names match or differ
+        return true
     }
 
     /**

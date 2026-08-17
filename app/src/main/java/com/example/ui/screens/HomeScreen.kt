@@ -184,26 +184,22 @@ fun HomeScreen(
                 }
 
                 // --- 2. Main Scrollable Content ---
-                LazyColumn(
+                Column(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 120.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     // Top Header Bar
-                    item {
-                        BrandHeader(
-                            isKids = isKids,
-                            profileInitial = activeProfile?.name ?: "P",
-                            avatarColorHex = activeProfile?.color ?: "#E50914",
-                            onAvatarClick = onNavigateProfile,
-                            modifier = Modifier.statusBarsPadding()
-                        )
-                    }
+                    BrandHeader(
+                        isKids = isKids,
+                        profileInitial = activeProfile?.name ?: "P",
+                        avatarColorHex = activeProfile?.color ?: "#E50914",
+                        onAvatarClick = onNavigateProfile,
+                        modifier = Modifier.statusBarsPadding()
+                    )
 
                     // --- Dynamic Hero Details for TV & Mobile (Shows current selected title) ---
-                    item {
-                        val media = selectedMedia
-                        if (media != null) {
+                    val media = selectedMedia
+                    if (media != null) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -284,59 +280,56 @@ fun HomeScreen(
                                 }
                             }
                         }
-                    }
 
                     // --- Tendencias ahora (Películas) ---
                     if (moviesRow.isNotEmpty()) {
-                        item {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(
-                                    text = if (isKids) "Películas Familiares" else "Tendencias ahora • Películas",
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 17.sp
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = if (isKids) "Películas Familiares" else "Tendencias ahora • Películas",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 17.sp
+                                ),
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
 
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    items(moviesRow, key = { it.id }) { movie ->
-                                        val isSelected = selectedMedia?.id == movie.id
-                                        MediaPosterCard(
-                                            title = movie.displayName,
-                                            imageUrl = movie.streamIcon,
-                                            rating = movie.formattedRating,
-                                            badgeText = null,
-                                            isSelected = isSelected,
-                                            onFocused = {
-                                                selectedMedia = FocusedMedia(
-                                                    id = movie.id,
-                                                    title = movie.displayName,
-                                                    description = "Película disponible en Nexo.",
-                                                    backdropUrl = movie.streamIcon ?: POSTER_FALLBACK,
-                                                    rating = movie.formattedRating,
-                                                    kind = "movie",
-                                                    containerExtension = movie.containerExtension ?: "mp4"
-                                                )
-                                            },
-                                            onClick = {
-                                                selectedMedia = FocusedMedia(
-                                                    id = movie.id,
-                                                    title = movie.displayName,
-                                                    description = "Película disponible en Nexo.",
-                                                    backdropUrl = movie.streamIcon ?: POSTER_FALLBACK,
-                                                    rating = movie.formattedRating,
-                                                    kind = "movie",
-                                                    containerExtension = movie.containerExtension ?: "mp4"
-                                                )
-                                                onNavigateMovie(movie.id)
-                                            }
-                                        )
-                                    }
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(moviesRow, key = { it.id }) { movie ->
+                                    val isSelected = selectedMedia?.id == movie.id
+                                    MediaPosterCard(
+                                        title = movie.displayName,
+                                        imageUrl = movie.streamIcon,
+                                        rating = movie.formattedRating,
+                                        badgeText = null,
+                                        isSelected = isSelected,
+                                        onFocused = {
+                                            selectedMedia = FocusedMedia(
+                                                id = movie.id,
+                                                title = movie.displayName,
+                                                description = "Película disponible en Nexo.",
+                                                backdropUrl = movie.streamIcon ?: POSTER_FALLBACK,
+                                                rating = movie.formattedRating,
+                                                kind = "movie",
+                                                containerExtension = movie.containerExtension ?: "mp4"
+                                            )
+                                        },
+                                        onClick = {
+                                            selectedMedia = FocusedMedia(
+                                                id = movie.id,
+                                                title = movie.displayName,
+                                                description = "Película disponible en Nexo.",
+                                                backdropUrl = movie.streamIcon ?: POSTER_FALLBACK,
+                                                rating = movie.formattedRating,
+                                                kind = "movie",
+                                                containerExtension = movie.containerExtension ?: "mp4"
+                                            )
+                                            onNavigateMovie(movie.id)
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -344,53 +337,51 @@ fun HomeScreen(
 
                     // --- Series Destacadas ---
                     if (seriesRow.isNotEmpty() && !isTv) {
-                        item {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(
-                                    text = if (isKids) "Series Infantiles" else "Series Destacadas",
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 17.sp
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = if (isKids) "Series Infantiles" else "Series Destacadas",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 17.sp
+                                ),
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
 
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    items(seriesRow, key = { it.id }) { series ->
-                                        val isSelected = selectedMedia?.id == series.id
-                                        MediaPosterCard(
-                                            title = series.displayName,
-                                            imageUrl = series.cover,
-                                            rating = series.formattedRating,
-                                            badgeText = null,
-                                            isSelected = isSelected,
-                                            onFocused = {
-                                                selectedMedia = FocusedMedia(
-                                                    id = series.id,
-                                                    title = series.displayName,
-                                                    description = series.plot ?: "Serie completa en alta definición.",
-                                                    backdropUrl = series.cover ?: POSTER_FALLBACK,
-                                                    rating = series.formattedRating,
-                                                    kind = "series"
-                                                )
-                                            },
-                                            onClick = {
-                                                selectedMedia = FocusedMedia(
-                                                    id = series.id,
-                                                    title = series.displayName,
-                                                    description = series.plot ?: "Serie completa en alta definición.",
-                                                    backdropUrl = series.cover ?: POSTER_FALLBACK,
-                                                    rating = series.formattedRating,
-                                                    kind = "series"
-                                                )
-                                                onNavigateSeries(series.id)
-                                            }
-                                        )
-                                    }
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(seriesRow, key = { it.id }) { series ->
+                                    val isSelected = selectedMedia?.id == series.id
+                                    MediaPosterCard(
+                                        title = series.displayName,
+                                        imageUrl = series.cover,
+                                        rating = series.formattedRating,
+                                        badgeText = null,
+                                        isSelected = isSelected,
+                                        onFocused = {
+                                            selectedMedia = FocusedMedia(
+                                                id = series.id,
+                                                title = series.displayName,
+                                                description = series.plot ?: "Serie completa en alta definición.",
+                                                backdropUrl = series.cover ?: POSTER_FALLBACK,
+                                                rating = series.formattedRating,
+                                                kind = "series"
+                                            )
+                                        },
+                                        onClick = {
+                                            selectedMedia = FocusedMedia(
+                                                id = series.id,
+                                                title = series.displayName,
+                                                description = series.plot ?: "Serie completa en alta definición.",
+                                                backdropUrl = series.cover ?: POSTER_FALLBACK,
+                                                rating = series.formattedRating,
+                                                kind = "series"
+                                            )
+                                            onNavigateSeries(series.id)
+                                        }
+                                    )
                                 }
                             }
                         }

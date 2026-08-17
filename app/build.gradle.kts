@@ -13,8 +13,8 @@ android {
         applicationId = "com.aistudio.nexus.jqvzkp"
         minSdk = 24
         targetSdk = 35
-        versionCode = 23
-        versionName = "1.1.12"
+        versionCode = 25
+        versionName = "1.1.14"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

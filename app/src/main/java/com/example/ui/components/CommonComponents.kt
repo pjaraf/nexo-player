@@ -165,23 +165,7 @@ fun BrandHeader(
             }
         }
 
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(avatarColor)
-                .border(1.5.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                .clickable { onAvatarClick() }
-                .testTag("header_avatar_btn"),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = profileInitial.take(1).uppercase(),
-                color = Color.White,
-                fontWeight = FontWeight.Black,
-                fontSize = 16.sp
-            )
-        }
+
     }
 }
 
