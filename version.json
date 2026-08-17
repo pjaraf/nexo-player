@@ -1,7 +1,7 @@
 {
-  "versionCode": 30,
-  "versionName": "1.1.19",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.19/app-debug.apk",
-  "changelog": "Pantalla flotante de fondo optimizada: visible exclusivamente en la página principal al situarse sobre la primera carátula en televisores.",
+  "versionCode": 31,
+  "versionName": "1.1.20",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.20/app-debug.apk",
+  "changelog": "Fondo dinámico adaptativo: se oculta al abrir el menú lateral y se actualiza suavemente al resaltar cualquier carátula del catálogo.",
   "isMandatory": true
 }

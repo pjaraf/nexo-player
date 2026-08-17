@@ -103,7 +103,8 @@ fun MainTabsScreen(
                     onNavigateMovie = onNavigateMovieDetail,
                     onNavigateSeries = onNavigateSeriesDetail,
                     onPlayDirect = onNavigatePlayerDirect,
-                    onNavigateProfile = { currentTab = MainTab.PROFILE }
+                    onNavigateProfile = { currentTab = MainTab.PROFILE },
+                    isSidebarOpen = isSidebarOpen
                 )
             }
             MainTab.LIVE -> {
