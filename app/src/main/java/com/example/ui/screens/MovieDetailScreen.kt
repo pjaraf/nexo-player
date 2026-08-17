@@ -101,7 +101,6 @@ fun MovieDetailScreen(
 
 
 
-@OptIn(UnstableApi::class)
 @Composable
 private fun MovieDetailTvScreen(
     movieId: String,
@@ -110,59 +109,14 @@ private fun MovieDetailTvScreen(
     onNavigateMovie: (movieId: String) -> Unit,
     onPlay: (url: String, title: String, kind: String, contentId: String, image: String, resumeMs: Long) -> Unit
 ) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
     var detail by remember { mutableStateOf<VodDetailResponse?>(null) }
-    var latestMovies by remember { mutableStateOf<List<VodStream>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
-
-    var isFullScreenMode by remember { mutableStateOf(false) }
-    var isPlaying by remember { mutableStateOf(true) }
-    var isPreviewLoading by remember { mutableStateOf(false) }
-
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
-            repeatMode = Player.REPEAT_MODE_OFF
-        }
-    }
-
-    DisposableEffect(lifecycleOwner, exoPlayer) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
-                    exoPlayer.pause()
-                    isPlaying = false
-                }
-                Lifecycle.Event.ON_RESUME -> {
-                    exoPlayer.play()
-                    isPlaying = true
-                }
-                Lifecycle.Event.ON_DESTROY -> {
-                    exoPlayer.stop()
-                    exoPlayer.release()
-                }
-                else -> {}
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer.stop()
-            exoPlayer.release()
-        }
-    }
+    var isFav by remember { mutableStateOf(viewModel.isFavorite("movies", movieId)) }
 
     LaunchedEffect(movieId) {
         loading = true
         detail = XtreamApi.getVodDetail(movieId)
-        try {
-            val allMovies = XtreamApi.getVodStreams()
-            latestMovies = allMovies.filter { it.id != movieId }.take(25)
-        } catch (e: Exception) {
-            latestMovies = emptyList()
-        }
+        isFav = viewModel.isFavorite("movies", movieId)
         loading = false
     }
 
@@ -171,35 +125,7 @@ private fun MovieDetailTvScreen(
         progressList.find { it.kind == "movie" && it.id == movieId }
     }
 
-    LaunchedEffect(detail) {
-        detail?.movieData?.let { data ->
-            try {
-                isPreviewLoading = true
-                val ext = data.containerExtension ?: "mp4"
-                val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
-                if (streamUrl.isNotBlank()) {
-                    exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
-                    if (savedProgress != null && savedProgress.positionMs > 5000) {
-                         exoPlayer.seekTo(savedProgress.positionMs)
-                    }
-                    exoPlayer.prepare()
-                    exoPlayer.play()
-                    isPlaying = true
-                }
-                isPreviewLoading = false
-            } catch (e: Exception) {
-                isPreviewLoading = false
-            }
-        }
-    }
-
-    BackHandler {
-        if (isFullScreenMode) {
-            isFullScreenMode = false
-        } else {
-            onBack()
-        }
-    }
+    BackHandler(onBack = onBack)
 
     val info = detail?.info
     val movieData = detail?.movieData
@@ -211,11 +137,10 @@ private fun MovieDetailTvScreen(
     val cleanRatingNumber = if (rating > 0) String.format("%.1f", rating) else "Nuevo"
     val plotText = info?.plot ?: info?.description ?: "No hay sinopsis disponible."
     val castText = info?.cast ?: "No disponible"
+    val directorText = info?.director ?: ""
+    val genreText = info?.genre ?: ""
+    val durationText = info?.duration ?: ""
     val ext = movieData?.containerExtension ?: "mp4"
-
-    val tvFocusBlue = Color(0xFF007AFF)
-    val tvButtonDefaultBg = Color.White.copy(alpha = 0.14f)
-    val tvButtonDefaultBorder = Color.White.copy(alpha = 0.22f)
 
     Box(
         modifier = Modifier
@@ -223,262 +148,328 @@ private fun MovieDetailTvScreen(
             .background(NexusBackground)
             .testTag("movie_detail_tv_screen")
     ) {
-        if (!isFullScreenMode) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // 1. Ambient Glow Layer
-                AsyncImage(
-                    model = cover,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(0.30f)
-                )
+        // 1. Ambient Glow Layer
+        AsyncImage(
+            model = cover,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(0.25f)
+        )
 
-                // 2. Full Uncropped Crisp Poster Art
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.TopEnd
-                ) {
-                    AsyncImage(
-                        model = cover,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.TopEnd,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(0.55f)
-                            .padding(end = 48.dp, top = 20.dp, bottom = 48.dp)
-                            .clip(RoundedCornerShape(12.dp))
+        // 2. Full Uncropped Crisp Poster Art on Right
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            AsyncImage(
+                model = cover,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.CenterEnd,
+                modifier = Modifier
+                    .fillMaxHeight(0.92f)
+                    .fillMaxWidth(0.48f)
+                    .padding(end = 56.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .shadow(24.dp, RoundedCornerShape(16.dp))
+            )
+        }
+
+        // 3. Vignette Gradients
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            NexusBackground,
+                            NexusBackground.copy(alpha = 0.98f),
+                            NexusBackground.copy(alpha = 0.85f),
+                            NexusBackground.copy(alpha = 0.40f),
+                            Color.Transparent
+                        ),
+                        startX = 0f,
+                        endX = 1300f
                     )
-                }
-
-                // 3. Vignette Gradients
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(
-                                    NexusBackground,
-                                    NexusBackground.copy(alpha = 0.95f),
-                                    NexusBackground.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.20f),
-                                    Color.Transparent
-                                ),
-                                startX = 0f,
-                                endX = 1100f
-                            )
-                        )
                 )
+        )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.75f),
-                                    Color.Transparent,
-                                    NexusBackground.copy(alpha = 0.85f),
-                                    NexusBackground
-                                )
-                            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.70f),
+                            Color.Transparent,
+                            NexusBackground.copy(alpha = 0.85f),
+                            NexusBackground
                         )
+                    )
                 )
+        )
+
+        if (loading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = TvFocusBlue)
             }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 48.dp, vertical = 32.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Top Bar: Back & Favorite
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    var isBackFocused by remember { mutableStateOf(false) }
+                    Surface(
+                        onClick = onBack,
+                        shape = CircleShape,
+                        color = if (isBackFocused) TvFocusBlue else Color.Black.copy(alpha = 0.6f),
+                        border = if (isBackFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .focusable()
+                            .onFocusChanged { isBackFocused = it.isFocused }
+                            .testTag("tv_movie_back_btn")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                        }
+                    }
 
-            if (loading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = tvFocusBlue)
+                    var isFavFocused by remember { mutableStateOf(false) }
+                    Surface(
+                        onClick = {
+                            isFav = viewModel.toggleFavorite("movies", movieId, title, cover)
+                        },
+                        shape = CircleShape,
+                        color = if (isFavFocused) TvFocusBlue else Color.Black.copy(alpha = 0.6f),
+                        border = if (isFavFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .focusable()
+                            .onFocusChanged { isFavFocused = it.isFocused }
+                            .testTag("tv_movie_fav_btn")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isFav) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                                contentDescription = "Favorito",
+                                tint = if (isFav) NexusPrimary else Color.White
+                            )
+                        }
+                    }
                 }
-            } else {
+
+                // Middle Info Section
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .padding(horizontal = 28.dp, vertical = 18.dp)
+                        .fillMaxWidth(0.58f)
+                        .weight(1f, fill = false),
+                    verticalArrangement = Arrangement.Center
                 ) {
+                    // Movie Title
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 32.sp,
+                            color = Color.White,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Badges row: Year, Rating, Duration, Genre
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Left Column
-                        Column(
+                        if (releaseYear.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = NexusSurfaceVariant,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
+                            ) {
+                                Text(
+                                    text = releaseYear,
+                                    color = NexusTextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        if (cleanRatingNumber.isNotBlank() && cleanRatingNumber != "0") {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF332000),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFC107).copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFC107),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = cleanRatingNumber,
+                                        color = Color(0xFFFFC107),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        if (durationText.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = NexusSurfaceVariant,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
+                            ) {
+                                Text(
+                                    text = durationText,
+                                    color = NexusTextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        if (genreText.isNotBlank()) {
+                            Text(
+                                text = genreText.split(",").firstOrNull()?.trim() ?: genreText,
+                                color = NexusTextSecondary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Synopsis
+                    Text(
+                        text = plotText,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 14.sp,
+                            lineHeight = 22.sp
+                        ),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Cast
+                    if (castText.isNotBlank() && castText != "No disponible") {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Reparto: ",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = castText,
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    // Director
+                    if (directorText.isNotBlank()) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Dirección: ",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = directorText,
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Action Buttons (Reproducir / Reanudar)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        var isPlayBtnFocused by remember { mutableStateOf(false) }
+                        Surface(
+                            onClick = {
+                                val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
+                                val resumeMs = savedProgress?.positionMs ?: 0L
+                                if (streamUrl.isNotBlank()) {
+                                    onPlay(streamUrl, title, "movie", movieId, cover, resumeMs)
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isPlayBtnFocused) TvFocusBlue else Color.White,
+                            border = if (isPlayBtnFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else null,
                             modifier = Modifier
-                                .weight(1.1f)
-                                .fillMaxHeight(),
-                            verticalArrangement = Arrangement.Center
+                                .height(48.dp)
+                                .focusable()
+                                .onFocusChanged { isPlayBtnFocused = it.isFocused }
+                                .testTag("btn_tv_movie_play")
                         ) {
                             Row(
+                                modifier = Modifier.padding(horizontal = 24.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = if (isPlayBtnFocused) Color.White else Color.Black,
+                                    modifier = Modifier.size(24.dp)
+                                )
                                 Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.headlineLarge.copy(
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 28.sp,
-                                        color = Color.White,
-                                        letterSpacing = (-0.5).sp
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
+                                    text = if (savedProgress != null && savedProgress.positionMs > 5000) "Reanudar Reproducción" else "Reproducir Película",
+                                    color = if (isPlayBtnFocused) Color.White else Color.Black,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Black
                                 )
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF00B0FF),
-                                    modifier = Modifier.padding(top = 2.dp)
-                                ) {
-                                    Text(
-                                        text = cleanRatingNumber,
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Black,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            val dateLine = if (releaseYear.isNotBlank()) "$releaseYear | $title" else title
-                            Text(text = dateLine, color = Color.White.copy(alpha = 0.65f), fontSize = 12.sp, maxLines = 1)
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                Text(text = "Actores: ", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(text = castText, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                Text(text = "Sinopsis: ", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(text = plotText, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                            }
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                var isFullBtnFocused by remember { mutableStateOf(false) }
-                                Surface(
-                                    onClick = {
-                                        val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
-                                        if (streamUrl.isNotBlank()) {
-                                            onPlay(streamUrl, title, "movie", movieId, cover, exoPlayer.currentPosition.coerceAtLeast(savedProgress?.positionMs ?: 0L))
-                                        }
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
-                                    border = if (isFullBtnFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder),
-                                    modifier = Modifier
-                                        .height(42.dp)
-                                        .focusable()
-                                        .onFocusChanged { isFullBtnFocused = it.isFocused }
-                                        .testTag("btn_movie_fullscreen")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                                        Text(text = "Pantalla completa", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Right Column (Player)
-                        var isPlayerFocused by remember { mutableStateOf(false) }
-                        Box(
-                            modifier = Modifier
-                                .weight(0.9f)
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .border(
-                                    if (isPlayerFocused) 2.dp else 1.dp,
-                                    if (isPlayerFocused) tvFocusBlue else Color.White.copy(alpha = 0.3f),
-                                    RoundedCornerShape(16.dp)
-                                )
-                                .background(Color.Black)
-                                .focusable()
-                                .onFocusChanged { isPlayerFocused = it.isFocused }
-                                .clickable {
-                                    val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
-                                    if (streamUrl.isNotBlank()) {
-                                        onPlay(streamUrl, title, "movie", movieId, cover, exoPlayer.currentPosition.coerceAtLeast(savedProgress?.positionMs ?: 0L))
-                                    }
-                                }
-                        ) {
-                            AndroidView(
-                                factory = { ctx ->
-                                    PlayerView(ctx).apply {
-                                        player = exoPlayer
-                                        useController = false
-                                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                                        layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-
-                    if (latestMovies.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = "Películas más nuevas",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 18.sp
-                                )
-                            )
-
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                contentPadding = PaddingValues(bottom = 12.dp, end = 28.dp)
-                            ) {
-                                items(latestMovies, key = { it.id }) { item ->
-                                    MediaPosterCard(
-                                        title = item.displayName,
-                                        imageUrl = item.streamIcon,
-                                        rating = item.formattedRating,
-                                        badgeText = "PELÍCULA",
-                                        onClick = { onNavigateMovie(item.id) }
-                                    )
-                                }
                             }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
-        } else {
-             // Full screen mode
-             Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                 AndroidView(
-                     factory = { ctx ->
-                         PlayerView(ctx).apply {
-                             player = exoPlayer
-                             useController = true
-                             resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                             layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                         }
-                     },
-                     modifier = Modifier.fillMaxSize()
-                 )
-
-
-             }
         }
     }
 }
