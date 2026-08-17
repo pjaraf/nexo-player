@@ -51,6 +51,8 @@ fun ProfileScreen(
 ) {
     val activeProfile by viewModel.activeProfile.collectAsState()
     val userInfo by viewModel.userInfo.collectAsState()
+    val isCheckingUpdates by viewModel.isCheckingUpdates.collectAsState()
+    val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
 
     var showPhoneLinkDialog by remember { mutableStateOf(false) }
 
@@ -200,7 +202,7 @@ fun ProfileScreen(
             // App Version Section
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "VERSIÓN",
+                    text = "ACTUALIZACIONES Y SISTEMA",
                     style = MaterialTheme.typography.labelSmall.copy(
                         letterSpacing = 2.sp,
                         color = NexusTextSecondary
@@ -213,37 +215,93 @@ fun ProfileScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_nexus_logo),
-                                contentDescription = "Nexo Logo",
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_nexus_logo),
+                                    contentDescription = "Nexo Logo",
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                )
+                                Text(
+                                    text = "Versión instalada",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                             Text(
-                                text = "Versión de la aplicación",
-                                color = Color.White,
+                                text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                                color = NexusPrimary,
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                        Text(
-                            text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
-                            color = NexusTextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+
+                        HorizontalDivider(color = NexusBorder)
+
+                        // Check for updates button
+                        var isCheckFocused by remember { mutableStateOf(false) }
+                        Button(
+                            onClick = { viewModel.checkForUpdates(manual = true) },
+                            enabled = !isCheckingUpdates,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isCheckFocused) TvFocusBlue else NexusSurfaceVariant
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                if (isCheckFocused) 2.dp else 1.dp,
+                                if (isCheckFocused) Color(0xFFFFC107) else NexusBorder
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .onFocusChanged { isCheckFocused = it.isFocused }
+                                .focusable()
+                                .testTag("profile_check_updates_btn")
+                        ) {
+                            if (isCheckingUpdates) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Comprobando versión...", fontSize = 13.sp, color = Color.White)
+                            } else {
+                                Icon(
+                                    Icons.Outlined.SystemUpdate,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Comprobar Actualizaciones", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        if (updateStatusMessage != null) {
+                            Text(
+                                text = updateStatusMessage ?: "",
+                                color = if (updateStatusMessage?.contains("Nueva versión", ignoreCase = true) == true) Color(0xFF10B981) else NexusTextSecondary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
                     }
                 }
             }
