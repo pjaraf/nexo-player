@@ -10,7 +10,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.aistudio.nexus.jqvzkp"
+        applicationId = "com.nexo.player"
         minSdk = 24
         targetSdk = 35
         versionCode = 31
