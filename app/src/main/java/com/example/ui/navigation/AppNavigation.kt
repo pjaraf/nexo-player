@@ -90,7 +90,7 @@ fun AppNavigation(
     val startDestination = if (!AppStorage.isLoggedIn()) {
         Routes.LOGIN
     } else {
-        Routes.PROFILE_SELECT
+        Routes.TABS
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -102,7 +102,7 @@ fun AppNavigation(
             LoginScreen(
                 viewModel = mainViewModel,
                 onLoginSuccess = {
-                    navController.navigate(Routes.PROFILE_SELECT) {
+                    navController.navigate(Routes.TABS) {
                         popUpTo(Routes.LOGIN) { inclusive = true }
                     }
                 }

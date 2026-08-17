@@ -308,15 +308,6 @@ fun ProfileScreen(
                     )
                 )
 
-                // Switch Profile
-                MenuOptionCard(
-                    title = "Cambiar de perfil",
-                    subtitle = "Selecciona otro usuario",
-                    icon = Icons.Outlined.People,
-                    onClick = onNavigateSwitchProfile,
-                    testTag = "profile_switch_btn"
-                )
-
                 // Favorites
                 MenuOptionCard(
                     title = "Mis Favoritos",
@@ -335,14 +326,6 @@ fun ProfileScreen(
                     testTag = "profile_link_tv_btn"
                 )
 
-                // Manage Profiles
-                MenuOptionCard(
-                    title = "Administrar perfiles",
-                    subtitle = "Crear perfiles, editar y PIN parental",
-                    icon = Icons.Outlined.Settings,
-                    onClick = onNavigateManageProfiles,
-                    testTag = "profile_manage_btn"
-                )
             }
 
             // Updates Section

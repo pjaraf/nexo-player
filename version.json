@@ -1,7 +1,7 @@
 {
-  "versionCode": 14,
-  "versionName": "1.1.3",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.3/app-debug.apk",
-  "changelog": "Diseño optimizado para TV: Fila principal exclusiva de Tendencias de Películas. Cambio de fondo dinámico automático al navegar y zoom con recuadro rojo en la carátula seleccionada para mejor control con el mando.",
+  "versionCode": 15,
+  "versionName": "1.1.4",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.4/app-debug.apk",
+  "changelog": "Se eliminó por completo la pantalla de selección de perfiles. Ahora la aplicación ingresa directamente al inicio en televisores y teléfonos para un acceso más rápido.",
   "isMandatory": false
 }
