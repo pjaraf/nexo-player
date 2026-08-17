@@ -153,7 +153,7 @@ fun MainTabsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(NexusBackground)
-                    .onPreviewKeyEvent { keyEvent ->
+                    .onKeyEvent { keyEvent ->
                         if (keyEvent.type == KeyEventType.KeyDown) {
                             val code = keyEvent.nativeKeyEvent.keyCode
                             when (code) {
@@ -421,6 +421,19 @@ private fun TvSidebarNavItem(
             .height(50.dp)
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                            onClick()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
             .testTag(tab.testTag)
     ) {
         Row(

@@ -158,67 +158,46 @@ private fun SeriesDetailPhoneScreen(
                 CircularProgressIndicator(color = NexusPrimary)
             }
         } else {
+            // Full Atmospheric Background Poster / Backdrop
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.72f)
+            ) {
+                AsyncImage(
+                    model = seriesCover,
+                    contentDescription = seriesTitle,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.4f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.5f),
+                                    NexusBackground.copy(alpha = 0.85f),
+                                    NexusBackground
+                                )
+                            )
+                        )
+                )
+            }
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header Backdrop
+                // Generous top spacing so the background poster is showcased beautifully
                 item {
-                    Box(
+                    Spacer(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp)
-                    ) {
-                        AsyncImage(
-                            model = seriesCover,
-                            contentDescription = seriesTitle,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f), NexusBackground)
-                                    )
-                                )
-                        )
-
-                        // Top bar buttons
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = onBack,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.Black.copy(alpha = 0.5f))
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
-                            }
-                            IconButton(
-                                onClick = {
-                                    isFav = viewModel.toggleFavorite("series", seriesId, seriesTitle, seriesCover)
-                                },
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.Black.copy(alpha = 0.5f))
-                            ) {
-                                Icon(
-                                    imageVector = if (isFav) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
-                                    contentDescription = "Favorito",
-                                    tint = if (isFav) NexusPrimary else Color.White
-                                )
-                            }
-                        }
-                    }
+                            .statusBarsPadding()
+                            .height(200.dp)
+                    )
                 }
 
                 // Info Section
@@ -452,6 +431,41 @@ private fun SeriesDetailPhoneScreen(
 
                 item {
                     Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+
+            // Top bar buttons (Floating above background)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                }
+                IconButton(
+                    onClick = {
+                        isFav = viewModel.toggleFavorite("series", seriesId, seriesTitle, seriesCover)
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                ) {
+                    Icon(
+                        imageVector = if (isFav) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = "Favorito",
+                        tint = if (isFav) NexusPrimary else Color.White
+                    )
                 }
             }
         }

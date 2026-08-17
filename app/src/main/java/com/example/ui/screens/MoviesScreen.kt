@@ -25,6 +25,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -197,12 +198,32 @@ fun MoviesScreen(
                         Spacer(modifier = Modifier.width(6.dp))
 
                         // Floating Categories Button
+                        var isCatBtnFocused by remember { mutableStateOf(false) }
                         Surface(
                             onClick = { isCategoriesOpen = !isCategoriesOpen },
                             shape = RoundedCornerShape(20.dp),
-                            color = if (isCategoriesOpen) NexusPrimary else Color.White.copy(alpha = 0.15f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isCategoriesOpen) NexusPrimary else Color.White.copy(alpha = 0.3f)),
-                            modifier = Modifier.testTag("btn_toggle_categories")
+                            color = if (isCategoriesOpen) NexusPrimary else if (isCatBtnFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                if (isCatBtnFocused) 2.dp else 1.dp,
+                                if (isCatBtnFocused) Color(0xFFFFC107) else if (isCategoriesOpen) NexusPrimary else Color.White.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier
+                                .onFocusChanged { isCatBtnFocused = it.isFocused }
+                                .focusable()
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.nativeKeyEvent.keyCode) {
+                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                            AndroidKeyEvent.KEYCODE_ENTER,
+                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                                isCategoriesOpen = !isCategoriesOpen
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                }
+                                .testTag("btn_toggle_categories")
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
@@ -344,7 +365,8 @@ fun MoviesScreen(
                             },
                             onClick = {
                                 onNavigateMovie(movie.id)
-                            }
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -444,12 +466,26 @@ fun MoviesScreen(
                                     .fillMaxWidth()
                                     .height(44.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .focusable()
                                     .onFocusChanged { state ->
                                         isCatFocused = state.isFocused
                                         if (state.isFocused) {
                                             viewModel.selectVodCategory(id)
                                         }
+                                    }
+                                    .focusable()
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                                    viewModel.selectVodCategory(id)
+                                                    isCategoriesOpen = false
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        } else false
                                     }
                                     .clickable {
                                         viewModel.selectVodCategory(id)

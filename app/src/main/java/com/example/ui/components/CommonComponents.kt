@@ -37,6 +37,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.key.*
+import android.view.KeyEvent as AndroidKeyEvent
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.utils.DeviceUtils
@@ -186,14 +188,14 @@ fun CategoryChipsRow(
             var isFocused by remember { mutableStateOf(false) }
 
             val chipBg = when {
-                isSelected -> TvSelectedRed
                 isFocused -> TvFocusBlue
+                isSelected -> TvSelectedRed
                 else -> NexusSurfaceVariant
             }
 
             val chipBorder = when {
+                isFocused -> androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFC107))
                 isSelected -> androidx.compose.foundation.BorderStroke(1.5.dp, TvSelectedRed)
-                isFocused -> androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
                 else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
             }
 
@@ -203,8 +205,21 @@ fun CategoryChipsRow(
                 border = chipBorder,
                 modifier = Modifier
                     .height(36.dp)
-                    .focusable()
                     .onFocusChanged { isFocused = it.isFocused }
+                    .focusable()
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown) {
+                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                AndroidKeyEvent.KEYCODE_ENTER,
+                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                    onSelect(id)
+                                    true
+                                }
+                                else -> false
+                            }
+                        } else false
+                    }
                     .clickable { onSelect(id) }
                     .testTag("category_chip_$id")
             ) {
@@ -242,24 +257,41 @@ fun MediaPosterCard(
     val isHighlighted = isFocused || isSelected
 
     val borderColor = when {
-        isHighlighted -> Color(0xFFFFC107) // Bright Gold/Yellow for clear focus indicator
+        isFocused -> Color(0xFFFFC107) // Bright Gold/Yellow for clear remote focus indicator
+        isSelected -> TvSelectedRed
         else -> NexusBorder
     }
     
-    val targetScale = if (isHighlighted) 1.15f else 1f
-    val scale by animateFloatAsState(targetValue = targetScale, label = "card_scale")
+    val targetScale = if (isFocused) 1.08f else 1f
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+        label = "card_scale"
+    )
 
     Column(
         modifier = modifier
-            .width(if (isHighlighted) 144.dp else 126.dp)
             .scale(scale)
             .zIndex(if (isHighlighted) 10f else 0f)
-            .focusable()
             .onFocusChanged { state ->
                 isFocused = state.isFocused
                 if (state.isFocused) {
                     onFocused?.invoke()
                 }
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                            onClick()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
             }
             .clickable { onClick() }
             .testTag("poster_card_${title.take(15)}"),
@@ -359,7 +391,7 @@ fun LiveChannelCard(
     var isFocused by remember { mutableStateOf(false) }
 
     val borderStroke = when {
-        isFocused -> androidx.compose.foundation.BorderStroke(2.dp, TvFocusBlue)
+        isFocused -> androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
         else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
     }
 
@@ -369,8 +401,21 @@ fun LiveChannelCard(
         border = borderStroke,
         modifier = modifier
             .fillMaxWidth()
-            .focusable()
             .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                            onClick()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
             .clickable { onClick() }
             .testTag("live_channel_${channel.id}")
     ) {
@@ -478,7 +523,7 @@ fun ContinueWatchingCard(
     } else 0f
 
     val borderStroke = when {
-        isFocused -> androidx.compose.foundation.BorderStroke(2.dp, TvFocusBlue)
+        isFocused -> androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
         else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
     }
 
@@ -488,8 +533,21 @@ fun ContinueWatchingCard(
         border = borderStroke,
         modifier = modifier
             .width(200.dp)
-            .focusable()
             .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                            onClick()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
             .clickable { onClick() }
             .testTag("continue_card_${item.key}")
     ) {

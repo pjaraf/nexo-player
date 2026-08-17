@@ -328,7 +328,8 @@ fun HomeScreen(
                                                 containerExtension = movie.containerExtension ?: "mp4"
                                             )
                                             onNavigateMovie(movie.id)
-                                        }
+                                        },
+                                        modifier = Modifier.width(if (isWideScreen) 130.dp else 115.dp)
                                     )
                                 }
                             }
@@ -380,7 +381,8 @@ fun HomeScreen(
                                                 kind = "series"
                                             )
                                             onNavigateSeries(series.id)
-                                        }
+                                        },
+                                        modifier = Modifier.width(if (isWideScreen) 130.dp else 115.dp)
                                     )
                                 }
                             }

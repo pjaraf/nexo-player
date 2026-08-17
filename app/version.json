@@ -1,7 +1,7 @@
 {
-  "versionCode": 27,
-  "versionName": "1.1.16",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.16/app-debug.apk",
-  "changelog": "Banner unificado de reproductor para películas y series, soporte de mando a distancia, retorno automático al terminar películas y cambio automático al siguiente episodio en series.",
+  "versionCode": 28,
+  "versionName": "1.1.17",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.17/app-debug.apk",
+  "changelog": "Soporte completo y navegación fluida con mando a distancia (D-Pad) en todos los listados de carátulas y categorías, sin bloqueos de desplazamiento.",
   "isMandatory": true
 }

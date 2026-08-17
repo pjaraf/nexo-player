@@ -481,39 +481,49 @@ private fun MovieDetailPhoneScreen(
             val image = info?.coverImage ?: movieData?.streamIcon ?: POSTER_FALLBACK
             val ext = movieData?.containerExtension ?: "mp4"
 
+            // Full Atmospheric Background Poster / Backdrop
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.72f)
+            ) {
+                AsyncImage(
+                    model = image,
+                    contentDescription = title,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Gradient overlays
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.4f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.5f),
+                                    NexusBackground.copy(alpha = 0.85f),
+                                    NexusBackground
+                                )
+                            )
+                        )
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
-                // Hero Backdrop
-                Box(
+                // Generous top spacing so the background poster is shown clearly
+                Spacer(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(340.dp)
-                ) {
-                    AsyncImage(
-                        model = image,
-                        contentDescription = title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    // Gradient overlays
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Black.copy(alpha = 0.6f),
-                                        Color.Transparent,
-                                        NexusBackground
-                                    )
-                                )
-                            )
-                    )
-                }
+                        .statusBarsPadding()
+                        .height(200.dp)
+                )
 
                 // Info Content
                 Column(
