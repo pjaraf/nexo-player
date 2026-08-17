@@ -75,12 +75,13 @@ jobs:
           fi
 
           # If release already exists, upload the new APK; otherwise create a new release
+          cp "$APK_FILE" app-debug.apk
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists. Uploading and replacing APK asset..."
-            gh release upload "$TAG" "$APK_FILE" --clobber
+            gh release upload "$TAG" app-debug.apk --clobber
           else
             echo "Creating new release $TAG..."
-            gh release create "$TAG" "$APK_FILE" --title "Nexo Player $TAG" --generate-notes
+            gh release create "$TAG" app-debug.apk --title "Nexo Player $TAG" --notes "Actualización automática Nexo Player $TAG (Build $VERSION_CODE)"
           fi
 
 

@@ -28,6 +28,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
@@ -731,26 +732,51 @@ private fun SeriesDetailTvScreen(
             .testTag("series_detail_tv_screen")
     ) {
         if (!isFullScreenMode) {
-            // Full Backdrop Wallpaper with Dark Vignette Gradients
+            // Full Backdrop Wallpaper with Dark Vignette Gradients (Uncropped 16:9 Art)
             Box(modifier = Modifier.fillMaxSize()) {
+                // 1. Ambient Glow Layer
                 AsyncImage(
                     model = seriesCover,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(0.30f)
                 )
 
-                // Dark Multilayer Vignette
+                // 2. Full Uncropped Crisp Poster Art
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.TopEnd
+                ) {
+                    AsyncImage(
+                        model = seriesCover,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.TopEnd,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(0.55f)
+                            .padding(end = 48.dp, top = 20.dp, bottom = 48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
+
+                // 3. Dark Multilayer Vignette
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.82f),
-                                    Color(0xFF0D0E15).copy(alpha = 0.90f),
-                                    Color(0xFF08090E).copy(alpha = 0.98f)
-                                )
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    NexusBackground,
+                                    NexusBackground.copy(alpha = 0.95f),
+                                    NexusBackground.copy(alpha = 0.65f),
+                                    Color.Black.copy(alpha = 0.20f),
+                                    Color.Transparent
+                                ),
+                                startX = 0f,
+                                endX = 1100f
                             )
                         )
                 )
@@ -759,11 +785,12 @@ private fun SeriesDetailTvScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.92f),
-                                    Color.Black.copy(alpha = 0.65f),
-                                    Color.Transparent
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.75f),
+                                    Color.Transparent,
+                                    NexusBackground.copy(alpha = 0.85f),
+                                    NexusBackground
                                 )
                             )
                         )

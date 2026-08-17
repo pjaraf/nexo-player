@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
@@ -99,7 +100,7 @@ fun MoviesScreen(
             }
             .testTag("movies_screen")
     ) {
-        // Dynamic Backdrop Wallpaper
+        // Dynamic Backdrop Wallpaper (Uncropped 16:9 Hero for TV & WideScreen)
         val currentPoster = selectedMovie?.streamIcon ?: POSTER_FALLBACK
         Crossfade(
             targetState = currentPoster,
@@ -109,40 +110,73 @@ fun MoviesScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isWideScreen) 540.dp else 400.dp)
+                    .height(if (isWideScreen) 580.dp else 400.dp)
             ) {
+                // 1. Ambient Background Glow Layer (Subtle darkened ambient backdrop)
                 AsyncImage(
                     model = imageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                // Vertical Dark Gradient
-                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.35f),
-                                    NexusBackground.copy(alpha = 0.95f),
-                                    NexusBackground
-                                )
-                            )
-                        )
+                        .alpha(0.35f)
                 )
 
-                // Vignette from Left
+                // 2. Full Uncropped Crisp Poster Art (Aligned in 16:9 aspect on TV)
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = if (isWideScreen) Alignment.TopEnd else Alignment.TopCenter
+                ) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        alignment = if (isWideScreen) Alignment.TopEnd else Alignment.TopCenter,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .then(
+                                if (isWideScreen) {
+                                    Modifier
+                                        .fillMaxWidth(0.55f)
+                                        .padding(end = 48.dp, top = 20.dp, bottom = 48.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                } else {
+                                    Modifier.fillMaxWidth()
+                                }
+                            )
+                    )
+                }
+
+                // 3. Left-to-Right vignette gradient shadow (Ensures title/texts are 100% readable)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.horizontalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.85f),
+                                colors = listOf(
+                                    NexusBackground,
+                                    NexusBackground.copy(alpha = 0.95f),
+                                    NexusBackground.copy(alpha = 0.65f),
+                                    Color.Black.copy(alpha = 0.20f),
                                     Color.Transparent
+                                ),
+                                startX = 0f,
+                                endX = if (isWideScreen) 1100f else 500f
+                            )
+                        )
+                )
+
+                // 4. Vertical dark gradient (Fades smoothly into bottom rows)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.75f),
+                                    Color.Transparent,
+                                    NexusBackground.copy(alpha = 0.85f),
+                                    NexusBackground
                                 )
                             )
                         )

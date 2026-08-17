@@ -1,7 +1,7 @@
 {
-  "versionCode": 28,
-  "versionName": "1.1.17",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.17/app-debug.apk",
-  "changelog": "Soporte completo y navegación fluida con mando a distancia (D-Pad) en todos los listados de carátulas y categorías, sin bloqueos de desplazamiento.",
+  "versionCode": 29,
+  "versionName": "1.1.18",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.18/app-debug.apk",
+  "changelog": "Ajuste de carátula e imágenes de fondo panorámicas 16:9 en TV sin recortes, además de navegación optimizada con mando a distancia.",
   "isMandatory": true
 }
