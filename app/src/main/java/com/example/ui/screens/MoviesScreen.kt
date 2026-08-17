@@ -343,11 +343,7 @@ fun MoviesScreen(
                                 selectedMovie = movie
                             },
                             onClick = {
-                                if (isSelected) {
-                                    onNavigateMovie(movie.id)
-                                } else {
-                                    selectedMovie = movie
-                                }
+                                onNavigateMovie(movie.id)
                             }
                         )
                     }

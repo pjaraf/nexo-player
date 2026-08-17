@@ -1,7 +1,7 @@
 {
-  "versionCode": 21,
-  "versionName": "1.1.10",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.10/app-debug.apk",
-  "changelog": "Fondo cinemático con collage de pósters en la pantalla de inicio y mejoras generales.",
+  "versionCode": 22,
+  "versionName": "1.1.11",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.11/app-debug.apk",
+  "changelog": "Navegación con control remoto optimizada en películas y series, y mejoras generales.",
   "isMandatory": false
 }

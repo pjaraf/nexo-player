@@ -334,11 +334,7 @@ fun SeriesScreen(
                                 selectedSeries = series
                             },
                             onClick = {
-                                if (isSelected) {
-                                    onNavigateSeries(series.id)
-                                } else {
-                                    selectedSeries = series
-                                }
+                                onNavigateSeries(series.id)
                             }
                         )
                     }
