@@ -64,7 +64,8 @@ fun HomeScreen(
     onNavigateMovie: (movieId: String) -> Unit,
     onNavigateSeries: (seriesId: String) -> Unit,
     onPlayDirect: (url: String, title: String, kind: String, contentId: String, image: String, resumeMs: Long) -> Unit,
-    onNavigateProfile: () -> Unit
+    onNavigateProfile: () -> Unit,
+    isSidebarOpen: Boolean = false
 ) {
     val activeProfile by viewModel.activeProfile.collectAsState()
     val isKids by viewModel.isKidsMode.collectAsState()
@@ -129,24 +130,13 @@ fun HomeScreen(
                 CircularProgressIndicator(color = NexusPrimary)
             }
         } else {
-            val firstMovieId = moviesRow.firstOrNull()?.id
-            val isFirstMovieFocused = selectedMedia?.id == null || selectedMedia?.id == firstMovieId
-
             Box(modifier = Modifier.fillMaxSize()) {
                 // --- 1. Dynamic Fullscreen Backdrop Layer (Uncropped 16:9 Hero for TV & WideScreen) ---
-                // Only displayed when focused on the first movie card on TV/WideScreen
-                if (isFirstMovieFocused) {
-                    val currentBackdrop = (selectedMedia ?: moviesRow.firstOrNull()?.let {
-                        FocusedMedia(
-                            id = it.id,
-                            title = it.displayName,
-                            description = "Película disponible en Nexo.",
-                            backdropUrl = it.streamIcon ?: POSTER_FALLBACK,
-                            rating = it.formattedRating,
-                            kind = "movie"
-                        )
-                    })?.backdropUrl ?: POSTER_FALLBACK
+                // Active for whichever card the user is currently focused on in Home, hidden when sidebar menu is open
+                val currentBackdrop = selectedMedia?.backdropUrl ?: (moviesRow.firstOrNull()?.streamIcon ?: POSTER_FALLBACK)
+                val showHero = !isSidebarOpen
 
+                if (showHero) {
                     Crossfade(
                         targetState = currentBackdrop,
                         animationSpec = tween(durationMillis = 400),
@@ -244,9 +234,9 @@ fun HomeScreen(
                         modifier = Modifier.statusBarsPadding()
                     )
 
-                    // --- Dynamic Hero Details for TV & Mobile (Shows only when on first movie card) ---
+                    // --- Dynamic Hero Details for TV & Mobile (Shows current selected title for any focused card) ---
                     val media = selectedMedia
-                    if (media != null && isFirstMovieFocused) {
+                    if (media != null && !isSidebarOpen) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
