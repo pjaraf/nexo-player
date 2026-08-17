@@ -239,7 +239,7 @@ object AppStorage {
     }
 
     // --- In-App Updates ---
-    const val DEFAULT_UPDATE_URL = "https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json"
+    const val DEFAULT_UPDATE_URL = "https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json"
 
     fun getUpdateCheckUrl(): String {
         return prefs.getString("custom_update_url", null)?.ifBlank { null } ?: DEFAULT_UPDATE_URL
