@@ -11,6 +11,7 @@ import com.example.data.updater.AppUpdateManager
 import com.example.utils.NetworkMonitor
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
 class MainViewModel(application: Application = NexusApp.instance) : AndroidViewModel(application) {
 
@@ -278,17 +279,19 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
 
             val moviesJob = launch {
                 val vodList = XtreamApi.getVodStreams()
-                val filtered = if (isKids) {
-                    vodList.filter { AppStorage.isKidsCategory(it.displayName) }
-                } else {
-                    vodList.filter { it.displayName.contains("2026") }
-                }
-                
-                // Fallback to newest if no 2026 movies are found
-                val finalMovies = if (filtered.isEmpty() && !isKids) {
-                    vodList.sortedByDescending { it.added?.toLongOrNull() ?: 0L }.take(20)
-                } else {
-                    filtered.take(20)
+                val finalMovies = kotlinx.coroutines.withContext(Dispatchers.Default) {
+                    val filtered = if (isKids) {
+                        vodList.filter { AppStorage.isKidsCategory(it.displayName) }
+                    } else {
+                        vodList.filter { it.displayName.contains("2026") }
+                    }
+                    
+                    // Fallback to newest if no 2026 movies are found
+                    if (filtered.isEmpty() && !isKids) {
+                        vodList.sortedByDescending { it.added?.toLongOrNull() ?: 0L }.take(20)
+                    } else {
+                        filtered.take(20)
+                    }
                 }
                 
                 _homeMoviesRow.value = finalMovies
@@ -299,15 +302,20 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
 
             val seriesJob = launch {
                 val seriesList = XtreamApi.getSeriesList()
-                val filtered = if (isKids) {
-                    seriesList.filter { AppStorage.isKidsCategory(it.displayName) }
-                } else {
-                    seriesList.sortedWith(
-                        compareByDescending<SeriesItem> { it.rating?.toString()?.toDoubleOrNull() ?: 0.0 }
-                            .thenByDescending { it.lastModified?.toLongOrNull() ?: 0L }
-                    )
+                val finalSeries = kotlinx.coroutines.withContext(Dispatchers.Default) {
+                    val filtered = if (isKids) {
+                        seriesList.filter { AppStorage.isKidsCategory(it.displayName) }
+                    } else {
+                        seriesList.sortedWith(
+                            compareByDescending<SeriesItem> { 
+                                val r = it.rating?.toString()?.toDoubleOrNull() ?: 0.0
+                                if (r.isNaN()) 0.0 else r
+                            }.thenByDescending { it.lastModified?.toLongOrNull() ?: 0L }
+                        )
+                    }
+                    filtered.take(20)
                 }
-                _homeSeriesRow.value = filtered.take(20)
+                _homeSeriesRow.value = finalSeries
             }
 
             liveJob.join()

@@ -1,7 +1,7 @@
 {
-  "versionCode": 12,
-  "versionName": "1.1.1",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.1/app-debug.apk",
-  "changelog": "Se solucionó el problema de las carátulas recortadas al fondo en pantallas de TV. Filtro mejorado: Tendencias muestra ahora solo películas de 2026 y Series Destacadas muestra las mejor valoradas y más recientes.",
+  "versionCode": 13,
+  "versionName": "1.1.2",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.2/app-debug.apk",
+  "changelog": "¡Urgente! Corrección del cierre inesperado de la aplicación en pantallas de inicio. Optimización de rendimiento para listas grandes de contenido.",
   "isMandatory": false
 }

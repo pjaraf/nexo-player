@@ -77,7 +77,7 @@ data class VodStream(
         get() = cleanId(streamId)
 
     val displayName: String
-        get() = name.ifBlank { title ?: "Película" }
+        get() = name?.ifBlank { title ?: "Película" } ?: title ?: "Película"
 
     val formattedRating: String?
         get() = rating?.toString()?.takeIf { it.isNotBlank() && it != "0" }
@@ -133,7 +133,7 @@ data class SeriesItem(
         get() = cleanId(seriesId)
 
     val displayName: String
-        get() = name.ifBlank { title ?: "Serie" }
+        get() = name?.ifBlank { title ?: "Serie" } ?: title ?: "Serie"
 
     val formattedRating: String?
         get() = rating?.toString()?.takeIf { it.isNotBlank() && it != "0" }
