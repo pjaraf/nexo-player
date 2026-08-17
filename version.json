@@ -1,7 +1,7 @@
 {
-  "versionCode": 10,
-  "versionName": "1.0.9",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.0.9/app-debug.apk",
-  "changelog": "Navegación con control remoto optimizada (foco azul y selección roja), mejoras en visualización de canales en vivo y estabilidad general.",
+  "versionCode": 11,
+  "versionName": "1.1.0",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.0/app-debug.apk",
+  "changelog": "Modo anti-suspensión activado (pantalla siempre activa sin apagarse en TV y móviles), consulta instantánea de actualizaciones vía API de GitHub y mejoras de control remoto.",
   "isMandatory": false
 }
