@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -663,6 +664,97 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.ButtonA -> {
+                            if (!showControls) {
+                                showControls = true
+                                if (isLive) showLiveChannelBanner = true
+                                true
+                            } else false
+                        }
+                        Key.MediaPlayPause -> {
+                            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                            showControls = true
+                            true
+                        }
+                        Key.MediaPlay -> {
+                            exoPlayer.play()
+                            showControls = true
+                            true
+                        }
+                        Key.MediaPause -> {
+                            exoPlayer.pause()
+                            showControls = true
+                            true
+                        }
+                        Key.DirectionLeft -> {
+                            if (!isLive) {
+                                val target = (exoPlayer.currentPosition - 10000L).coerceAtLeast(0L)
+                                exoPlayer.seekTo(target)
+                                showControls = true
+                                true
+                            } else false
+                        }
+                        Key.DirectionRight -> {
+                            if (!isLive) {
+                                val target = (exoPlayer.currentPosition + 10000L).coerceAtMost(duration)
+                                exoPlayer.seekTo(target)
+                                showControls = true
+                                true
+                            } else false
+                        }
+                        Key.MediaFastForward -> {
+                            val target = (exoPlayer.currentPosition + 10000L).coerceAtMost(duration)
+                            exoPlayer.seekTo(target)
+                            showControls = true
+                            true
+                        }
+                        Key.MediaRewind, Key.MediaPrevious -> {
+                            val target = (exoPlayer.currentPosition - 10000L).coerceAtLeast(0L)
+                            exoPlayer.seekTo(target)
+                            showControls = true
+                            true
+                        }
+                        Key.MediaNext -> {
+                            if (kind == "series") {
+                                playNextEpisode()
+                                true
+                            } else false
+                        }
+                        Key.DirectionUp -> {
+                            if (isLive) {
+                                jumpChannel(1, "up")
+                                true
+                            } else {
+                                showControls = true
+                                false
+                            }
+                        }
+                        Key.DirectionDown -> {
+                            if (isLive) {
+                                jumpChannel(-1, "down")
+                                true
+                            } else {
+                                showControls = true
+                                false
+                            }
+                        }
+                        Key.Back, Key.Escape -> {
+                            if (showControls) {
+                                showControls = false
+                                true
+                            } else {
+                                onClose()
+                                true
+                            }
+                        }
+                        else -> false
+                    }
+                } else false
+            }
             // Tap gesture detector to toggle HUD controls
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -1181,8 +1273,8 @@ fun PlayerScreen(
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
                                 shadowElevation = 6.dp,
                                 modifier = Modifier
-                                    .width(42.dp)
-                                    .height(60.dp)
+                                    .width(44.dp)
+                                    .height(62.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .testTag("player_cover_poster")
                             ) {
@@ -1207,6 +1299,15 @@ fun PlayerScreen(
                                     }
                                 }
                             }
+
+                            // Barra vertical roja de acento (idéntica al banner de TV)
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .height(42.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(NexusPrimary)
+                            )
 
                             // 2. BARRA DE PROGRESO Y CONTROLES DEBAJO
                             Column(

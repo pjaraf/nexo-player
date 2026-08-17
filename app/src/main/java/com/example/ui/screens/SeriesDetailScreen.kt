@@ -89,7 +89,8 @@ fun SeriesDetailScreen(
         SeriesDetailTvScreen(
             seriesId = seriesId,
             viewModel = viewModel,
-            onBack = onBack
+            onBack = onBack,
+            onPlayEpisode = onPlayEpisode
         )
     } else {
         SeriesDetailPhoneScreen(
@@ -469,7 +470,19 @@ private fun SeriesDetailPhoneScreen(
 private fun SeriesDetailTvScreen(
     seriesId: String,
     viewModel: MainViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onPlayEpisode: (
+        url: String,
+        title: String,
+        kind: String,
+        contentId: String,
+        image: String,
+        resumeMs: Long,
+        nextUrl: String?,
+        nextTitle: String?,
+        nextContentId: String?,
+        nextEpImage: String?
+    ) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -878,8 +891,27 @@ private fun SeriesDetailTvScreen(
                                 var isFullBtnFocused by remember { mutableStateOf(false) }
                                 Surface(
                                     onClick = {
-                                        isFullScreenMode = true
-                                        showPlayerControls = true
+                                        val currentEp = selectedEpisode ?: currentEpisodes.firstOrNull()
+                                        if (currentEp != null) {
+                                            val epIndex = currentEpisodes.indexOfFirst { it.epId == currentEp.epId }
+                                            val nextEp = if (epIndex >= 0 && epIndex + 1 < currentEpisodes.size) currentEpisodes[epIndex + 1] else null
+                                            val url = XtreamApi.getSeriesStreamUrl(currentEp.epId, currentEp.containerExtension ?: "mp4")
+                                            val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+                                            val epImg = currentEp.info?.movieImage ?: seriesCover
+                                            val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
+                                            onPlayEpisode(
+                                                url,
+                                                "$seriesTitle - T${selectedSeason}E${currentEp.epNumber}: ${currentEp.displayTitle}",
+                                                "series",
+                                                seriesId,
+                                                epImg,
+                                                exoPlayer.currentPosition.coerceAtLeast(0L),
+                                                nextUrl,
+                                                nextEp?.displayTitle,
+                                                nextEp?.epId,
+                                                nextEpImg
+                                            )
+                                        }
                                     },
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
@@ -992,8 +1024,27 @@ private fun SeriesDetailTvScreen(
                                 .focusable()
                                 .onFocusChanged { isPreviewFocused = it.isFocused }
                                 .clickable {
-                                    isFullScreenMode = true
-                                    showPlayerControls = true
+                                    val currentEp = selectedEpisode ?: currentEpisodes.firstOrNull()
+                                    if (currentEp != null) {
+                                        val epIndex = currentEpisodes.indexOfFirst { it.epId == currentEp.epId }
+                                        val nextEp = if (epIndex >= 0 && epIndex + 1 < currentEpisodes.size) currentEpisodes[epIndex + 1] else null
+                                        val url = XtreamApi.getSeriesStreamUrl(currentEp.epId, currentEp.containerExtension ?: "mp4")
+                                        val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+                                        val epImg = currentEp.info?.movieImage ?: seriesCover
+                                        val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
+                                        onPlayEpisode(
+                                            url,
+                                            "$seriesTitle - T${selectedSeason}E${currentEp.epNumber}: ${currentEp.displayTitle}",
+                                            "series",
+                                            seriesId,
+                                            epImg,
+                                            exoPlayer.currentPosition.coerceAtLeast(0L),
+                                            nextUrl,
+                                            nextEp?.displayTitle,
+                                            nextEp?.epId,
+                                            nextEpImg
+                                        )
+                                    }
                                 }
                                 .testTag("series_preview_player")
                         ) {
@@ -1162,14 +1213,24 @@ private fun SeriesDetailTvScreen(
                                                 isFocused = state.isFocused
                                             }
                                             .clickable {
-                                                if (isSelected) {
-                                                    // Toggle in-place full screen seamlessly
-                                                    isFullScreenMode = true
-                                                    showPlayerControls = true
-                                                } else {
-                                                    // Select this episode (turns Red and loads preview)
-                                                    selectedEpisode = ep
-                                                }
+                                                val epIndex = currentEpisodes.indexOfFirst { it.epId == ep.epId }
+                                                val nextEp = if (epIndex >= 0 && epIndex + 1 < currentEpisodes.size) currentEpisodes[epIndex + 1] else null
+                                                val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
+                                                val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+                                                val epImg = ep.info?.movieImage ?: seriesCover
+                                                val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
+                                                onPlayEpisode(
+                                                    url,
+                                                    "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
+                                                    "series",
+                                                    seriesId,
+                                                    epImg,
+                                                    if (isSelected) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L,
+                                                    nextUrl,
+                                                    nextEp?.displayTitle,
+                                                    nextEp?.epId,
+                                                    nextEpImg
+                                                )
                                             }
                                             .testTag("episode_block_${ep.epNumber}"),
                                         shape = RoundedCornerShape(8.dp),

@@ -8,11 +8,11 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
-import com.example.NexusApp
 import com.example.data.models.UpdateDownloadState
 import com.example.data.models.UpdateInfo
 import com.example.data.storage.AppStorage
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
@@ -44,9 +45,26 @@ object AppUpdateManager {
     val currentVersionCode: Int = BuildConfig.VERSION_CODE
     val currentVersionName: String = BuildConfig.VERSION_NAME
 
+    /**
+     * Accurately compares two semantic versions (e.g. "1.1.16" > "1.1.15")
+     */
     fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
-        // Force update if remote versionCode > currentVersionCode even if names match or differ
-        return true
+        val remoteClean = remoteVersion.trim().removePrefix("v").removePrefix("V")
+        val currentClean = currentVersion.trim().removePrefix("v").removePrefix("V")
+        if (remoteClean.isBlank() || currentClean.isBlank()) return false
+        if (remoteClean.equals(currentClean, ignoreCase = true)) return false
+
+        val remoteParts = remoteClean.split(".").mapNotNull { it.trim().toIntOrNull() }
+        val currentParts = currentClean.split(".").mapNotNull { it.trim().toIntOrNull() }
+
+        val maxLen = maxOf(remoteParts.size, currentParts.size)
+        for (i in 0 until maxLen) {
+            val r = remoteParts.getOrElse(i) { 0 }
+            val c = currentParts.getOrElse(i) { 0 }
+            if (r > c) return true
+            if (r < c) return false
+        }
+        return false
     }
 
     /**
@@ -74,60 +92,48 @@ object AppUpdateManager {
     }
 
     /**
-     * Checks the remote server/GitHub for a newer version.
-     * Returns the UpdateInfo if a newer version is available, or null if up to date.
+     * Checks both version.json and GitHub Releases API for a newer version.
      */
     suspend fun checkForUpdates(customUrl: String? = null, force: Boolean = false): UpdateInfo? = withContext(Dispatchers.IO) {
-        val rawUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
-        val normalized = normalizeUrl(rawUrl)
-        val cacheBuster = if (normalized.contains("?")) "&_cb=${System.currentTimeMillis()}" else "?_cb=${System.currentTimeMillis()}"
-        val targetUrl = "$normalized$cacheBuster"
-
         try {
-            Log.d(TAG, "Checking update. Current version: $currentVersionName (code $currentVersionCode). URL: $targetUrl")
+            Log.d(TAG, "Checking update. Current version: $currentVersionName (code $currentVersionCode)")
 
-            // Check version.json as update source
-            val request = Request.Builder()
-                .url(targetUrl)
-                .header("User-Agent", "Nexo-Updater/${currentVersionName}")
-                .header("Cache-Control", "no-cache, no-store, must-revalidate")
-                .header("Pragma", "no-cache")
-                .build()
+            // 1. First attempt: Check version.json
+            val versionInfo = fetchFromVersionJson(customUrl)
+            if (versionInfo != null) {
+                val isNewer = (versionInfo.versionCode > currentVersionCode) ||
+                        isVersionHigher(versionInfo.versionName, currentVersionName)
 
-            val response = httpClient.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body?.string()
-                Log.d(TAG, "Update response from version.json: $body")
-                if (!body.isNullOrBlank()) {
-                    val update = try {
-                        gson.fromJson(body, UpdateInfo::class.java)
-                    } catch (e: Exception) {
-                        null
+                if (isNewer) {
+                    val dismissed = AppStorage.getDismissedUpdateVersion()
+                    if (!force && dismissed == versionInfo.versionName) {
+                        Log.d(TAG, "Update v${versionInfo.versionName} was previously dismissed")
+                        _latestUpdateInfo.value = null
+                        return@withContext null
                     }
+                    Log.i(TAG, "New update found via version.json: v${versionInfo.versionName} (code=${versionInfo.versionCode})")
+                    _latestUpdateInfo.value = versionInfo
+                    AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
+                    return@withContext versionInfo
+                }
+            }
 
-                    if (update != null) {
-                        AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                        val remoteVer = update.versionName.trim()
-                        val isNewer = isVersionHigher(remoteVer, currentVersionName) || (update.versionCode > currentVersionCode)
+            // 2. Second attempt: Check GitHub Releases API directly if version.json didn't yield an update
+            val releaseInfo = fetchFromGitHubReleases()
+            if (releaseInfo != null) {
+                val isNewer = (releaseInfo.versionCode > currentVersionCode) ||
+                        isVersionHigher(releaseInfo.versionName, currentVersionName)
 
-                        if (isNewer) {
-                            val dismissed = AppStorage.getDismissedUpdateVersion()
-                            if (!force && dismissed == remoteVer) {
-                                Log.d(TAG, "Update v$remoteVer was previously dismissed")
-                                _latestUpdateInfo.value = null
-                                return@withContext null
-                            }
-                            val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
-                                normalizeUrl(update.apkUrl)
-                            } else {
-                                "https://github.com/pjaraf/nexo-player/releases/download/v$remoteVer/app-debug.apk"
-                            }
-                            val normalizedUpdate = update.copy(apkUrl = resolvedApkUrl)
-                            Log.i(TAG, "New update found via version.json! v${normalizedUpdate.versionName} (code=${normalizedUpdate.versionCode})")
-                            _latestUpdateInfo.value = normalizedUpdate
-                            return@withContext normalizedUpdate
-                        }
+                if (isNewer) {
+                    val dismissed = AppStorage.getDismissedUpdateVersion()
+                    if (!force && dismissed == releaseInfo.versionName) {
+                        _latestUpdateInfo.value = null
+                        return@withContext null
                     }
+                    Log.i(TAG, "New update found via GitHub Releases API: v${releaseInfo.versionName}")
+                    _latestUpdateInfo.value = releaseInfo
+                    AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
+                    return@withContext releaseInfo
                 }
             }
 
@@ -140,8 +146,96 @@ object AppUpdateManager {
         }
     }
 
+    private fun fetchFromVersionJson(customUrl: String?): UpdateInfo? {
+        return try {
+            val rawUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
+            val normalized = normalizeUrl(rawUrl)
+            val cacheBuster = if (normalized.contains("?")) "&_cb=${System.currentTimeMillis()}" else "?_cb=${System.currentTimeMillis()}"
+            val targetUrl = "$normalized$cacheBuster"
+
+            val request = Request.Builder()
+                .url(targetUrl)
+                .header("User-Agent", "Nexo-Updater/${currentVersionName}")
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .header("Pragma", "no-cache")
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                val body = response.body?.string()
+                if (!body.isNullOrBlank()) {
+                    val update = gson.fromJson(body, UpdateInfo::class.java)
+                    if (update != null && update.versionName.isNotBlank()) {
+                        val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
+                            normalizeUrl(update.apkUrl)
+                        } else {
+                            "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-debug.apk"
+                        }
+                        return update.copy(apkUrl = resolvedApkUrl)
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch from version.json: ${e.message}")
+            null
+        }
+    }
+
+    private fun fetchFromGitHubReleases(): UpdateInfo? {
+        return try {
+            val apiUrl = "https://api.github.com/repos/pjaraf/nexo-player/releases/latest"
+            val request = Request.Builder()
+                .url(apiUrl)
+                .header("User-Agent", "Nexo-Updater/${currentVersionName}")
+                .header("Accept", "application/vnd.github.v3+json")
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                val body = response.body?.string()
+                if (!body.isNullOrBlank()) {
+                    val json = gson.fromJson(body, JsonObject::class.java)
+                    val tagName = json.get("tag_name")?.asString?.removePrefix("v")?.removePrefix("V") ?: ""
+                    val releaseNotes = json.get("body")?.asString ?: "Nueva versión con mejoras y correcciones."
+
+                    var downloadUrl = ""
+                    val assets = json.getAsJsonArray("assets")
+                    if (assets != null && assets.size() > 0) {
+                        for (assetElement in assets) {
+                            val asset = assetElement.asJsonObject
+                            val name = asset.get("name")?.asString ?: ""
+                            if (name.endsWith(".apk", ignoreCase = true)) {
+                                downloadUrl = asset.get("browser_download_url")?.asString ?: ""
+                                break
+                            }
+                        }
+                    }
+
+                    if (downloadUrl.isBlank() && tagName.isNotBlank()) {
+                        downloadUrl = "https://github.com/pjaraf/nexo-player/releases/download/v$tagName/app-debug.apk"
+                    }
+
+                    if (tagName.isNotBlank()) {
+                        return UpdateInfo(
+                            versionCode = currentVersionCode + 1,
+                            versionName = tagName,
+                            apkUrl = downloadUrl,
+                            changelog = releaseNotes,
+                            isMandatory = true
+                        )
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch from GitHub Releases API: ${e.message}")
+            null
+        }
+    }
+
     /**
-     * Downloads the APK from the given UpdateInfo and reports progress via downloadState.
+     * Downloads the APK with multi-URL fallback to guarantee reliable downloads.
      */
     suspend fun downloadUpdate(
         context: Context,
@@ -151,19 +245,48 @@ object AppUpdateManager {
         try {
             _downloadState.value = UpdateDownloadState.Downloading(0, 0L, 0L)
 
-            val downloadUrl = normalizeUrl(update.apkUrl)
-            val request = Request.Builder()
-                .url(downloadUrl)
-                .header("User-Agent", "Nexo-Downloader")
-                .build()
+            // Candidate URLs in priority order
+            val cleanVersion = update.versionName.removePrefix("v").removePrefix("V")
+            val candidateUrls = mutableListOf<String>()
 
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful || response.body == null) {
-                _downloadState.value = UpdateDownloadState.Error("Error al descargar archivo (HTTP ${response.code})")
+            if (update.apkUrl.isNotBlank()) {
+                candidateUrls.add(normalizeUrl(update.apkUrl))
+            }
+            candidateUrls.add("https://github.com/pjaraf/nexo-player/releases/download/v$cleanVersion/app-debug.apk")
+            candidateUrls.add("https://github.com/pjaraf/nexo-player/releases/download/$cleanVersion/app-debug.apk")
+            candidateUrls.add("https://github.com/pjaraf/nexo-player/releases/latest/download/app-debug.apk")
+
+            var successfulResponse: Response? = null
+            var lastErrorMessage = ""
+
+            for (url in candidateUrls.distinct()) {
+                try {
+                    Log.d(TAG, "Attempting APK download from: $url")
+                    val request = Request.Builder()
+                        .url(url)
+                        .header("User-Agent", "Nexo-Downloader")
+                        .build()
+
+                    val response = httpClient.newCall(request).execute()
+                    if (response.isSuccessful && response.body != null) {
+                        successfulResponse = response
+                        Log.i(TAG, "Successfully connected to download source: $url")
+                        break
+                    } else {
+                        lastErrorMessage = "HTTP ${response.code} en $url"
+                        response.close()
+                    }
+                } catch (e: Exception) {
+                    lastErrorMessage = e.message ?: "Error de red"
+                }
+            }
+
+            if (successfulResponse == null || successfulResponse.body == null) {
+                _downloadState.value = UpdateDownloadState.Error("No se pudo descargar el archivo APK ($lastErrorMessage)")
                 return@withContext false
             }
 
-            val responseBody = response.body!!
+            val responseBody = successfulResponse.body!!
             val totalLength = responseBody.contentLength()
 
             val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS) ?: context.cacheDir
@@ -176,13 +299,13 @@ object AppUpdateManager {
                 }
             }
 
-            val apkFile = File(downloadsDir, "nexo_update_${update.versionCode}.apk")
+            val apkFile = File(downloadsDir, "nexo_update_${cleanVersion}.apk")
             if (apkFile.exists()) apkFile.delete()
 
             val inputStream = responseBody.byteStream()
             val outputStream = FileOutputStream(apkFile)
 
-            val buffer = ByteArray(16 * 1024)
+            val buffer = ByteArray(32 * 1024)
             var bytesRead: Int
             var totalDownloaded = 0L
             var lastPercent = 0

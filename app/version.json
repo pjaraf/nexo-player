@@ -1,7 +1,7 @@
 {
-  "versionCode": 26,
-  "versionName": "1.1.15",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.15/app-debug.apk",
-  "changelog": "Actualización automática v1.1.15 para asegurar el aviso de actualización.",
+  "versionCode": 27,
+  "versionName": "1.1.16",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.16/app-debug.apk",
+  "changelog": "Banner unificado de reproductor para películas y series, soporte de mando a distancia, retorno automático al terminar películas y cambio automático al siguiente episodio en series.",
   "isMandatory": true
 }

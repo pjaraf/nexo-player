@@ -312,7 +312,10 @@ private fun MovieDetailTvScreen(
                                 var isFullBtnFocused by remember { mutableStateOf(false) }
                                 Surface(
                                     onClick = {
-                                        isFullScreenMode = true
+                                        val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
+                                        if (streamUrl.isNotBlank()) {
+                                            onPlay(streamUrl, title, "movie", movieId, cover, exoPlayer.currentPosition.coerceAtLeast(savedProgress?.positionMs ?: 0L))
+                                        }
                                     },
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
@@ -336,13 +339,26 @@ private fun MovieDetailTvScreen(
                         }
 
                         // Right Column (Player)
+                        var isPlayerFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier
                                 .weight(0.9f)
                                 .aspectRatio(16f / 9f)
                                 .clip(RoundedCornerShape(16.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                                .border(
+                                    if (isPlayerFocused) 2.dp else 1.dp,
+                                    if (isPlayerFocused) tvFocusBlue else Color.White.copy(alpha = 0.3f),
+                                    RoundedCornerShape(16.dp)
+                                )
                                 .background(Color.Black)
+                                .focusable()
+                                .onFocusChanged { isPlayerFocused = it.isFocused }
+                                .clickable {
+                                    val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
+                                    if (streamUrl.isNotBlank()) {
+                                        onPlay(streamUrl, title, "movie", movieId, cover, exoPlayer.currentPosition.coerceAtLeast(savedProgress?.positionMs ?: 0L))
+                                    }
+                                }
                         ) {
                             AndroidView(
                                 factory = { ctx ->

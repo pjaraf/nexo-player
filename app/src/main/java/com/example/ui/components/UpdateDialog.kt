@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -296,13 +298,35 @@ fun UpdateDialog(
                         }
                     }
 
-                    if (!updateInfo.isMandatory && downloadState !is UpdateDownloadState.Downloading) {
+                    if (downloadState is UpdateDownloadState.Error) {
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    val fallbackUrl = updateInfo.apkUrl.ifBlank { "https://github.com/pjaraf/nexo-player/releases/latest" }
+                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(browserIntent)
+                                } catch (e: Exception) {
+                                    // ignore
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Descargar desde Navegador", color = Color.White, fontSize = 13.sp)
+                        }
+                    }
+
+                    if (downloadState !is UpdateDownloadState.Downloading) {
                         TextButton(
                             onClick = onDismiss,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Más tarde",
+                                text = if (updateInfo.isMandatory && downloadState !is UpdateDownloadState.Error) "Cerrar" else "Más tarde",
                                 color = NexusTextSecondary,
                                 fontSize = 13.sp
                             )
