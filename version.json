@@ -1,7 +1,7 @@
 {
-  "versionCode": 11,
-  "versionName": "1.1.0",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.0/app-debug.apk",
-  "changelog": "Modo anti-suspensión activado (pantalla siempre activa sin apagarse en TV y móviles), consulta instantánea de actualizaciones vía API de GitHub y mejoras de control remoto.",
+  "versionCode": 12,
+  "versionName": "1.1.1",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.1/app-debug.apk",
+  "changelog": "Se solucionó el problema de las carátulas recortadas al fondo en pantallas de TV. Filtro mejorado: Tendencias muestra ahora solo películas de 2026 y Series Destacadas muestra las mejor valoradas y más recientes.",
   "isMandatory": false
 }

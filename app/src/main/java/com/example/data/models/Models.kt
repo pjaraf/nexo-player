@@ -70,7 +70,8 @@ data class VodStream(
     val rating: Any? = null,
     @SerializedName("rating_5based") val rating5Based: Any? = null,
     @SerializedName("category_id") val categoryId: String? = null,
-    @SerializedName("container_extension") val containerExtension: String? = "mp4"
+    @SerializedName("container_extension") val containerExtension: String? = "mp4",
+    val added: String? = null
 ) {
     val id: String
         get() = cleanId(streamId)
@@ -125,7 +126,8 @@ data class SeriesItem(
     val cover: String? = null,
     val plot: String? = null,
     val rating: Any? = null,
-    @SerializedName("category_id") val categoryId: String? = null
+    @SerializedName("category_id") val categoryId: String? = null,
+    @SerializedName("last_modified") val lastModified: String? = null
 ) {
     val id: String
         get() = cleanId(seriesId)

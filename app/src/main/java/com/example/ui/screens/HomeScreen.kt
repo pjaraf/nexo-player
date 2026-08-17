@@ -181,9 +181,8 @@ fun HomeScreen(
 
                 // --- 2. Main Scrollable Content ---
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 70.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 120.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     // Top Header Bar

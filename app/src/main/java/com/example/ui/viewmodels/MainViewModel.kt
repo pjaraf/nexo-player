@@ -281,11 +281,19 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
                 val filtered = if (isKids) {
                     vodList.filter { AppStorage.isKidsCategory(it.displayName) }
                 } else {
-                    vodList
+                    vodList.filter { it.displayName.contains("2026") }
                 }
-                _homeMoviesRow.value = filtered.take(20)
-                if (_homeHeroItem.value == null && filtered.isNotEmpty()) {
-                    _homeHeroItem.value = filtered.first()
+                
+                // Fallback to newest if no 2026 movies are found
+                val finalMovies = if (filtered.isEmpty() && !isKids) {
+                    vodList.sortedByDescending { it.added?.toLongOrNull() ?: 0L }.take(20)
+                } else {
+                    filtered.take(20)
+                }
+                
+                _homeMoviesRow.value = finalMovies
+                if (_homeHeroItem.value == null && finalMovies.isNotEmpty()) {
+                    _homeHeroItem.value = finalMovies.first()
                 }
             }
 
@@ -294,7 +302,10 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
                 val filtered = if (isKids) {
                     seriesList.filter { AppStorage.isKidsCategory(it.displayName) }
                 } else {
-                    seriesList
+                    seriesList.sortedWith(
+                        compareByDescending<SeriesItem> { it.rating?.toString()?.toDoubleOrNull() ?: 0.0 }
+                            .thenByDescending { it.lastModified?.toLongOrNull() ?: 0L }
+                    )
                 }
                 _homeSeriesRow.value = filtered.take(20)
             }
