@@ -258,20 +258,18 @@ fun MediaPosterCard(
     val isHighlighted = isFocused || isSelected
 
     val borderColor = when {
-        isTv && isHighlighted -> TvSelectedRed
-        isSelected -> TvSelectedRed
-        isFocused -> TvFocusBlue
+        isHighlighted -> Color(0xFFFFC107) // Bright Gold/Yellow for clear focus indicator
         else -> NexusBorder
     }
     
-    val targetScale = if (isTv && isHighlighted) 1.08f else 1f
+    val targetScale = if (isHighlighted) 1.15f else 1f
     val scale by animateFloatAsState(targetValue = targetScale, label = "card_scale")
 
     Column(
         modifier = modifier
-            .width(if (isHighlighted && !isTv) 140.dp else 126.dp)
+            .width(if (isHighlighted) 144.dp else 126.dp)
             .scale(scale)
-            .zIndex(if (isHighlighted) 1f else 0f)
+            .zIndex(if (isHighlighted) 10f else 0f)
             .focusable()
             .onFocusChanged { state ->
                 isFocused = state.isFocused
@@ -290,7 +288,7 @@ fun MediaPosterCard(
                 .clip(RoundedCornerShape(12.dp))
                 .background(NexusSurfaceVariant)
                 .border(
-                    if (isHighlighted) 2.5.dp else 1.dp,
+                    if (isHighlighted) 3.5.dp else 1.dp,
                     borderColor,
                     RoundedCornerShape(12.dp)
                 )

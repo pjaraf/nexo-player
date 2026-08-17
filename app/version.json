@@ -1,7 +1,7 @@
 {
-  "versionCode": 18,
-  "versionName": "1.1.7",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.7/app-debug.apk",
-  "changelog": "Diseño de perfil simplificado y mejoras generales.",
+  "versionCode": 19,
+  "versionName": "1.1.8",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.8/app-debug.apk",
+  "changelog": "Indicador visual destacado en carátulas y mejoras generales.",
   "isMandatory": false
 }
