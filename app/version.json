@@ -1,7 +1,7 @@
 {
-  "versionCode": 19,
-  "versionName": "1.1.8",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.8/app-debug.apk",
-  "changelog": "Indicador visual destacado en carátulas y mejoras generales.",
+  "versionCode": 20,
+  "versionName": "1.1.9",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.9/app-debug.apk",
+  "changelog": "Nuevo fondo cinemático en la pantalla de inicio y mejoras generales.",
   "isMandatory": false
 }

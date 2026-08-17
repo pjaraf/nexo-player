@@ -1,7 +1,7 @@
 {
-  "versionCode": 19,
-  "versionName": "1.1.8",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.8/app-debug.apk",
-  "changelog": "Indicador visual destacado en carátulas y mejoras generales.",
+  "versionCode": 15,
+  "versionName": "1.1.4",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.4/app-debug.apk",
+  "changelog": "Se eliminó por completo la pantalla de selección de perfiles. Ahora la aplicación ingresa directamente al inicio en televisores y teléfonos para un acceso más rápido.",
   "isMandatory": false
 }

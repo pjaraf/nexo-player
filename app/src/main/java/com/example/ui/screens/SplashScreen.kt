@@ -47,9 +47,24 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(NexusBackground),
+            .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
+        // Cinematic Ambient Glow matching LoginScreen
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    androidx.compose.ui.graphics.Brush.radialGradient(
+                        colors = listOf(
+                            Color(0x33E50914),
+                            Color(0x66000000),
+                            Color(0xEE000000)
+                        ),
+                        radius = 1200f
+                    )
+                )
+        )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
