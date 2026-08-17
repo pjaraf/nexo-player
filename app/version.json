@@ -1,7 +1,7 @@
 {
-  "versionCode": 17,
-  "versionName": "1.1.6",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.6/app-debug.apk",
-  "changelog": "Pantalla de inicio animada (Splash Screen), carrusel de películas en TV, y mejoras generales de estabilidad.",
+  "versionCode": 18,
+  "versionName": "1.1.7",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.7/app-debug.apk",
+  "changelog": "Diseño de perfil simplificado y mejoras generales.",
   "isMandatory": false
 }
