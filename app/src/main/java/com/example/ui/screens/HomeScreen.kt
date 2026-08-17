@@ -129,88 +129,104 @@ fun HomeScreen(
                 CircularProgressIndicator(color = NexusPrimary)
             }
         } else {
+            val firstMovieId = moviesRow.firstOrNull()?.id
+            val isFirstMovieFocused = selectedMedia?.id == null || selectedMedia?.id == firstMovieId
+
             Box(modifier = Modifier.fillMaxSize()) {
                 // --- 1. Dynamic Fullscreen Backdrop Layer (Uncropped 16:9 Hero for TV & WideScreen) ---
-                val currentBackdrop = selectedMedia?.backdropUrl ?: POSTER_FALLBACK
-                Crossfade(
-                    targetState = currentBackdrop,
-                    animationSpec = tween(durationMillis = 400),
-                    label = "backdrop_crossfade"
-                ) { imageUrl ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(if (isWideScreen) 620.dp else 440.dp)
-                    ) {
-                        // 1. Ambient Background Glow Layer (Subtle darkened ambient backdrop)
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .alpha(0.35f)
+                // Only displayed when focused on the first movie card on TV/WideScreen
+                if (isFirstMovieFocused) {
+                    val currentBackdrop = (selectedMedia ?: moviesRow.firstOrNull()?.let {
+                        FocusedMedia(
+                            id = it.id,
+                            title = it.displayName,
+                            description = "Película disponible en Nexo.",
+                            backdropUrl = it.streamIcon ?: POSTER_FALLBACK,
+                            rating = it.formattedRating,
+                            kind = "movie"
                         )
+                    })?.backdropUrl ?: POSTER_FALLBACK
 
-                        // 2. Full Uncropped Crisp Poster Art (Aligned beautifully in 16:9 aspect on TV)
+                    Crossfade(
+                        targetState = currentBackdrop,
+                        animationSpec = tween(durationMillis = 400),
+                        label = "backdrop_crossfade"
+                    ) { imageUrl ->
                         Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = if (isWideScreen) Alignment.TopEnd else Alignment.TopCenter
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(if (isWideScreen) 620.dp else 440.dp)
                         ) {
+                            // 1. Ambient Background Glow Layer (Subtle darkened ambient backdrop)
                             AsyncImage(
                                 model = imageUrl,
                                 contentDescription = null,
-                                contentScale = ContentScale.Fit,
-                                alignment = if (isWideScreen) Alignment.TopEnd else Alignment.TopCenter,
+                                contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .fillMaxHeight()
-                                    .then(
-                                        if (isWideScreen) {
-                                            Modifier
-                                                .fillMaxWidth(0.55f)
-                                                .padding(end = 48.dp, top = 20.dp, bottom = 48.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                        } else {
-                                            Modifier.fillMaxWidth()
-                                        }
+                                    .fillMaxSize()
+                                    .alpha(0.35f)
+                            )
+
+                            // 2. Full Uncropped Crisp Poster Art (Aligned beautifully in 16:9 aspect on TV)
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = if (isWideScreen) Alignment.TopEnd else Alignment.TopCenter
+                            ) {
+                                AsyncImage(
+                                    model = imageUrl,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    alignment = if (isWideScreen) Alignment.TopEnd else Alignment.TopCenter,
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .then(
+                                            if (isWideScreen) {
+                                                Modifier
+                                                    .fillMaxWidth(0.55f)
+                                                    .padding(end = 48.dp, top = 20.dp, bottom = 48.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                            } else {
+                                                Modifier.fillMaxWidth()
+                                            }
+                                        )
+                                )
+                            }
+
+                            // 3. Left-to-Right vignette gradient shadow (Ensures title/texts are 100% readable)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(
+                                                NexusBackground,
+                                                NexusBackground.copy(alpha = 0.95f),
+                                                NexusBackground.copy(alpha = 0.65f),
+                                                Color.Black.copy(alpha = 0.20f),
+                                                Color.Transparent
+                                            ),
+                                            startX = 0f,
+                                            endX = if (isWideScreen) 1100f else 500f
+                                        )
+                                    )
+                            )
+
+                            // 4. Vertical dark gradient (Fades smoothly into bottom rows)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.75f),
+                                                Color.Transparent,
+                                                NexusBackground.copy(alpha = 0.85f),
+                                                NexusBackground
+                                            )
+                                        )
                                     )
                             )
                         }
-
-                        // 3. Left-to-Right vignette gradient shadow (Ensures title/texts are 100% readable)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        colors = listOf(
-                                            NexusBackground,
-                                            NexusBackground.copy(alpha = 0.95f),
-                                            NexusBackground.copy(alpha = 0.65f),
-                                            Color.Black.copy(alpha = 0.20f),
-                                            Color.Transparent
-                                        ),
-                                        startX = 0f,
-                                        endX = if (isWideScreen) 1100f else 500f
-                                    )
-                                )
-                        )
-
-                        // 4. Vertical dark gradient (Fades smoothly into bottom rows)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Black.copy(alpha = 0.75f),
-                                            Color.Transparent,
-                                            NexusBackground.copy(alpha = 0.85f),
-                                            NexusBackground
-                                        )
-                                    )
-                                )
-                        )
                     }
                 }
 
@@ -228,9 +244,9 @@ fun HomeScreen(
                         modifier = Modifier.statusBarsPadding()
                     )
 
-                    // --- Dynamic Hero Details for TV & Mobile (Shows current selected title) ---
+                    // --- Dynamic Hero Details for TV & Mobile (Shows only when on first movie card) ---
                     val media = selectedMedia
-                    if (media != null) {
+                    if (media != null && isFirstMovieFocused) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
