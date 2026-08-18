@@ -152,9 +152,9 @@ fun HomeScreen(
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
                 // --- 1. Dynamic Fullscreen Backdrop Layer (Uncropped 16:9 Hero for TV & WideScreen) ---
-                // Active for whichever card the user is currently focused on in Home, hidden when sidebar menu is open
+                // Active for whichever card the user is currently focused on in Home, always visible behind floating menu
                 val currentBackdrop = selectedMedia?.backdropUrl ?: (moviesRow.firstOrNull()?.streamIcon ?: POSTER_FALLBACK)
-                val showHero = !isSidebarOpen
+                val showHero = true
 
                 if (showHero) {
                     Crossfade(
@@ -256,7 +256,7 @@ fun HomeScreen(
 
                     // --- Dynamic Hero Details for TV & Mobile (Shows current selected title for any focused card) ---
                     val media = selectedMedia
-                    if (media != null && !isSidebarOpen) {
+                    if (media != null) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -396,7 +396,7 @@ fun HomeScreen(
                     }
 
                     // --- Series Destacadas ---
-                    if (seriesRow.isNotEmpty() && !isTv) {
+                    if (seriesRow.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
                                 text = if (isKids) "Series Infantiles" else "Series Destacadas",
@@ -412,7 +412,7 @@ fun HomeScreen(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                items(seriesRow, key = { it.id }) { series ->
+                                itemsIndexed(seriesRow, key = { _, it -> it.id }) { index, series ->
                                     val isSelected = selectedMedia?.id == series.id
                                     MediaPosterCard(
                                         title = series.displayName,
@@ -421,6 +421,7 @@ fun HomeScreen(
                                         badgeText = null,
                                         isSelected = isSelected,
                                         onFocused = {
+                                            onFirstItemFocused(index == 0)
                                             selectedMedia = FocusedMedia(
                                                 id = series.id,
                                                 title = series.displayName,

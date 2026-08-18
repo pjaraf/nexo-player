@@ -270,7 +270,7 @@ fun MainTabsScreen(
                 }
 
                 // Scrim overlay when sidebar is open (Transparent so background carátulas remain fully visible)
-                if (isSidebarOpen) {
+                if (isSidebarOpen && currentTab == MainTab.HOME) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -279,9 +279,9 @@ fun MainTabsScreen(
                     )
                 }
 
-                // Floating lateral navigation drawer
+                // Floating lateral navigation drawer (Only shown on Home screen)
                 AnimatedVisibility(
-                    visible = isSidebarOpen,
+                    visible = isSidebarOpen && currentTab == MainTab.HOME,
                     enter = fadeIn() + slideInHorizontally { -it },
                     exit = fadeOut() + slideOutHorizontally { -it },
                     modifier = Modifier.align(Alignment.CenterStart)
