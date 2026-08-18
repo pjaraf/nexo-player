@@ -310,52 +310,54 @@ fun SeriesScreen(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        var isPlayBtnFocused by remember { mutableStateOf(false) }
-                        Button(
-                            onClick = { onNavigateSeries(active.id) },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isPlayBtnFocused) TvFocusBlue else Color.White,
-                                contentColor = if (isPlayBtnFocused) Color.White else Color.Black
-                            ),
-                            modifier = Modifier
-                                .height(38.dp)
-                                .onFocusChanged { isPlayBtnFocused = it.isFocused }
+                    if (!isTv) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = if (isPlayBtnFocused) Color.White else Color.Black,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                "Ver Temporadas",
-                                color = if (isPlayBtnFocused) Color.White else Color.Black,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        }
+                            var isPlayBtnFocused by remember { mutableStateOf(false) }
+                            Button(
+                                onClick = { onNavigateSeries(active.id) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isPlayBtnFocused) TvFocusBlue else Color.White,
+                                    contentColor = if (isPlayBtnFocused) Color.White else Color.Black
+                                ),
+                                modifier = Modifier
+                                    .height(38.dp)
+                                    .onFocusChanged { isPlayBtnFocused = it.isFocused }
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = if (isPlayBtnFocused) Color.White else Color.Black,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Ver Temporadas",
+                                    color = if (isPlayBtnFocused) Color.White else Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
 
-                        var isDetailBtnFocused by remember { mutableStateOf(false) }
-                        Button(
-                            onClick = { onNavigateSeries(active.id) },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isDetailBtnFocused) TvFocusBlue else Color.White.copy(alpha = 0.2f),
-                                contentColor = Color.White
-                            ),
-                            modifier = Modifier
-                                .height(38.dp)
-                                .onFocusChanged { isDetailBtnFocused = it.isFocused }
-                        ) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Detalles", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            var isDetailBtnFocused by remember { mutableStateOf(false) }
+                            Button(
+                                onClick = { onNavigateSeries(active.id) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isDetailBtnFocused) TvFocusBlue else Color.White.copy(alpha = 0.2f),
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier
+                                    .height(38.dp)
+                                    .onFocusChanged { isDetailBtnFocused = it.isFocused }
+                            ) {
+                                Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Detalles", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
                         }
                     }
                 }
