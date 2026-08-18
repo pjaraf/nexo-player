@@ -1,7 +1,7 @@
 {
-  "versionCode": 39,
-  "versionName": "1.1.28",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.28/app-debug.apk",
-  "changelog": "Versión 1.1.28: Fondo transparente al abrir menú lateral, activación exclusiva en primera carátula y corrección visual para Android TV.",
+  "versionCode": 40,
+  "versionName": "1.1.29",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.29/app-debug.apk",
+  "changelog": "Versión 1.1.29: Solo se muestran Tendencias de Películas en la pantalla principal y se eliminó el botón flotante superior.",
   "isMandatory": false
 }
