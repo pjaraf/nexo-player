@@ -1,7 +1,7 @@
 {
-  "versionCode": 32,
-  "versionName": "1.1.21",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.21/app-debug.apk",
-  "changelog": "Restauración de la ficha de detalle de películas clásica a pantalla completa y actualización del identificador de paquete com.nexo.player.",
+  "versionCode": 33,
+  "versionName": "1.1.22",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.22/app-debug.apk",
+  "changelog": "Diseño unificado de películas y series para TV con reproductor en vivo, fondo cinematográfico y carrusel de películas.",
   "isMandatory": true
 }
