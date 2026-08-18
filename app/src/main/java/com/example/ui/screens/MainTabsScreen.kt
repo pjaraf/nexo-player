@@ -170,6 +170,14 @@ fun MainTabsScreen(
                         if (keyEvent.type == KeyEventType.KeyDown) {
                             val code = keyEvent.nativeKeyEvent.keyCode
                             when (code) {
+                                AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
+                                    if (!isSidebarOpen) {
+                                        isSidebarOpen = true
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
                                 AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
                                     if (isSidebarOpen) {
                                         isSidebarOpen = false
@@ -204,6 +212,59 @@ fun MainTabsScreen(
                         .fillMaxSize()
                 ) {
                     RenderTabContent()
+                }
+
+                // Floating Menu Trigger Button on top-left for TV users
+                if (!isSidebarOpen) {
+                    var isMenuFocused by remember { mutableStateOf(false) }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isMenuFocused) TvFocusBlue else Color(0xFF161622).copy(alpha = 0.9f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            if (isMenuFocused) 2.5.dp else 1.dp,
+                            if (isMenuFocused) TvFocusGold else Color.White.copy(alpha = 0.2f)
+                        ),
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(16.dp)
+                            .onFocusChanged { isMenuFocused = it.isFocused }
+                            .focusable()
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.nativeKeyEvent.keyCode) {
+                                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                        AndroidKeyEvent.KEYCODE_ENTER,
+                                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                            isSidebarOpen = true
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                } else false
+                            }
+                            .clickable { isSidebarOpen = true }
+                            .testTag("floating_menu_trigger_btn")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Menú",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Menú (TV / Series / Películas)",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
 
                 // Scrim overlay when sidebar is open
