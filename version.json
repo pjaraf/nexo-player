@@ -1,7 +1,7 @@
 {
-  "versionCode": 42,
-  "versionName": "1.1.31",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.31/app-debug.apk",
-  "changelog": "Versión 1.1.31: Eliminación total de botones flotantes en TV; incorporación de barra lateral fija con iconos para Inicio, TV, Series, Películas y Perfil.",
+  "versionCode": 43,
+  "versionName": "1.1.32",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.32/app-debug.apk",
+  "changelog": "Versión 1.1.32: Barra lateral de iconos en TV visible únicamente en la pantalla principal (Home), maximizando el espacio en otras secciones.",
   "isMandatory": false
 }

@@ -153,81 +153,96 @@ fun MainTabsScreen(
     }
 
     if (isTv) {
-        // --- TELEVISION LAYOUT WITH FIXED ICON-ONLY NAVIGATION RAIL ON THE LEFT ---
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(NexusBackground)
-                .testTag("main_tv_layout")
-        ) {
-            // Fixed Side Navigation Rail (Icon-only)
-            Surface(
-                modifier = Modifier
-                    .width(72.dp)
-                    .fillMaxHeight(),
-                color = Color(0xFF0D0D12),
-                shape = RoundedCornerShape(0.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
-                ) {
-                    MainTab.values().forEach { tab ->
-                        val isSelected = currentTab == tab
-                        var isFocused by remember { mutableStateOf(false) }
+        BackHandler(enabled = currentTab != MainTab.HOME) {
+            currentTab = MainTab.HOME
+        }
 
-                        Surface(
-                            shape = CircleShape,
-                            color = when {
-                                isSelected -> NexusPrimary
-                                isFocused -> Color.White.copy(alpha = 0.2f)
-                                else -> Color.Transparent
-                            },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .onFocusChanged { isFocused = it.isFocused }
-                                .focusable()
-                                .clickable { currentTab = tab }
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyDown) {
-                                        when (keyEvent.nativeKeyEvent.keyCode) {
-                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                            AndroidKeyEvent.KEYCODE_ENTER,
-                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                currentTab = tab
-                                                true
+        if (currentTab == MainTab.HOME) {
+            // --- TELEVISION HOME SCREEN WITH FIXED ICON-ONLY NAVIGATION RAIL ON THE LEFT ---
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(NexusBackground)
+                    .testTag("main_tv_layout")
+            ) {
+                // Fixed Side Navigation Rail (Icon-only)
+                Surface(
+                    modifier = Modifier
+                        .width(72.dp)
+                        .fillMaxHeight(),
+                    color = Color(0xFF0D0D12),
+                    shape = RoundedCornerShape(0.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+                    ) {
+                        MainTab.values().forEach { tab ->
+                            val isSelected = currentTab == tab
+                            var isFocused by remember { mutableStateOf(false) }
+
+                            Surface(
+                                shape = CircleShape,
+                                color = when {
+                                    isSelected -> NexusPrimary
+                                    isFocused -> Color.White.copy(alpha = 0.2f)
+                                    else -> Color.Transparent
+                                },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .onFocusChanged { isFocused = it.isFocused }
+                                    .focusable()
+                                    .clickable { currentTab = tab }
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                    currentTab = tab
+                                                    true
+                                                }
+                                                else -> false
                                             }
-                                            else -> false
-                                        }
-                                    } else false
-                                }
-                                .testTag("tv_nav_${tab.testTag}")
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
+                                        } else false
+                                    }
+                                    .testTag("tv_nav_${tab.testTag}")
                             ) {
-                                Icon(
-                                    imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                    contentDescription = tab.title,
-                                    tint = if (isSelected || isFocused) Color.White else Color.White.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                        contentDescription = tab.title,
+                                        tint = if (isSelected || isFocused) Color.White else Color.White.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Main Content Area taking the rest of the screen
+                // Main Content Area taking the rest of the screen
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    RenderTabContent()
+                }
+            }
+        } else {
+            // --- TELEVISION NON-HOME SCREENS: FULL SCREEN WITHOUT SIDEBAR ---
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
+                    .fillMaxSize()
+                    .background(NexusBackground)
             ) {
                 RenderTabContent()
             }
