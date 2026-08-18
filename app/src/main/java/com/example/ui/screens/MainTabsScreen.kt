@@ -153,226 +153,83 @@ fun MainTabsScreen(
     }
 
     if (isTv) {
-        if (currentTab == MainTab.LIVE) {
-            // --- FULLSCREEN TV MODE ON TELEVISION ---
+        // --- TELEVISION LAYOUT WITH FIXED ICON-ONLY NAVIGATION RAIL ON THE LEFT ---
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(NexusBackground)
+                .testTag("main_tv_layout")
+        ) {
+            // Fixed Side Navigation Rail (Icon-only)
+            Surface(
+                modifier = Modifier
+                    .width(72.dp)
+                    .fillMaxHeight(),
+                color = Color(0xFF0D0D12),
+                shape = RoundedCornerShape(0.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+                ) {
+                    MainTab.values().forEach { tab ->
+                        val isSelected = currentTab == tab
+                        var isFocused by remember { mutableStateOf(false) }
+
+                        Surface(
+                            shape = CircleShape,
+                            color = when {
+                                isSelected -> NexusPrimary
+                                isFocused -> Color.White.copy(alpha = 0.2f)
+                                else -> Color.Transparent
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .onFocusChanged { isFocused = it.isFocused }
+                                .focusable()
+                                .clickable { currentTab = tab }
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.nativeKeyEvent.keyCode) {
+                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                            AndroidKeyEvent.KEYCODE_ENTER,
+                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                currentTab = tab
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                }
+                                .testTag("tv_nav_${tab.testTag}")
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                    contentDescription = tab.title,
+                                    tint = if (isSelected || isFocused) Color.White else Color.White.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Main Content Area taking the rest of the screen
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(NexusBackground)
+                    .weight(1f)
+                    .fillMaxHeight()
             ) {
                 RenderTabContent()
-            }
-        } else {
-            // --- TELEVISION LAYOUT WITH HIDDEN FLOATING SIDEBAR (DRAWER) ---
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(NexusBackground)
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyDown) {
-                            val code = keyEvent.nativeKeyEvent.keyCode
-                            when (code) {
-                                AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                                    if (currentTab == MainTab.HOME && isAtFirstCaratula && !isSidebarOpen) {
-                                        isSidebarOpen = true
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
-                                AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                    if (isSidebarOpen) {
-                                        isSidebarOpen = false
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
-                                AndroidKeyEvent.KEYCODE_BACK, AndroidKeyEvent.KEYCODE_ESCAPE -> {
-                                    if (isSidebarOpen) {
-                                        isSidebarOpen = false
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
-                                AndroidKeyEvent.KEYCODE_MENU -> {
-                                    isSidebarOpen = !isSidebarOpen
-                                    true
-                                }
-                                else -> false
-                            }
-                        } else {
-                            false
-                        }
-                    }
-                    .testTag("main_tv_layout")
-            ) {
-                // Main Content Area taking FULL 100% width of the TV screen
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                ) {
-                    RenderTabContent()
-                }
-
-                // Floating indicator showing "◄ Menú" ONLY when focused on the first carátula on TV
-                if (isTv && currentTab == MainTab.HOME && !isSidebarOpen && isAtFirstCaratula) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF161622).copy(alpha = 0.9f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 12.dp)
-                            .testTag("floating_menu_prompt")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "◄ Menú",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                // Scrim overlay when sidebar is open (Transparent so background carátulas remain fully visible)
-                if (isSidebarOpen && currentTab == MainTab.HOME) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Transparent)
-                            .clickable { isSidebarOpen = false }
-                    )
-                }
-
-                // Floating lateral navigation drawer (Only shown on Home screen)
-                AnimatedVisibility(
-                    visible = isSidebarOpen && currentTab == MainTab.HOME,
-                    enter = fadeIn() + slideInHorizontally { -it },
-                    exit = fadeOut() + slideOutHorizontally { -it },
-                    modifier = Modifier.align(Alignment.CenterStart)
-                ) {
-                    Surface(
-                        modifier = Modifier
-                            .padding(start = 20.dp, top = 20.dp, bottom = 20.dp)
-                            .width(190.dp)
-                            .fillMaxHeight()
-                            .shadow(24.dp, RoundedCornerShape(24.dp))
-                            .testTag("floating_tv_sidebar"),
-                        shape = RoundedCornerShape(24.dp),
-                        color = Color(0xFF101018).copy(alpha = 0.96f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 10.dp, vertical = 18.dp),
-                            horizontalAlignment = Alignment.Start,
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Nexo Logo & TV Header
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier
-                                        .padding(horizontal = 6.dp, vertical = 8.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(34.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                Brush.linearGradient(
-                                                    listOf(NexusPrimary, NexusPrimaryVariant)
-                                                )
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "N",
-                                            color = Color.White,
-                                            fontSize = 18.sp,
-                                            fontWeight = FontWeight.Black,
-                                            fontFamily = FontFamily.SansSerif
-                                        )
-                                    }
-                                    Text(
-                                        text = "NEXO",
-                                        color = Color.White,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        letterSpacing = 2.sp
-                                    )
-                                }
-
-                                Divider(
-                                    color = Color.White.copy(alpha = 0.1f),
-                                    thickness = 1.dp,
-                                    modifier = Modifier.padding(bottom = 6.dp)
-                                )
-
-                                // Lateral Nav Items
-                                MainTab.values().forEach { tab ->
-                                    val isSelected = currentTab == tab
-                                    TvSidebarNavItem(
-                                        tab = tab,
-                                        isSelected = isSelected,
-                                        focusRequester = if (isSelected) sidebarFocusRequester else null,
-                                        onClick = {
-                                            currentTab = tab
-                                            isSidebarOpen = false
-                                        }
-                                    )
-                                }
-                            }
-
-                            // Bottom info in floating bar
-                            Surface(
-                                color = Color.White.copy(alpha = 0.05f),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(7.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF4CAF50))
-                                    )
-                                    Text(
-                                        text = "Control Remoto Activo",
-                                        color = Color(0xFFA0A0AB),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     } else {

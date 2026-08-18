@@ -1,7 +1,7 @@
 {
-  "versionCode": 41,
-  "versionName": "1.1.30",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.30/app-debug.apk",
-  "changelog": "Versión 1.1.30: Series restauradas en teléfonos, ocultas en TV; indicador flotante de menú solo en la primera carátula en TV para navegación fluida.",
+  "versionCode": 42,
+  "versionName": "1.1.31",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.31/app-debug.apk",
+  "changelog": "Versión 1.1.31: Eliminación total de botones flotantes en TV; incorporación de barra lateral fija con iconos para Inicio, TV, Series, Películas y Perfil.",
   "isMandatory": false
 }
