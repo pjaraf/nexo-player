@@ -398,4 +398,57 @@ fun HomeScreen(
             }
         }
     }
+
+    // --- Series Destacadas (Solo en Teléfonos) ---
+    if (seriesRow.isNotEmpty() && !isTv) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = if (isKids) "Series Infantiles" else "Series Destacadas",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 17.sp
+                ),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(seriesRow, key = { it.id }) { series ->
+                    val isSelected = selectedMedia?.id == series.id
+                    MediaPosterCard(
+                        title = series.displayName,
+                        imageUrl = series.cover,
+                        rating = series.formattedRating,
+                        badgeText = null,
+                        isSelected = isSelected,
+                        onFocused = {
+                            selectedMedia = FocusedMedia(
+                                id = series.id,
+                                title = series.displayName,
+                                description = series.plot ?: "Serie completa en alta definición.",
+                                backdropUrl = series.cover ?: POSTER_FALLBACK,
+                                rating = series.formattedRating,
+                                kind = "series"
+                            )
+                        },
+                        onClick = {
+                            selectedMedia = FocusedMedia(
+                                id = series.id,
+                                title = series.displayName,
+                                description = series.plot ?: "Serie completa en alta definición.",
+                                backdropUrl = series.cover ?: POSTER_FALLBACK,
+                                rating = series.formattedRating,
+                                kind = "series"
+                            )
+                            onNavigateSeries(series.id)
+                        },
+                        modifier = Modifier.width(if (isWideScreen) 130.dp else 115.dp)
+                    )
+                }
+            }
+        }
+    }
 }

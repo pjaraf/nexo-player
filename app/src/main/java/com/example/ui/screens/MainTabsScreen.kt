@@ -216,6 +216,38 @@ fun MainTabsScreen(
                     RenderTabContent()
                 }
 
+                // Floating indicator showing "◄ Menú" ONLY when focused on the first carátula on TV
+                if (isTv && currentTab == MainTab.HOME && !isSidebarOpen && isAtFirstCaratula) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF161622).copy(alpha = 0.9f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 12.dp)
+                            .testTag("floating_menu_prompt")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "◄ Menú",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
                 // Scrim overlay when sidebar is open (Transparent so background carátulas remain fully visible)
                 if (isSidebarOpen && currentTab == MainTab.HOME) {
                     Box(
