@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -71,6 +72,12 @@ fun AppNavigation(
     val isLoggedIn by mainViewModel.isLoggedIn.collectAsState()
     val updateInfo by mainViewModel.updateInfo.collectAsState()
     val updateDownloadState by mainViewModel.updateDownloadState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        if (AppStorage.isAutoCheckUpdatesEnabled()) {
+            mainViewModel.checkForUpdates(manual = false)
+        }
+    }
 
     if (updateInfo != null) {
         UpdateDialog(
