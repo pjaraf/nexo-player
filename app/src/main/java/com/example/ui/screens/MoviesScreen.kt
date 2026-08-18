@@ -47,12 +47,19 @@ import com.example.ui.components.POSTER_FALLBACK
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 
+import androidx.compose.ui.platform.LocalContext
+import com.example.utils.DeviceUtils
+
 @Composable
 fun MoviesScreen(
     viewModel: MainViewModel,
     onNavigateMovie: (movieId: String) -> Unit,
     onPlayDirect: ((url: String, title: String, kind: String, contentId: String, image: String, resumeMs: Long) -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val isTv = remember { DeviceUtils.isTelevision(context) }
+    var isAtFirstItem by remember { mutableStateOf(true) }
+
     val categories by viewModel.vodCategories.collectAsState()
     val selectedCat by viewModel.selectedVodCat.collectAsState()
     val streams by viewModel.vodStreams.collectAsState()
@@ -117,7 +124,31 @@ fun MoviesScreen(
             .fillMaxSize()
             .background(NexusBackground)
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
+                if (keyEvent.type == KeyEventType.KeyDown && isTv) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                            if (!isCategoriesOpen && isAtFirstItem) {
+                                isCategoriesOpen = true
+                                true
+                            } else false
+                        }
+                        android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            if (isCategoriesOpen) {
+                                isCategoriesOpen = false
+                                try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+                                true
+                            } else false
+                        }
+                        android.view.KeyEvent.KEYCODE_BACK, android.view.KeyEvent.KEYCODE_ESCAPE -> {
+                            if (isCategoriesOpen) {
+                                isCategoriesOpen = false
+                                try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+                                true
+                            } else false
+                        }
+                        else -> false
+                    }
+                } else if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         android.view.KeyEvent.KEYCODE_BACK, android.view.KeyEvent.KEYCODE_ESCAPE -> {
                             if (isCategoriesOpen) {
@@ -343,6 +374,7 @@ fun MoviesScreen(
                             isSelected = isSelected,
                             onFocused = {
                                 selectedMovie = movie
+                                isAtFirstItem = (index == 0)
                             },
                             onClick = {
                                 onNavigateMovie(movie.id)

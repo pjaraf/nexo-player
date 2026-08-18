@@ -1,7 +1,7 @@
 {
-  "versionCode": 43,
-  "versionName": "1.1.32",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.32/app-debug.apk",
-  "changelog": "Versión 1.1.32: Barra lateral de iconos en TV visible únicamente en la pantalla principal (Home), maximizando el espacio en otras secciones.",
+  "versionCode": 44,
+  "versionName": "1.1.33",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.33/app-debug.apk",
+  "changelog": "Versión 1.1.33: Categorías ocultas por defecto en Películas y Series en TV; se deslizan hacia la izquierda al presionar la flecha izquierda sobre la primera carátula.",
   "isMandatory": false
 }
