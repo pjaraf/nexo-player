@@ -162,6 +162,41 @@ fun MoviesScreen(
             }
             .testTag("movies_screen")
     ) {
+        // Dynamic Background Backdrop of currently focused movie
+        val currentBackdrop = selectedMovie?.streamIcon ?: streams.firstOrNull()?.streamIcon
+        if (currentBackdrop != null) {
+            Crossfade(
+                targetState = currentBackdrop,
+                animationSpec = tween(durationMillis = 350),
+                label = "movies_backdrop_crossfade",
+                modifier = Modifier.fillMaxSize()
+            ) { backdropUrl ->
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        model = backdropUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(0.3f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        NexusBackground.copy(alpha = 0.5f),
+                                        NexusBackground.copy(alpha = 0.85f),
+                                        NexusBackground
+                                    )
+                                )
+                            )
+                    )
+                }
+            }
+        }
+
         // Main Foreground Content
         Column(
             modifier = Modifier
@@ -207,59 +242,61 @@ fun MoviesScreen(
                             )
                         )
 
-                        Spacer(modifier = Modifier.width(6.dp))
+                        if (!isTv) {
+                            Spacer(modifier = Modifier.width(6.dp))
 
-                        // Floating Categories Button
-                        var isCatBtnFocused by remember { mutableStateOf(false) }
-                        Surface(
-                            onClick = { isCategoriesOpen = !isCategoriesOpen },
-                            shape = RoundedCornerShape(20.dp),
-                            color = if (isCategoriesOpen) NexusPrimary else if (isCatBtnFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
-                            border = androidx.compose.foundation.BorderStroke(
-                                if (isCatBtnFocused) 2.dp else 1.dp,
-                                if (isCatBtnFocused) Color(0xFFFFC107) else if (isCategoriesOpen) NexusPrimary else Color.White.copy(alpha = 0.3f)
-                            ),
-                            modifier = Modifier
-                                .onFocusChanged { isCatBtnFocused = it.isFocused }
-                                .focusable()
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyDown) {
-                                        when (keyEvent.nativeKeyEvent.keyCode) {
-                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                            AndroidKeyEvent.KEYCODE_ENTER,
-                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                                                isCategoriesOpen = !isCategoriesOpen
-                                                true
+                            // Floating Categories Button
+                            var isCatBtnFocused by remember { mutableStateOf(false) }
+                            Surface(
+                                onClick = { isCategoriesOpen = !isCategoriesOpen },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isCategoriesOpen) NexusPrimary else if (isCatBtnFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    if (isCatBtnFocused) 2.dp else 1.dp,
+                                    if (isCatBtnFocused) Color(0xFFFFC107) else if (isCategoriesOpen) NexusPrimary else Color.White.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier
+                                    .onFocusChanged { isCatBtnFocused = it.isFocused }
+                                    .focusable()
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                                    isCategoriesOpen = !isCategoriesOpen
+                                                    true
+                                                }
+                                                else -> false
                                             }
-                                            else -> false
-                                        }
-                                    } else false
-                                }
-                                .testTag("btn_toggle_categories")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        } else false
+                                    }
+                                    .testTag("btn_toggle_categories")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Category,
-                                    contentDescription = "Categorías",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = "📂 $selectedCategoryLabel",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Icon(
-                                    imageVector = if (isCategoriesOpen) Icons.Default.ArrowBack else Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Category,
+                                        contentDescription = "Categorías",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "📂 $selectedCategoryLabel",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Icon(
+                                        imageVector = if (isCategoriesOpen) Icons.Default.ArrowBack else Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
