@@ -138,9 +138,9 @@ object AppUpdateManager {
                     } else {
                         val infoToShow = if (!isNewer && force) {
                             versionInfo.copy(
-                                versionCode = currentVersionCode + 1,
-                                versionName = "1.1.38",
-                                changelog = "Versión 1.1.38: Actualización disponible con mejoras en TV y rendimiento."
+                                versionCode = 50,
+                                versionName = "1.1.39",
+                                changelog = "Versión 1.1.39: Estandarización completa de estados de enfoque (Azul) y selección (Rojo) en todos los botones y reproductor de TV."
                             )
                         } else {
                             versionInfo
@@ -170,8 +170,9 @@ object AppUpdateManager {
                     } else {
                         val infoToShow = if (!isNewer && force) {
                             releaseInfo.copy(
-                                versionCode = currentVersionCode + 1,
-                                versionName = "1.1.38"
+                                versionCode = 50,
+                                versionName = "1.1.39",
+                                changelog = "Versión 1.1.39: Estandarización completa de estados de enfoque (Azul) y selección (Rojo) en todos los botones y reproductor de TV."
                             )
                         } else {
                             releaseInfo
@@ -187,10 +188,10 @@ object AppUpdateManager {
             // Fallback for manual check if network didn't yield newer or failed
             if (force) {
                 val fallbackInfo = UpdateInfo(
-                    versionCode = currentVersionCode + 1,
-                    versionName = "1.1.38",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.38/app-debug.apk",
-                    changelog = "Versión 1.1.38: Correcciones generales, estabilidad mejorada y actualización de interfaces en TV.",
+                    versionCode = 50,
+                    versionName = "1.1.39",
+                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.39/app-debug.apk",
+                    changelog = "Versión 1.1.39: Estandarización completa de estados de enfoque (Azul) y selección (Rojo) en todos los botones y reproductor de TV.",
                     isMandatory = false
                 )
                 _latestUpdateInfo.value = fallbackInfo
@@ -205,10 +206,10 @@ object AppUpdateManager {
             Log.e(TAG, "Error during update check: ${e.message}")
             if (force) {
                 val fallbackInfo = UpdateInfo(
-                    versionCode = currentVersionCode + 1,
-                    versionName = "1.1.38",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.38/app-debug.apk",
-                    changelog = "Versión 1.1.38: Correcciones generales, estabilidad mejorada y actualización de interfaces en TV.",
+                    versionCode = 50,
+                    versionName = "1.1.39",
+                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.39/app-debug.apk",
+                    changelog = "Versión 1.1.39: Estandarización completa de estados de enfoque (Azul) y selección (Rojo) en todos los botones y reproductor de TV.",
                     isMandatory = false
                 )
                 _latestUpdateInfo.value = fallbackInfo
