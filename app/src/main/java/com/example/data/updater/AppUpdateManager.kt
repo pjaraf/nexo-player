@@ -132,10 +132,15 @@ object AppUpdateManager {
                 )
 
                 if (isNewer) {
-                    Log.i(TAG, "New update found via version.json: v${versionInfo.versionName} (code=${versionInfo.versionCode})")
-                    _latestUpdateInfo.value = versionInfo
-                    AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                    return@withContext versionInfo
+                    val dismissed = AppStorage.getDismissedUpdateVersion()
+                    if (!force && dismissed == versionInfo.versionName) {
+                        Log.d(TAG, "Update v${versionInfo.versionName} was previously dismissed")
+                    } else {
+                        Log.i(TAG, "New update found via version.json: v${versionInfo.versionName} (code=${versionInfo.versionCode})")
+                        _latestUpdateInfo.value = versionInfo
+                        AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
+                        return@withContext versionInfo
+                    }
                 }
             }
 
@@ -150,10 +155,15 @@ object AppUpdateManager {
                 )
 
                 if (isNewer) {
-                    Log.i(TAG, "New update found via GitHub Releases API: v${releaseInfo.versionName}")
-                    _latestUpdateInfo.value = releaseInfo
-                    AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                    return@withContext releaseInfo
+                    val dismissed = AppStorage.getDismissedUpdateVersion()
+                    if (!force && dismissed == releaseInfo.versionName) {
+                        Log.d(TAG, "Update v${releaseInfo.versionName} was previously dismissed")
+                    } else {
+                        Log.i(TAG, "New update found via GitHub Releases API: v${releaseInfo.versionName}")
+                        _latestUpdateInfo.value = releaseInfo
+                        AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
+                        return@withContext releaseInfo
+                    }
                 }
             }
 

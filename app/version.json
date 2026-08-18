@@ -1,7 +1,7 @@
 {
-  "versionCode": 37,
-  "versionName": "1.1.26",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.26/app-debug.apk",
-  "changelog": "Nueva versión optimizada para Android TV con persistencia de avisos de actualización y navegación fluida.",
+  "versionCode": 36,
+  "versionName": "1.1.25",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.25/app-debug.apk",
+  "changelog": "Versión actual instalada con mejoras de control remoto y navegación en Android TV.",
   "isMandatory": false
 }
