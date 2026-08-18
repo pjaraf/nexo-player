@@ -728,74 +728,14 @@ private fun SeriesDetailTvScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(NexusBackground)
+            .background(Color.Black)
             .testTag("series_detail_tv_screen")
     ) {
         if (!isFullScreenMode) {
-            // Full Backdrop Wallpaper with Dark Vignette Gradients (Uncropped 16:9 Art)
-            Box(modifier = Modifier.fillMaxSize()) {
-                // 1. Ambient Glow Layer
-                AsyncImage(
-                    model = seriesCover,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(0.30f)
-                )
-
-                // 2. Full Uncropped Crisp Poster Art
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.TopEnd
-                ) {
-                    AsyncImage(
-                        model = seriesCover,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.TopEnd,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(0.55f)
-                            .padding(end = 48.dp, top = 20.dp, bottom = 48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                    )
-                }
-
-                // 3. Dark Multilayer Vignette
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(
-                                    NexusBackground,
-                                    NexusBackground.copy(alpha = 0.95f),
-                                    NexusBackground.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.20f),
-                                    Color.Transparent
-                                ),
-                                startX = 0f,
-                                endX = 1100f
-                            )
-                        )
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.75f),
-                                    Color.Transparent,
-                                    NexusBackground.copy(alpha = 0.85f),
-                                    NexusBackground
-                                )
-                            )
-                        )
-                )
-            }
+            // Fondo idéntico al inicio de sesión (Muro de pósters Netflix con viñeta cinematográfica)
+            com.example.ui.components.NetflixPosterWallBackground(
+                alpha = 0.45f
+            )
 
             if (loading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
