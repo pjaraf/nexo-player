@@ -32,6 +32,9 @@ val NexusCardBg = Color(0xFF161622)
 // TV Remote focus and selection colors
 val TvFocusBlue = Color(0xFF007AFF)      // Blue focus on remote hover
 val TvSelectedRed = Color(0xFFE50914)    // Red on active / selection
+val TvFocusGold = Color(0xFFFFD700)      // Bright Gold focus highlight
+val TvFocusCyan = Color(0xFF00E5FF)      // Cyan accent highlight
+val TvFocusGlow = Color(0xFF38BDF8)      // Sky blue glow
 
 private val DarkColorScheme = darkColorScheme(
     primary = NexusPrimary,

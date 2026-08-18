@@ -31,6 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
+import android.view.KeyEvent as AndroidKeyEvent
+import kotlinx.coroutines.delay
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -529,6 +534,21 @@ private fun SeriesDetailTvScreen(
     }
 
     var isPreviewLoading by remember { mutableStateOf(false) }
+
+    val playButtonFocusRequester = remember { FocusRequester() }
+    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(loading) {
+        if (!loading && !hasRequestedInitialFocus) {
+            delay(250)
+            try {
+                playButtonFocusRequester.requestFocus()
+                hasRequestedInitialFocus = true
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
     var previewError by remember { mutableStateOf(false) }
 
     // Audio & Subtitle tracks
@@ -903,8 +923,42 @@ private fun SeriesDetailTvScreen(
                                     },
                                     modifier = Modifier
                                         .height(42.dp)
-                                        .focusable()
+                                        .focusRequester(playButtonFocusRequester)
                                         .onFocusChanged { isFullBtnFocused = it.isFocused }
+                                        .focusable()
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        selectedEpisode?.let { currentEp ->
+                                                            val url = XtreamApi.getSeriesStreamUrl(currentEp.epId, currentEp.containerExtension ?: "mp4")
+                                                            val currIndex = currentEpisodes.indexOfFirst { it.epId == currentEp.epId }
+                                                            val nextEp = if (currIndex in 0 until currentEpisodes.lastIndex) currentEpisodes[currIndex + 1] else null
+                                                            val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+                                                            val epImg = currentEp.info?.movieImage ?: seriesCover
+                                                            val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
+                                                            onPlayEpisode(
+                                                                url,
+                                                                "$seriesTitle - T${selectedSeason}E${currentEp.epNumber}: ${currentEp.displayTitle}",
+                                                                "series",
+                                                                seriesId,
+                                                                epImg,
+                                                                exoPlayer.currentPosition.coerceAtLeast(0L),
+                                                                nextUrl,
+                                                                nextEp?.displayTitle,
+                                                                nextEp?.epId,
+                                                                nextEpImg
+                                                            )
+                                                        }
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
                                         .testTag("btn_series_fullscreen")
                                 ) {
                                     Row(

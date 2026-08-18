@@ -1,6 +1,9 @@
 package com.example
 
+import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,8 +19,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Prevent app from going into sleep / ambient mode / screensaver
+        // Prevent app from going into sleep / ambient mode / screensaver on Android TV & devices
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        
+        // Ensure default highlight is disabled on API 26+ so custom TV focus borders display cleanly
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            window.decorView.defaultFocusHighlightEnabled = false
+        }
+        
+        // Make sure decorView can receive TV D-pad focus
+        window.decorView.isFocusable = true
+        window.decorView.isFocusableInTouchMode = true
         
         enableEdgeToEdge()
         setContent {
@@ -37,4 +49,16 @@ class MainActivity : ComponentActivity() {
         // Re-enforce keep screen on when resuming
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Fallback for TV remote key presses if focus is temporarily between views
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val currentFocus = currentFocus
+            if (currentFocus == null) {
+                window.decorView.requestFocus()
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
 }
+

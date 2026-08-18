@@ -82,6 +82,18 @@ fun MainTabsScreen(
         }
     }
 
+    val sidebarFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isSidebarOpen) {
+        if (isSidebarOpen) {
+            try {
+                sidebarFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
     // Intercept BACK button when sidebar is open on TV
     BackHandler(enabled = isTv && isSidebarOpen) {
         isSidebarOpen = false
@@ -158,14 +170,6 @@ fun MainTabsScreen(
                         if (keyEvent.type == KeyEventType.KeyDown) {
                             val code = keyEvent.nativeKeyEvent.keyCode
                             when (code) {
-                                AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                                    if (!isSidebarOpen) {
-                                        isSidebarOpen = true
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
                                 AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
                                     if (isSidebarOpen) {
                                         isSidebarOpen = false
@@ -288,6 +292,7 @@ fun MainTabsScreen(
                                     TvSidebarNavItem(
                                         tab = tab,
                                         isSelected = isSelected,
+                                        focusRequester = if (isSelected) sidebarFocusRequester else null,
                                         onClick = {
                                             currentTab = tab
                                             isSidebarOpen = false
@@ -387,6 +392,7 @@ fun MainTabsScreen(
 private fun TvSidebarNavItem(
     tab: MainTab,
     isSelected: Boolean,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -420,6 +426,7 @@ private fun TvSidebarNavItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
             .onKeyEvent { keyEvent ->
@@ -427,7 +434,8 @@ private fun TvSidebarNavItem(
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                         AndroidKeyEvent.KEYCODE_ENTER,
-                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                             onClick()
                             true
                         }

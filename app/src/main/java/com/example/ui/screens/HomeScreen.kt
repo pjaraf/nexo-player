@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -115,6 +119,21 @@ fun HomeScreen(
     val context = LocalContext.current
     val isTv = remember { DeviceUtils.isTelevision(context) }
     val isWideScreen = configuration.screenWidthDp >= 600 || isTv
+
+    val firstCardFocusRequester = remember { FocusRequester() }
+    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(moviesRow, isTv, isSidebarOpen) {
+        if (isTv && !isSidebarOpen && moviesRow.isNotEmpty() && !hasRequestedInitialFocus) {
+            delay(200)
+            try {
+                firstCardFocusRequester.requestFocus()
+                hasRequestedInitialFocus = true
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
 
     Scaffold(
         containerColor = NexusBackground,
@@ -335,7 +354,7 @@ fun HomeScreen(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                items(moviesRow, key = { it.id }) { movie ->
+                                itemsIndexed(moviesRow, key = { _, it -> it.id }) { index, movie ->
                                     val isSelected = selectedMedia?.id == movie.id
                                     MediaPosterCard(
                                         title = movie.displayName,
@@ -366,7 +385,9 @@ fun HomeScreen(
                                             )
                                             onNavigateMovie(movie.id)
                                         },
-                                        modifier = Modifier.width(if (isWideScreen) 130.dp else 115.dp)
+                                        modifier = Modifier
+                                            .width(if (isWideScreen) 130.dp else 115.dp)
+                                            .then(if (index == 0) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
                                     )
                                 }
                             }

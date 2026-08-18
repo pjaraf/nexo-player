@@ -28,6 +28,12 @@ import androidx.compose.ui.unit.sp
 import com.example.data.storage.AppStorage
 import com.example.ui.theme.*
 
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
+import android.view.KeyEvent as AndroidKeyEvent
+import kotlinx.coroutines.delay
+
 @Composable
 fun PinScreen(
     action: String = "enter", // "enter", "set", "remove"
@@ -38,6 +44,17 @@ fun PinScreen(
     var pinValue by remember { mutableStateOf("") }
     var confirmValue by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+
+    val firstKeyFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(200)
+        try {
+            firstKeyFocusRequester.requestFocus()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
 
     val currentVal = if (step == "pin") pinValue else confirmValue
     val existingPin = remember { AppStorage.getPin() }
@@ -112,6 +129,32 @@ fun PinScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(24.dp)
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    val code = keyEvent.nativeKeyEvent.keyCode
+                    when {
+                        code in AndroidKeyEvent.KEYCODE_0..AndroidKeyEvent.KEYCODE_9 -> {
+                            val digit = (code - AndroidKeyEvent.KEYCODE_0).toString()
+                            onKeyPress(digit)
+                            true
+                        }
+                        code in AndroidKeyEvent.KEYCODE_NUMPAD_0..AndroidKeyEvent.KEYCODE_NUMPAD_9 -> {
+                            val digit = (code - AndroidKeyEvent.KEYCODE_NUMPAD_0).toString()
+                            onKeyPress(digit)
+                            true
+                        }
+                        code == AndroidKeyEvent.KEYCODE_DEL -> {
+                            onBackspace()
+                            true
+                        }
+                        code == AndroidKeyEvent.KEYCODE_BACK || code == AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                            onClose()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
             .testTag("pin_screen")
     ) {
         // Close button
@@ -220,8 +263,22 @@ fun PinScreen(
                                 border = borderStroke,
                                 modifier = Modifier
                                     .size(72.dp)
-                                    .focusable()
                                     .onFocusChanged { isFocused = it.isFocused }
+                                    .focusable()
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                    onBackspace()
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        } else false
+                                    }
                                     .clickable { onBackspace() }
                                     .testTag("pin_backspace_btn")
                             ) {
@@ -249,8 +306,23 @@ fun PinScreen(
                                 border = borderStroke,
                                 modifier = Modifier
                                     .size(72.dp)
-                                    .focusable()
+                                    .then(if (key == "1") Modifier.focusRequester(firstKeyFocusRequester) else Modifier)
                                     .onFocusChanged { isFocused = it.isFocused }
+                                    .focusable()
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                    onKeyPress(key)
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        } else false
+                                    }
                                     .clickable { onKeyPress(key) }
                                     .testTag("pin_key_$key")
                             ) {

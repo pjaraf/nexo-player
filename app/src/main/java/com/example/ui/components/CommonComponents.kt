@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.Brush
@@ -194,16 +195,25 @@ fun CategoryChipsRow(
             }
 
             val chipBorder = when {
-                isFocused -> androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFC107))
+                isFocused -> androidx.compose.foundation.BorderStroke(2.5.dp, TvFocusGold)
                 isSelected -> androidx.compose.foundation.BorderStroke(1.5.dp, TvSelectedRed)
                 else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
             }
+
+            val scale by animateFloatAsState(
+                targetValue = if (isFocused) 1.08f else 1f,
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+                label = "chip_scale"
+            )
 
             Surface(
                 shape = RoundedCornerShape(999.dp),
                 color = chipBg,
                 border = chipBorder,
                 modifier = Modifier
+                    .scale(scale)
+                    .zIndex(if (isFocused) 5f else 0f)
+                    .shadow(if (isFocused) 10.dp else 0.dp, RoundedCornerShape(999.dp))
                     .height(36.dp)
                     .onFocusChanged { isFocused = it.isFocused }
                     .focusable()
@@ -212,7 +222,8 @@ fun CategoryChipsRow(
                             when (keyEvent.nativeKeyEvent.keyCode) {
                                 AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                                 AndroidKeyEvent.KEYCODE_ENTER,
-                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                     onSelect(id)
                                     true
                                 }
@@ -285,7 +296,8 @@ fun MediaPosterCard(
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                         AndroidKeyEvent.KEYCODE_ENTER,
-                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                             onClick()
                             true
                         }
@@ -391,15 +403,24 @@ fun LiveChannelCard(
     var isFocused by remember { mutableStateOf(false) }
 
     val borderStroke = when {
-        isFocused -> androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
+        isFocused -> androidx.compose.foundation.BorderStroke(3.dp, TvFocusGold)
         else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
     }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.04f else 1f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+        label = "live_ch_scale"
+    )
 
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = if (isFocused) Color(0xFF1E2638) else NexusSurfaceVariant,
         border = borderStroke,
         modifier = modifier
+            .scale(scale)
+            .zIndex(if (isFocused) 5f else 0f)
+            .shadow(if (isFocused) 14.dp else 0.dp, RoundedCornerShape(12.dp))
             .fillMaxWidth()
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
@@ -408,7 +429,8 @@ fun LiveChannelCard(
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                         AndroidKeyEvent.KEYCODE_ENTER,
-                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                             onClick()
                             true
                         }
@@ -523,15 +545,24 @@ fun ContinueWatchingCard(
     } else 0f
 
     val borderStroke = when {
-        isFocused -> androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
+        isFocused -> androidx.compose.foundation.BorderStroke(3.dp, TvFocusGold)
         else -> androidx.compose.foundation.BorderStroke(1.dp, NexusBorder)
     }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.05f else 1f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+        label = "continue_scale"
+    )
 
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = if (isFocused) Color(0xFF1E2638) else NexusSurfaceVariant,
         border = borderStroke,
         modifier = modifier
+            .scale(scale)
+            .zIndex(if (isFocused) 5f else 0f)
+            .shadow(if (isFocused) 14.dp else 0.dp, RoundedCornerShape(12.dp))
             .width(200.dp)
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
@@ -540,7 +571,8 @@ fun ContinueWatchingCard(
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                         AndroidKeyEvent.KEYCODE_ENTER,
-                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                             onClick()
                             true
                         }

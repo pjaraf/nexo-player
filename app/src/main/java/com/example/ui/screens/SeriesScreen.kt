@@ -10,7 +10,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,6 +67,33 @@ fun SeriesScreen(
         val l = mutableListOf("ALL" to "TODAS")
         l.addAll(categories.map { it.categoryId to it.categoryName })
         l
+    }
+
+    val firstCardFocusRequester = remember { FocusRequester() }
+    val categoryFocusRequester = remember { FocusRequester() }
+    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(list, isCategoriesOpen) {
+        if (!isCategoriesOpen && list.isNotEmpty() && !hasRequestedInitialFocus) {
+            delay(200)
+            try {
+                firstCardFocusRequester.requestFocus()
+                hasRequestedInitialFocus = true
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
+    LaunchedEffect(isCategoriesOpen) {
+        if (isCategoriesOpen) {
+            delay(150)
+            try {
+                categoryFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
     }
 
     val selectedCategoryLabel = remember(chipList, selectedCat) {
@@ -293,7 +324,7 @@ fun SeriesScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(list, key = { it.id }) { series ->
+                    itemsIndexed(list, key = { _, it -> it.id }) { index, series ->
                         val isSelected = selectedSeries?.id == series.id
                         MediaPosterCard(
                             title = series.displayName,
@@ -307,7 +338,9 @@ fun SeriesScreen(
                             onClick = {
                                 onNavigateSeries(series.id)
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(if (index == 0) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
                         )
                     }
                 }
@@ -407,6 +440,7 @@ fun SeriesScreen(
                                     .fillMaxWidth()
                                     .height(44.dp)
                                     .clip(RoundedCornerShape(12.dp))
+                                    .then(if (isCatSelected) Modifier.focusRequester(categoryFocusRequester) else Modifier)
                                     .onFocusChanged { state ->
                                         isCatFocused = state.isFocused
                                         if (state.isFocused) {
@@ -419,7 +453,8 @@ fun SeriesScreen(
                                             when (keyEvent.nativeKeyEvent.keyCode) {
                                                 AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                                                 AndroidKeyEvent.KEYCODE_ENTER,
-                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                     viewModel.selectSeriesCategory(id)
                                                     isCategoriesOpen = false
                                                     true

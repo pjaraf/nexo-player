@@ -32,6 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
+import android.view.KeyEvent as AndroidKeyEvent
+import kotlinx.coroutines.delay
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -138,6 +143,21 @@ private fun MovieDetailTvScreen(
     }
 
     var isPreviewLoading by remember { mutableStateOf(false) }
+
+    val playButtonFocusRequester = remember { FocusRequester() }
+    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(loading) {
+        if (!loading && !hasRequestedInitialFocus) {
+            delay(250)
+            try {
+                playButtonFocusRequester.requestFocus()
+                hasRequestedInitialFocus = true
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
     var previewError by remember { mutableStateOf(false) }
 
     // Audio & Subtitle tracks
@@ -523,8 +543,27 @@ private fun MovieDetailTvScreen(
                                     },
                                     modifier = Modifier
                                         .height(42.dp)
-                                        .focusable()
+                                        .focusRequester(playButtonFocusRequester)
                                         .onFocusChanged { isFullBtnFocused = it.isFocused }
+                                        .focusable()
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
+                                                        val resumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                                                        if (streamUrl.isNotBlank()) {
+                                                            onPlay(streamUrl, title, "movie", movieId, cover, resumeMs)
+                                                        }
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
                                         .testTag("btn_movie_fullscreen")
                                 ) {
                                     Row(
