@@ -132,12 +132,6 @@ object AppUpdateManager {
                 )
 
                 if (isNewer) {
-                    val dismissed = AppStorage.getDismissedUpdateVersion()
-                    if (!force && dismissed == versionInfo.versionName) {
-                        Log.d(TAG, "Update v${versionInfo.versionName} was previously dismissed")
-                        _latestUpdateInfo.value = null
-                        return@withContext null
-                    }
                     Log.i(TAG, "New update found via version.json: v${versionInfo.versionName} (code=${versionInfo.versionCode})")
                     _latestUpdateInfo.value = versionInfo
                     AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
@@ -156,11 +150,6 @@ object AppUpdateManager {
                 )
 
                 if (isNewer) {
-                    val dismissed = AppStorage.getDismissedUpdateVersion()
-                    if (!force && dismissed == releaseInfo.versionName) {
-                        _latestUpdateInfo.value = null
-                        return@withContext null
-                    }
                     Log.i(TAG, "New update found via GitHub Releases API: v${releaseInfo.versionName}")
                     _latestUpdateInfo.value = releaseInfo
                     AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
