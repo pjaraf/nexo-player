@@ -528,11 +528,7 @@ private fun MovieDetailTvScreen(
                                 var isFullBtnFocused by remember { mutableStateOf(false) }
                                 Surface(
                                     onClick = {
-                                        val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
-                                        val resumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-                                        if (streamUrl.isNotBlank()) {
-                                            onPlay(streamUrl, title, "movie", movieId, cover, resumeMs)
-                                        }
+                                        isFullScreenMode = true
                                     },
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
@@ -553,11 +549,7 @@ private fun MovieDetailTvScreen(
                                                     AndroidKeyEvent.KEYCODE_ENTER,
                                                     AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
                                                     AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                        val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
-                                                        val resumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-                                                        if (streamUrl.isNotBlank()) {
-                                                            onPlay(streamUrl, title, "movie", movieId, cover, resumeMs)
-                                                        }
+                                                        isFullScreenMode = true
                                                         true
                                                     }
                                                     else -> false
@@ -705,11 +697,7 @@ private fun MovieDetailTvScreen(
                                 .focusable()
                                 .onFocusChanged { isPreviewFocused = it.isFocused }
                                 .clickable {
-                                    val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
-                                    val resumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-                                    if (streamUrl.isNotBlank()) {
-                                        onPlay(streamUrl, title, "movie", movieId, cover, resumeMs)
-                                    }
+                                    isFullScreenMode = true
                                 }
                                 .testTag("movie_preview_player")
                         ) {

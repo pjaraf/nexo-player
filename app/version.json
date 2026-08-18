@@ -1,7 +1,7 @@
 {
-  "versionCode": 47,
-  "versionName": "1.1.36",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.36/app-debug.apk",
-  "changelog": "Versión 1.1.36: Eliminación de botones de reproducir y detalles en películas y series en TV (manteniéndolos en teléfonos).",
+  "versionCode": 48,
+  "versionName": "1.1.37",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.37/app-debug.apk",
+  "changelog": "Versión 1.1.37: Expansión de pantalla completa en TV sin reiniciar reproducción y estandarización de estados de botones (Azul/Rojo).",
   "isMandatory": false
 }
