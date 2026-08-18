@@ -74,9 +74,8 @@ fun AppNavigation(
     val updateDownloadState by mainViewModel.updateDownloadState.collectAsState()
 
     LaunchedEffect(Unit) {
-        if (AppStorage.isAutoCheckUpdatesEnabled()) {
-            mainViewModel.checkForUpdates(manual = false)
-        }
+        AppStorage.setDismissedUpdateVersion(null)
+        mainViewModel.checkForUpdates(manual = true)
     }
 
     if (updateInfo != null) {

@@ -119,9 +119,8 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
 
     init {
         loadSessionData()
-        if (AppStorage.isAutoCheckUpdatesEnabled()) {
-            checkForUpdates(manual = false)
-        }
+        AppStorage.setDismissedUpdateVersion(null)
+        checkForUpdates(manual = true)
 
         // React when device comes back online
         viewModelScope.launch {
