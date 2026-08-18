@@ -75,6 +75,7 @@ fun MainTabsScreen(
     val isTv = remember { DeviceUtils.isTelevision(context) }
     var currentTab by remember { mutableStateOf(MainTab.HOME) }
     var isSidebarOpen by remember { mutableStateOf(false) }
+    var isAtFirstCaratula by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         if (AppStorage.isAutoCheckUpdatesEnabled()) {
@@ -116,7 +117,8 @@ fun MainTabsScreen(
                     onNavigateSeries = onNavigateSeriesDetail,
                     onPlayDirect = onNavigatePlayerDirect,
                     onNavigateProfile = { currentTab = MainTab.PROFILE },
-                    isSidebarOpen = isSidebarOpen
+                    isSidebarOpen = isSidebarOpen,
+                    onFirstItemFocused = { isAtFirstCaratula = it }
                 )
             }
             MainTab.LIVE -> {
@@ -171,7 +173,7 @@ fun MainTabsScreen(
                             val code = keyEvent.nativeKeyEvent.keyCode
                             when (code) {
                                 AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                                    if (!isSidebarOpen) {
+                                    if (currentTab == MainTab.HOME && isAtFirstCaratula && !isSidebarOpen) {
                                         isSidebarOpen = true
                                         true
                                     } else {
@@ -214,8 +216,8 @@ fun MainTabsScreen(
                     RenderTabContent()
                 }
 
-                // Floating Menu Trigger Button on top-left for TV users
-                if (!isSidebarOpen) {
+                // Floating Menu Trigger Button on top-left for TV users (Only on Home screen and when sidebar is closed)
+                if (currentTab == MainTab.HOME && !isSidebarOpen) {
                     var isMenuFocused by remember { mutableStateOf(false) }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -267,12 +269,12 @@ fun MainTabsScreen(
                     }
                 }
 
-                // Scrim overlay when sidebar is open
+                // Scrim overlay when sidebar is open (Transparent so background carátulas remain fully visible)
                 if (isSidebarOpen) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.65f))
+                            .background(Color.Transparent)
                             .clickable { isSidebarOpen = false }
                     )
                 }

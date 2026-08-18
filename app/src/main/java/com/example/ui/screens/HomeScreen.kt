@@ -69,7 +69,8 @@ fun HomeScreen(
     onNavigateSeries: (seriesId: String) -> Unit,
     onPlayDirect: (url: String, title: String, kind: String, contentId: String, image: String, resumeMs: Long) -> Unit,
     onNavigateProfile: () -> Unit,
-    isSidebarOpen: Boolean = false
+    isSidebarOpen: Boolean = false,
+    onFirstItemFocused: (Boolean) -> Unit = {}
 ) {
     val activeProfile by viewModel.activeProfile.collectAsState()
     val isKids by viewModel.isKidsMode.collectAsState()
