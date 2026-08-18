@@ -294,6 +294,28 @@ fun ProfileScreen(
                             }
                         }
 
+                        Spacer(modifier = Modifier.height(8.dp))
+                        var isSimulateFocused by remember { mutableStateOf(false) }
+                        Button(
+                            onClick = { viewModel.simulateUpdate() },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSimulateFocused) TvFocusBlue else NexusSurfaceVariant
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                if (isSimulateFocused) 2.dp else 1.dp,
+                                if (isSimulateFocused) Color(0xFFFFC107) else NexusBorder
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp)
+                                .onFocusChanged { isSimulateFocused = it.isFocused }
+                                .focusable()
+                                .testTag("profile_simulate_update_btn")
+                        ) {
+                            Text("Probar aviso de actualización", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Medium)
+                        }
+
                         if (updateStatusMessage != null) {
                             Text(
                                 text = updateStatusMessage ?: "",

@@ -178,6 +178,17 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
         _updateStatusMessage.value = null
     }
 
+    fun simulateUpdate() {
+        val mockUpdate = UpdateInfo(
+            versionCode = 36,
+            versionName = "1.1.25",
+            apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.25/app-debug.apk",
+            changelog = "Versión de prueba simulada para comprobar el cuadro de diálogo de actualización automática en dispositivos y TV.",
+            isMandatory = false
+        )
+        AppUpdateManager.setUpdateInfo(mockUpdate)
+    }
+
     fun clearUpdateStatusMessage() {
         _updateStatusMessage.value = null
     }

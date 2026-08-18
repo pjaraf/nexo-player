@@ -431,4 +431,8 @@ object AppUpdateManager {
         _latestUpdateInfo.value = null
         _downloadState.value = UpdateDownloadState.Idle
     }
+
+    fun setUpdateInfo(info: UpdateInfo?) {
+        _latestUpdateInfo.value = info
+    }
 }

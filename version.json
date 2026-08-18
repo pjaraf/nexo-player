@@ -1,7 +1,7 @@
 {
-  "versionCode": 33,
-  "versionName": "1.1.22",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.22/app-debug.apk",
-  "changelog": "Diseño unificado de películas y series para TV con reproductor en vivo, fondo cinematográfico y carrusel de películas.",
-  "isMandatory": true
+  "versionCode": 36,
+  "versionName": "1.1.25",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.25/app-debug.apk",
+  "changelog": "Mejoras de control remoto global en todas las pantallas y optimización de visualización en Android TV.",
+  "isMandatory": false
 }
