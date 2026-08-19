@@ -1,4 +1,6 @@
-package com.example.ui.screens
+import os
+
+content = """package com.example.ui.screens
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -27,7 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.data.api.XtreamApi
-import com.example.ui.viewmodels.MainViewModel
 import com.example.data.models.Episode
 import com.example.data.models.SeriesDetailInfo
 import com.example.ui.components.POSTER_FALLBACK
@@ -38,7 +39,6 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SeriesDetailScreen(
     seriesId: String,
-    viewModel: com.example.ui.viewmodels.MainViewModel,
     onBack: () -> Unit,
     onPlayEpisode: (String, String, String, String, String, Long, String?, String?, String?, String?) -> Unit
 ) {
@@ -46,9 +46,9 @@ fun SeriesDetailScreen(
     val isTv = configuration.screenWidthDp > 600
 
     if (isTv) {
-        SeriesDetailTvScreen(seriesId, viewModel, onBack, onPlayEpisode)
+        SeriesDetailTvScreen(seriesId, onBack, onPlayEpisode)
     } else {
-        SeriesDetailPhoneScreen(seriesId, viewModel, onBack, onPlayEpisode)
+        SeriesDetailPhoneScreen(seriesId, onBack, onPlayEpisode)
     }
 }
 
@@ -56,7 +56,6 @@ fun SeriesDetailScreen(
 @Composable
 fun SeriesDetailPhoneScreen(
     seriesId: String,
-    viewModel: com.example.ui.viewmodels.MainViewModel,
     onBack: () -> Unit,
     onPlayEpisode: (String, String, String, String, String, Long, String?, String?, String?, String?) -> Unit
 ) {
@@ -282,7 +281,6 @@ fun SeriesDetailPhoneScreen(
 @Composable
 fun SeriesDetailTvScreen(
     seriesId: String,
-    viewModel: com.example.ui.viewmodels.MainViewModel,
     onBack: () -> Unit,
     onPlayEpisode: (String, String, String, String, String, Long, String?, String?, String?, String?) -> Unit
 ) {
@@ -502,3 +500,7 @@ fun SeriesDetailTvScreen(
         }
     }
 }
+"""
+
+with open('app/src/main/java/com/example/ui/screens/SeriesDetailScreen.kt', 'w') as f:
+    f.write(content)
