@@ -410,7 +410,6 @@ object XtreamApi {
                 return@withContext Pair(null, emptyMap())
             }
             
-            // Using JsonReader directly to avoid loading entire string into memory and handle malformed fields safely
             response.body!!.charStream().use { reader ->
                 val jsonReader = com.google.gson.stream.JsonReader(reader)
                 jsonReader.isLenient = true
@@ -438,8 +437,43 @@ object XtreamApi {
                                     while (jsonReader.hasNext()) {
                                         val seasonKey = jsonReader.nextName()
                                         try {
-                                            val epType = object : TypeToken<List<Episode>>() {}.type
-                                            val list: List<Episode> = gson.fromJson(jsonReader, epType) ?: emptyList()
+                                            val seasonPeek = jsonReader.peek()
+                                            val list = mutableListOf<Episode>()
+                                            var count = 0
+                                            val maxEps = 2000
+                                            
+                                            if (seasonPeek == com.google.gson.stream.JsonToken.BEGIN_ARRAY) {
+                                                jsonReader.beginArray()
+                                                while (jsonReader.hasNext()) {
+                                                    if (count < maxEps) {
+                                                        try {
+                                                            val ep = gson.fromJson<Episode>(jsonReader, Episode::class.java)
+                                                            if (ep != null) list.add(ep)
+                                                        } catch(e: Exception) { jsonReader.skipValue() }
+                                                    } else {
+                                                        jsonReader.skipValue()
+                                                    }
+                                                    count++
+                                                }
+                                                jsonReader.endArray()
+                                            } else if (seasonPeek == com.google.gson.stream.JsonToken.BEGIN_OBJECT) {
+                                                jsonReader.beginObject()
+                                                while (jsonReader.hasNext()) {
+                                                    jsonReader.nextName() // skip episode key (usually index)
+                                                    if (count < maxEps) {
+                                                        try {
+                                                            val ep = gson.fromJson<Episode>(jsonReader, Episode::class.java)
+                                                            if (ep != null) list.add(ep)
+                                                        } catch(e: Exception) { jsonReader.skipValue() }
+                                                    } else {
+                                                        jsonReader.skipValue()
+                                                    }
+                                                    count++
+                                                }
+                                                jsonReader.endObject()
+                                            } else {
+                                                jsonReader.skipValue()
+                                            }
                                             episodesMap[seasonKey] = list
                                         } catch (e: Exception) {
                                             Log.e(TAG, "Error parsing season $seasonKey", e)
@@ -448,7 +482,7 @@ object XtreamApi {
                                     }
                                     jsonReader.endObject()
                                 } else {
-                                    jsonReader.skipValue() // Skip if episodes is an array or string
+                                    jsonReader.skipValue()
                                 }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Error parsing episodes", e)
