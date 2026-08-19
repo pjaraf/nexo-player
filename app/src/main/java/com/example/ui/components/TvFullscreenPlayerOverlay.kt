@@ -38,7 +38,9 @@ fun TvFullscreenPlayerOverlay(
     onRewind: () -> Unit,
     onForward: () -> Unit,
     onExit: () -> Unit,
-    onSubtitles: () -> Unit
+    onSubtitles: () -> Unit,
+    onSkipNext: (() -> Unit)? = null,
+    onAspectRatio: (() -> Unit)? = null
 ) {
     val focusColor = Color(0xFFE50914) // Netflix Red
     val playPauseFocusRequester = remember { FocusRequester() }
@@ -248,6 +250,21 @@ fun TvFullscreenPlayerOverlay(
                             .clickable { onForward() }
                     )
 
+                    // Skip Next (Optional)
+                    if (onSkipNext != null) {
+                        var focusSkip by remember { mutableStateOf(false) }
+                        Icon(
+                            imageVector = Icons.Default.SkipNext,
+                            contentDescription = "Siguiente",
+                            tint = if (focusSkip) focusColor else Color.White,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .focusable()
+                                .onFocusChanged { focusSkip = it.isFocused }
+                                .clickable { onSkipNext() }
+                        )
+                    }
+
                     // Subtitles
                     var focusSubs by remember { mutableStateOf(false) }
                     Icon(
@@ -271,7 +288,7 @@ fun TvFullscreenPlayerOverlay(
                             .size(32.dp)
                             .focusable()
                             .onFocusChanged { focusPip = it.isFocused }
-                            .clickable {}
+                            .clickable { onAspectRatio?.invoke() }
                     )
                 }
             }

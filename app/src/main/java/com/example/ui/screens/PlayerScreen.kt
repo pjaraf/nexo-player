@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.example.ui.components.TvFullscreenPlayerOverlay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -1117,417 +1118,36 @@ fun PlayerScreen(
                     }
                 }
             } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.45f))
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
-                ) {
-                    // Top Close button & Title & Orientation Toggle
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopCenter),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            IconButton(onClick = onClose, modifier = Modifier.testTag("player_close_btn")) {
-                                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
-                            }
+                TvFullscreenPlayerOverlay(
+                    isPlaying = isPlaying,
+                    title = currentTitle,
+                    thumbnailUrl = currentCoverImage ?: "",
+                    currentPositionMs = currentPosition,
+                    durationMs = duration,
+                    onPlayPause = {
+                        if (exoPlayer.isPlaying) {
+                            exoPlayer.pause()
+                        } else {
+                            exoPlayer.play()
                         }
-
-                        // Title
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = currentTitle,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        // Top Right Action Buttons: Rotate Screen Orientation Toggle Button
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            IconButton(
-                                onClick = { isLandscape = !isLandscape },
-                                modifier = Modifier.testTag("player_orientation_toggle_btn")
-                            ) {
-                                Icon(
-                                    if (isLandscape) Icons.Default.ScreenRotation else Icons.Default.CropLandscape,
-                                    contentDescription = "Rotar Pantalla",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // VOD Center Controls: Rewind 10s, Play/Pause, Forward 10s
-                    Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(28.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = {
-                                val target = (exoPlayer.currentPosition - 10000L).coerceAtLeast(0L)
-                                exoPlayer.seekTo(target)
-                            },
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f))
-                        ) {
-                            Icon(Icons.Default.Replay10, contentDescription = "-10s", tint = Color.White, modifier = Modifier.size(30.dp))
-                        }
-
-                        IconButton(
-                            onClick = {
-                                if (exoPlayer.isPlaying) {
-                                    exoPlayer.pause()
-                                } else {
-                                    exoPlayer.play()
-                                }
-                            },
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(NexusPrimary)
-                        ) {
-                            Icon(
-                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                                tint = Color.White,
-                                modifier = Modifier.size(38.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = {
-                                val target = (exoPlayer.currentPosition + 10000L).coerceAtMost(duration)
-                                exoPlayer.seekTo(target)
-                            },
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f))
-                        ) {
-                            Icon(Icons.Default.Forward10, contentDescription = "+10s", tint = Color.White, modifier = Modifier.size(30.dp))
-                        }
-
-                        if (kind == "series" && (currentEpisodeIndex + 1 < seriesEpisodes.size || !nextUrl.isNullOrBlank())) {
-                            IconButton(
-                                onClick = { playNextEpisode() },
-                                modifier = Modifier
-                                    .size(50.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.Black.copy(alpha = 0.6f))
-                                    .testTag("player_skip_next_episode_btn")
-                            ) {
-                                Icon(
-                                    Icons.Default.SkipNext,
-                                    contentDescription = "Siguiente Episodio",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(30.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Bottom Controls Area: Carátula at the start, Progress Bar, and Action Buttons below Progress Bar
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.Black.copy(alpha = 0.85f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
-                        shadowElevation = 12.dp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.BottomCenter)
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        // Movies and Series VOD Controls
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // 1. CARÁTULA AL PRINCIPIO DE LA BARRA DE PROGRESO
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFF202020),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
-                                shadowElevation = 6.dp,
-                                modifier = Modifier
-                                    .width(44.dp)
-                                    .height(62.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .testTag("player_cover_poster")
-                            ) {
-                                if (!currentCoverImage.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = currentCoverImage,
-                                        contentDescription = "Carátula",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize().background(Color(0xFF252525)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            if (kind == "series") Icons.Default.Tv else Icons.Default.Movie,
-                                            contentDescription = null,
-                                            tint = NexusTextSecondary,
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Barra vertical roja de acento (idéntica al banner de TV)
-                            Box(
-                                modifier = Modifier
-                                    .width(3.dp)
-                                    .height(42.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(NexusPrimary)
-                            )
-
-                            // 2. BARRA DE PROGRESO Y CONTROLES DEBAJO
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                val activePos = if (isSeeking) (seekProgress * duration).toLong() else currentPosition
-                                // Timeline Scrubber Row
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = formatTimeMs(activePos),
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Slider(
-                                        value = if (isSeeking) seekProgress else (currentPosition.toFloat() / duration.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f),
-                                        onValueChange = {
-                                            isSeeking = true
-                                            seekProgress = it
-                                        },
-                                        onValueChangeFinished = {
-                                            exoPlayer.seekTo((seekProgress * duration).toLong())
-                                            isSeeking = false
-                                        },
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = NexusPrimary,
-                                            activeTrackColor = NexusPrimary,
-                                            inactiveTrackColor = Color.White.copy(alpha = 0.25f)
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Text(
-                                        text = formatTimeMs(duration),
-                                        color = NexusTextSecondary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                // 3. BOTONES Y DETALLES DEBAJO DE LA BARRA DE PROGRESO
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    // Título / Info
-                                    Text(
-                                        text = currentTitle,
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(end = 8.dp)
-                                    )
-
-                                    // Botones de acción debajo de la barra
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        // Botón Idiomas y Subtítulos
-                                        val interactionSourceAudioBtn = remember { MutableInteractionSource() }
-                                        val isAudioBtnFocused by interactionSourceAudioBtn.collectIsFocusedAsState()
-                                        val isAudioActive = !isSubtitlesDisabled && availableSubtitleTracks.isNotEmpty()
-                                        val audioBgColor = when {
-                                            isAudioBtnFocused -> TvFocusBlue
-                                            isAudioActive -> TvSelectedRed
-                                            else -> Color.White.copy(alpha = 0.15f)
-                                        }
-                                        val audioBorder = when {
-                                            isAudioBtnFocused -> androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
-                                            isAudioActive -> androidx.compose.foundation.BorderStroke(1.5.dp, TvSelectedRed)
-                                            else -> androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
-                                        }
-
-                                        Surface(
-                                            onClick = { showAudioSubtitlesDialog = true },
-                                            interactionSource = interactionSourceAudioBtn,
-                                            shape = RoundedCornerShape(999.dp),
-                                            color = audioBgColor,
-                                            border = audioBorder,
-                                            modifier = Modifier
-                                                .testTag("player_audio_subtitles_btn")
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Subtitles,
-                                                    contentDescription = "Idiomas y Subtítulos",
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                                Text(
-                                                    text = "Audio / Subtítulos",
-                                                    color = Color.White,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-
-                                        // Botón Expandir Pantalla Completa (Aspect Ratio - mismo estilo que los otros botones)
-                                        val interactionSourceResizeBtn = remember { MutableInteractionSource() }
-                                        val isResizeBtnFocused by interactionSourceResizeBtn.collectIsFocusedAsState()
-                                        val isResizeActive = currentResizeMode != ScreenResizeMode.FIT
-                                        val resizeBgColor = when {
-                                            isResizeBtnFocused -> TvFocusBlue
-                                            isResizeActive -> TvSelectedRed
-                                            else -> Color.White.copy(alpha = 0.15f)
-                                        }
-                                        val resizeBorder = when {
-                                            isResizeBtnFocused -> androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
-                                            isResizeActive -> androidx.compose.foundation.BorderStroke(1.5.dp, TvSelectedRed)
-                                            else -> androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
-                                        }
-
-                                        Surface(
-                                            onClick = { cycleResizeMode() },
-                                            interactionSource = interactionSourceResizeBtn,
-                                            shape = RoundedCornerShape(999.dp),
-                                            color = resizeBgColor,
-                                            border = resizeBorder,
-                                            modifier = Modifier
-                                                .testTag("player_expand_fullscreen_btn")
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                            ) {
-                                                Icon(
-                                                    when (currentResizeMode) {
-                                                        ScreenResizeMode.ZOOM -> Icons.Default.Fullscreen
-                                                        ScreenResizeMode.FILL -> Icons.Default.AspectRatio
-                                                        ScreenResizeMode.FIT -> Icons.Default.FullscreenExit
-                                                    },
-                                                    contentDescription = "Expandir Pantalla Completa",
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                                Text(
-                                                    text = currentResizeMode.shortLabel,
-                                                    color = Color.White,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-
-                                        // Botón Siguiente Episodio (si es serie)
-                                        if (kind == "series" && (currentEpisodeIndex + 1 < seriesEpisodes.size || !nextUrl.isNullOrBlank())) {
-                                            val interactionSourceNextBtn = remember { MutableInteractionSource() }
-                                            val isNextBtnFocused by interactionSourceNextBtn.collectIsFocusedAsState()
-                                            val nextBgColor = when {
-                                                isNextBtnFocused -> TvFocusBlue
-                                                else -> Color.White.copy(alpha = 0.15f)
-                                            }
-                                            val nextBorder = when {
-                                                isNextBtnFocused -> androidx.compose.foundation.BorderStroke(1.5.dp, TvFocusBlue)
-                                                else -> androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
-                                            }
-
-                                            Surface(
-                                                onClick = { playNextEpisode() },
-                                                interactionSource = interactionSourceNextBtn,
-                                                shape = RoundedCornerShape(999.dp),
-                                                color = nextBgColor,
-                                                border = nextBorder,
-                                                modifier = Modifier
-                                                    .testTag("player_skip_next_episode_bottom_btn")
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.SkipNext,
-                                                        contentDescription = "Siguiente Episodio",
-                                                        tint = Color.White,
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                    Text(
-                                                        text = "Siguiente",
-                                                        color = Color.White,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                    },
+                    onRewind = {
+                        val target = (exoPlayer.currentPosition - 10000L).coerceAtLeast(0L)
+                        exoPlayer.seekTo(target)
+                    },
+                    onForward = {
+                        val target = (exoPlayer.currentPosition + 10000L).coerceAtMost(duration)
+                        exoPlayer.seekTo(target)
+                    },
+                    onExit = onClose,
+                    onSubtitles = { showAudioSubtitlesDialog = true },
+                    onSkipNext = if (kind == "series" && (currentEpisodeIndex + 1 < seriesEpisodes.size || !nextUrl.isNullOrBlank())) {
+                        { playNextEpisode() }
+                    } else null,
+                    onAspectRatio = { cycleResizeMode() }
+                )
             }
         }
-
         // Audio & Subtitles Selection Dialog
         if (showAudioSubtitlesDialog) {
             AudioSubtitlesDialog(
@@ -1551,283 +1171,110 @@ fun AudioSubtitlesDialog(
     onSelectSubtitle: (MediaTrackOption?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Audio, 1 = Subtítulos
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier
-            .fillMaxWidth(0.94f)
-            .widthIn(max = 480.dp)
-            .testTag("audio_subtitles_dialog"),
-        containerColor = Color(0xFF161616),
-        shape = RoundedCornerShape(24.dp),
+        containerColor = Color(0xFF14151F),
         title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Subtitles,
-                        contentDescription = null,
-                        tint = NexusPrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = "Audio y Subtítulos",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = NexusTextSecondary)
-                }
-            }
+            Text(
+                "Idiomas y Subtítulos",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Tab Selection (Audio / Subtítulos)
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = Color(0xFF222222),
-                    contentColor = NexusPrimary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text(
-                                    text = "Audio (${if (availableAudioTracks.isEmpty()) 1 else availableAudioTracks.size})",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
-                            }
+                Text(
+                    "Audio",
+                    color = TvFocusBlue,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                if (availableAudioTracks.isEmpty()) {
+                    Text("No hay pistas de audio alternativas disponibles.", color = Color.Gray, fontSize = 14.sp)
+                } else {
+                    availableAudioTracks.forEach { track ->
+                        val isSelected = track.isSelected
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSelectAudio(track)
+                                    onDismiss()
+                                }
+                                .padding(vertical = 8.dp)
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = null,
+                                colors = RadioButtonDefaults.colors(selectedColor = TvFocusBlue, unselectedColor = Color.White)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(track.label, color = if (isSelected) Color.White else Color.Gray)
                         }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(Icons.Default.Subtitles, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text(
-                                    text = "Subtítulos (${availableSubtitleTracks.size})",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        }
-                    )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // List container
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 240.dp)
-                ) {
-                    if (selectedTab == 0) {
-                        // Audio Tracks List
-                        if (availableAudioTracks.isEmpty()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = NexusPrimary.copy(alpha = 0.15f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, NexusPrimary),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = NexusPrimary, modifier = Modifier.size(20.dp))
-                                        Column {
-                                            Text("Audio Predeterminado (Original)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                            Text("Pista de audio integrada en la transmisión", color = NexusTextSecondary, fontSize = 12.sp)
-                                        }
-                                    }
-                                }
+                Text(
+                    "Subtítulos",
+                    color = TvFocusBlue,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                if (availableSubtitleTracks.isEmpty()) {
+                    Text("No hay subtítulos disponibles.", color = Color.Gray, fontSize = 14.sp)
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSelectSubtitle(null)
+                                onDismiss()
                             }
-                        } else {
-                            androidx.compose.foundation.lazy.LazyColumn(
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                items(availableAudioTracks.size) { idx ->
-                                    val track = availableAudioTracks[idx]
-                                    val isSelected = track.isSelected
-                                    val interactionSourceAudio = remember { MutableInteractionSource() }
-                                    val isAudioFocused by interactionSourceAudio.collectIsFocusedAsState()
-
-                                    Surface(
-                                        onClick = { onSelectAudio(track) },
-                                        interactionSource = interactionSourceAudio,
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = when {
-                                            isAudioFocused -> TvFocusBlue
-                                            isSelected -> NexusPrimary.copy(alpha = 0.18f)
-                                            else -> Color(0xFF222222)
-                                        },
-                                        border = androidx.compose.foundation.BorderStroke(
-                                            1.dp,
-                                            if (isAudioFocused) Color.White else if (isSelected) NexusPrimary else Color.Transparent
-                                        ),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = track.label,
-                                                color = if (isSelected) Color.White else NexusTextSecondary,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 14.sp
-                                            )
-                                            if (isSelected) {
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = NexusPrimary, modifier = Modifier.size(20.dp))
-                                            }
-                                        }
-                                    }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        RadioButton(
+                            selected = isSubtitlesDisabled,
+                            onClick = null,
+                            colors = RadioButtonDefaults.colors(selectedColor = TvFocusBlue, unselectedColor = Color.White)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Desactivar Subtítulos", color = if (isSubtitlesDisabled) Color.White else Color.Gray)
+                    }
+                    availableSubtitleTracks.forEach { track ->
+                        val isSelected = track.isSelected && !isSubtitlesDisabled
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSelectSubtitle(track)
+                                    onDismiss()
                                 }
-                            }
-                        }
-                    } else {
-                        // Subtitles List
-                        androidx.compose.foundation.lazy.LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                                .padding(vertical = 8.dp)
                         ) {
-                            // "Desactivados" option
-                            item {
-                                val interactionSourceDisableSub = remember { MutableInteractionSource() }
-                                val isDisableSubFocused by interactionSourceDisableSub.collectIsFocusedAsState()
-
-                                Surface(
-                                    onClick = { onSelectSubtitle(null) },
-                                    interactionSource = interactionSourceDisableSub,
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = when {
-                                        isDisableSubFocused -> TvFocusBlue
-                                        isSubtitlesDisabled -> NexusPrimary.copy(alpha = 0.18f)
-                                        else -> Color(0xFF222222)
-                                    },
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (isDisableSubFocused) Color.White else if (isSubtitlesDisabled) NexusPrimary else Color.Transparent
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "Desactivados",
-                                            color = if (isSubtitlesDisabled) Color.White else NexusTextSecondary,
-                                            fontWeight = if (isSubtitlesDisabled) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 14.sp
-                                        )
-                                        if (isSubtitlesDisabled) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = NexusPrimary, modifier = Modifier.size(20.dp))
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (availableSubtitleTracks.isEmpty()) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 12.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "No se detectaron subtítulos adicionales en este contenido",
-                                            color = NexusTextSecondary,
-                                            fontSize = 12.sp,
-                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                        )
-                                    }
-                                }
-                            } else {
-                                items(availableSubtitleTracks.size) { idx ->
-                                    val track = availableSubtitleTracks[idx]
-                                    val isSelected = !isSubtitlesDisabled && track.isSelected
-                                    val interactionSourceSub = remember { MutableInteractionSource() }
-                                    val isSubFocused by interactionSourceSub.collectIsFocusedAsState()
-
-                                    Surface(
-                                        onClick = { onSelectSubtitle(track) },
-                                        interactionSource = interactionSourceSub,
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = when {
-                                            isSubFocused -> TvFocusBlue
-                                            isSelected -> NexusPrimary.copy(alpha = 0.18f)
-                                            else -> Color(0xFF222222)
-                                        },
-                                        border = androidx.compose.foundation.BorderStroke(
-                                            1.dp,
-                                            if (isSubFocused) Color.White else if (isSelected) NexusPrimary else Color.Transparent
-                                        ),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = track.label,
-                                                color = if (isSelected) Color.White else NexusTextSecondary,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 14.sp
-                                            )
-                                            if (isSelected) {
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = NexusPrimary, modifier = Modifier.size(20.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = null,
+                                colors = RadioButtonDefaults.colors(selectedColor = TvFocusBlue, unselectedColor = Color.White)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(track.label, color = if (isSelected) Color.White else Color.Gray)
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            Button(
+            TextButton(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary),
-                shape = RoundedCornerShape(999.dp),
-                modifier = Modifier.padding(bottom = 6.dp, end = 6.dp)
+                colors = ButtonDefaults.textButtonColors(contentColor = Color.White)
             ) {
                 Text("Listo", fontWeight = FontWeight.Bold, color = Color.White)
             }
@@ -1846,5 +1293,3 @@ fun formatTimeMs(ms: Long): String {
         String.format("%02d:%02d", minutes, seconds)
     }
 }
-
-
