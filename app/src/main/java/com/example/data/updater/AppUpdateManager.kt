@@ -167,40 +167,14 @@ object AppUpdateManager {
                 }
             }
 
-            // Fallback for manual check if network didn't yield newer or failed
-            if (force) {
-                val fallbackInfo = UpdateInfo(
-                    versionCode = 54,
-                    versionName = "1.1.44",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.44/app-debug.apk",
-                    changelog = "Versión 1.1.44: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción.",
-                    isMandatory = false
-                )
-                _latestUpdateInfo.value = fallbackInfo
-                AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                return@withContext fallbackInfo
-            }
-
-            AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
+                        AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
             _latestUpdateInfo.value = null
             return@withContext null
         } catch (e: Exception) {
             Log.e(TAG, "Error during update check: ${e.message}")
-            if (force) {
-                val fallbackInfo = UpdateInfo(
-                    versionCode = 54,
-                    versionName = "1.1.44",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.44/app-debug.apk",
-                    changelog = "Versión 1.1.44: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción.",
-                    isMandatory = false
-                )
-                _latestUpdateInfo.value = fallbackInfo
-                return@withContext fallbackInfo
-            }
             return@withContext null
         }
     }
-
     private fun fetchFromVersionJson(customUrl: String?): UpdateInfo? {
         return try {
             val rawUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
