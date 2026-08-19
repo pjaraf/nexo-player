@@ -1,4 +1,6 @@
-package com.example.ui.screens
+import re
+
+content = """package com.example.ui.screens
 
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -69,7 +71,8 @@ fun SeriesDetailScreen(
     }
 }
 
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(UnstableApi::class)
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 fun SeriesDetailTvScreen(
     seriesId: String,
@@ -426,7 +429,7 @@ fun SeriesDetailTvScreen(
     }
 }
 
-@androidx.annotation.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 fun SeriesDetailPhoneScreen(
     seriesId: String,
@@ -636,3 +639,8 @@ fun SeriesDetailPhoneScreen(
         }
     }
 }
+"""
+
+with open('app/src/main/java/com/example/ui/screens/SeriesDetailScreen.kt', 'w') as f:
+    f.write(content)
+

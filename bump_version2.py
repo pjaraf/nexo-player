@@ -23,8 +23,6 @@ if version_code_match and version_name_match:
     with open('app/build.gradle.kts', 'w') as f:
         f.write(content)
         
-    print(f"Bumped build.gradle.kts to {new_vn} ({new_vc})")
-    
     # Update version.json
     with open('version.json', 'r') as f:
         v_data = json.load(f)
@@ -35,4 +33,4 @@ if version_code_match and version_name_match:
     with open('version.json', 'w') as f:
         json.dump(v_data, f, indent=4)
         
-    print(f"Bumped version.json to {new_vn} ({new_vc})")
+    print(f"Bumped to {new_vn} ({new_vc})")
