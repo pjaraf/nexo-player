@@ -150,7 +150,7 @@ private fun SeriesDetailPhoneScreen(
 
     BackHandler(onBack = onBack)
 
-    val currentEpisodes = episodesMap[selectedSeason] ?: emptyList()
+    val currentEpisodes = (episodesMap[selectedSeason]?.filterNotNull() ?: emptyList()).filterNotNull()
     val seriesTitle = info?.name ?: "Serie"
     val seriesCover = info?.cover ?: info?.backdropPath?.firstOrNull() ?: POSTER_FALLBACK
 
@@ -558,7 +558,7 @@ private fun SeriesDetailTvScreen(
     var isSubtitlesDisabled by remember { mutableStateOf(false) }
 
     val currentEpisodes = remember(episodesMap, selectedSeason) {
-        episodesMap[selectedSeason] ?: emptyList()
+        episodesMap[selectedSeason]?.filterNotNull() ?: emptyList()
     }
 
     // Stop playback when leaving foreground

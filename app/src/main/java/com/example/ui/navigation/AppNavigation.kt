@@ -39,8 +39,14 @@ object Routes {
     const val PLAYER = "player?url={url}&title={title}&isLive={isLive}&channelId={channelId}&categoryId={categoryId}&kind={kind}&contentId={contentId}&image={image}&resumeMs={resumeMs}&nextUrl={nextUrl}&nextTitle={nextTitle}&nextContentId={nextContentId}&nextEpImage={nextEpImage}"
 
     fun pin(action: String) = "pin/$action"
-    fun movieDetail(id: String) = "movie/$id"
-    fun seriesDetail(id: String) = "series/$id"
+    fun movieDetail(id: String): String {
+        val encoded = if (id.isNotBlank()) java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8.toString()) else "empty"
+        return "movie/$encoded"
+    }
+    fun seriesDetail(id: String): String {
+        val encoded = if (id.isNotBlank()) java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8.toString()) else "empty"
+        return "series/$encoded"
+    }
 
     fun player(
         url: String,
