@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import com.example.ui.components.TvFullscreenPlayerOverlay
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -853,7 +854,7 @@ private fun MovieDetailTvScreen(
                                         ) {
                                             // Mini Poster Thumbnail
                                             AsyncImage(
-                                                model = relMovie.streamIcon?.ifBlank { POSTER_FALLBACK } ?: POSTER_FALLBACK,
+                                                model = cover?.ifBlank { POSTER_FALLBACK } ?: POSTER_FALLBACK,
                                                 contentDescription = relMovie.name,
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier
@@ -914,205 +915,37 @@ private fun MovieDetailTvScreen(
                 }
 
                 // Full Screen Controls Overlay
+                // Full Screen Controls Overlay
                 AnimatedVisibility(
                     visible = showPlayerControls,
                     enter = fadeIn(tween(200)),
                     exit = fadeOut(tween(200)),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color.Black.copy(alpha = 0.75f),
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.85f)
-                                    )
-                                )
-                            )
-                    ) {
-                        // Top Bar in Full Screen
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .padding(horizontal = 24.dp, vertical = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                // Collapse / Exit Full Screen button (Blue on focus)
-                                var isExitFocused by remember { mutableStateOf(false) }
-                                Surface(
-                                    onClick = { isFullScreenMode = false },
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (isExitFocused) tvFocusBlue else Color.Black.copy(alpha = 0.5f),
-                                    border = if (isExitFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                                    modifier = Modifier
-                                        .focusable()
-                                        .onFocusChanged { isExitFocused = it.isFocused }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Icon(Icons.Default.FullscreenExit, contentDescription = "Salir", tint = Color.White, modifier = Modifier.size(18.dp))
-                                        Text("Salir", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-
-                                Column {
-                                    Text(
-                                        text = title,
-                                        color = Color.White,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    if (genreText.isNotBlank()) {
-                                        Text(
-                                            text = genreText,
-                                            color = Color(0xFFFF9800),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                }
+                    TvFullscreenPlayerOverlay(
+                        isPlaying = isPlaying,
+                        title = title,
+                        thumbnailUrl = cover?.ifBlank { POSTER_FALLBACK } ?: POSTER_FALLBACK,
+                        currentPositionMs = currentPositionMs,
+                        durationMs = durationMs,
+                        onPlayPause = {
+                            if (exoPlayer.isPlaying) {
+                                exoPlayer.pause()
+                                isPlaying = false
+                            } else {
+                                exoPlayer.play()
+                                isPlaying = true
                             }
-
-                            // Audio & Subtitles button in Full Screen (Blue on focus)
-                            var isTracksFsFocused by remember { mutableStateOf(false) }
-                            Surface(
-                                onClick = { showTracksDialog = true },
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isTracksFsFocused) tvFocusBlue else Color.Black.copy(alpha = 0.5f),
-                                border = if (isTracksFsFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                                modifier = Modifier
-                                    .focusable()
-                                    .onFocusChanged { isTracksFsFocused = it.isFocused }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
-                                    Text("Audio y Subtítulos", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
-
-                        // Center Play / Pause and Skip 10s Controls
-                        Row(
-                            modifier = Modifier.align(Alignment.Center),
-                            horizontalArrangement = Arrangement.spacedBy(28.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // -10s Rewind button
-                            var isRewindFocused by remember { mutableStateOf(false) }
-                            IconButton(
-                                onClick = {
-                                    exoPlayer.seekTo((exoPlayer.currentPosition - 10000).coerceAtLeast(0L))
-                                },
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isRewindFocused) tvFocusBlue else Color.Black.copy(alpha = 0.55f))
-                                    .border(if (isRewindFocused) 2.dp else 1.dp, Color.White, CircleShape)
-                                    .focusable()
-                                    .onFocusChanged { isRewindFocused = it.isFocused }
-                            ) {
-                                Icon(Icons.Default.Replay10, contentDescription = "-10s", tint = Color.White, modifier = Modifier.size(28.dp))
-                            }
-
-                            // Play / Pause center button
-                            var isPlayCenterFocused by remember { mutableStateOf(false) }
-                            IconButton(
-                                onClick = {
-                                    if (exoPlayer.isPlaying) {
-                                        exoPlayer.pause()
-                                        isPlaying = false
-                                    } else {
-                                        exoPlayer.play()
-                                        isPlaying = true
-                                    }
-                                },
-                                modifier = Modifier
-                                    .size(68.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isPlayCenterFocused) tvFocusBlue else Color.White.copy(alpha = 0.25f))
-                                    .border(if (isPlayCenterFocused) 2.5.dp else 1.5.dp, Color.White, CircleShape)
-                                    .focusable()
-                                    .onFocusChanged { isPlayCenterFocused = it.isFocused }
-                            ) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(38.dp)
-                                )
-                            }
-
-                            // +10s Forward button
-                            var isForwardFocused by remember { mutableStateOf(false) }
-                            IconButton(
-                                onClick = {
-                                    val d = exoPlayer.duration.coerceAtLeast(0L)
-                                    val target = if (d > 0) (exoPlayer.currentPosition + 10000).coerceAtMost(d) else (exoPlayer.currentPosition + 10000)
-                                    exoPlayer.seekTo(target)
-                                },
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isForwardFocused) tvFocusBlue else Color.Black.copy(alpha = 0.55f))
-                                    .border(if (isForwardFocused) 2.dp else 1.dp, Color.White, CircleShape)
-                                    .focusable()
-                                    .onFocusChanged { isForwardFocused = it.isFocused }
-                            ) {
-                                Icon(Icons.Default.Forward10, contentDescription = "+10s", tint = Color.White, modifier = Modifier.size(28.dp))
-                            }
-                        }
-
-                        // Bottom Timeline Bar
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomCenter)
-                                .navigationBarsPadding()
-                                .padding(horizontal = 28.dp, vertical = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Progress bar
-                            val progress = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
-                            LinearProgressIndicator(
-                                progress = { progress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
-                                color = tvFocusBlue,
-                                trackColor = Color.White.copy(alpha = 0.3f)
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${formatPlaybackTime(currentPositionMs)} / ${formatPlaybackTime(durationMs)}",
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
+                        },
+                        onRewind = { exoPlayer.seekTo((exoPlayer.currentPosition - 10000).coerceAtLeast(0L)) },
+                        onForward = {
+                            val d = exoPlayer.duration.coerceAtLeast(0L)
+                            val target = if (d > 0) (exoPlayer.currentPosition + 10000).coerceAtMost(d) else (exoPlayer.currentPosition + 10000)
+                            exoPlayer.seekTo(target)
+                        },
+                        onExit = { isFullScreenMode = false },
+                        onSubtitles = { showTracksDialog = true }
+                    )
                 }
             }
         }
