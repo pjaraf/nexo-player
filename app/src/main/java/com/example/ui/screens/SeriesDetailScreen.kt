@@ -749,10 +749,30 @@ private fun SeriesDetailTvScreen(
             .testTag("series_detail_tv_screen")
     ) {
         if (!isFullScreenMode) {
-            // Fondo idéntico al inicio de sesión (Muro de pósters Netflix con viñeta cinematográfica)
-            com.example.ui.components.NetflixPosterWallBackground(
-                alpha = 0.45f
-            )
+            // Fondo dinámico basado en el póster de la serie para mejor rendimiento (Evita OOM en TV)
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = seriesCover,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(0.35f)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.5f),
+                                    Color.Black.copy(alpha = 0.8f),
+                                    Color.Black
+                                )
+                            )
+                        )
+                )
+            }
 
             if (loading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
