@@ -138,9 +138,9 @@ object AppUpdateManager {
                     } else {
                         val infoToShow = if (!isNewer && force) {
                             versionInfo.copy(
-                                versionCode = 53,
-                                versionName = "1.1.42",
-                                changelog = "Versión 1.1.42: Estandarización universal de botones (Azul foco, Rojo selección) y robustez en reproducción de series."
+                                versionCode = 54,
+                                versionName = "1.1.43",
+                                changelog = "Versión 1.1.43: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción."
                             )
                         } else {
                             versionInfo
@@ -170,9 +170,9 @@ object AppUpdateManager {
                     } else {
                         val infoToShow = if (!isNewer && force) {
                             releaseInfo.copy(
-                                versionCode = 53,
-                                versionName = "1.1.42",
-                                changelog = "Versión 1.1.42: Estandarización universal de botones (Azul foco, Rojo selección) y robustez en reproducción de series."
+                                versionCode = 54,
+                                versionName = "1.1.43",
+                                changelog = "Versión 1.1.43: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción."
                             )
                         } else {
                             releaseInfo
@@ -188,10 +188,10 @@ object AppUpdateManager {
             // Fallback for manual check if network didn't yield newer or failed
             if (force) {
                 val fallbackInfo = UpdateInfo(
-                    versionCode = 53,
-                    versionName = "1.1.42",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.42/app-debug.apk",
-                    changelog = "Versión 1.1.42: Estandarización universal de botones (Azul foco, Rojo selección) y robustez en reproducción de series.",
+                    versionCode = 54,
+                    versionName = "1.1.43",
+                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.43/app-debug.apk",
+                    changelog = "Versión 1.1.43: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción.",
                     isMandatory = false
                 )
                 _latestUpdateInfo.value = fallbackInfo
@@ -206,10 +206,10 @@ object AppUpdateManager {
             Log.e(TAG, "Error during update check: ${e.message}")
             if (force) {
                 val fallbackInfo = UpdateInfo(
-                    versionCode = 53,
-                    versionName = "1.1.42",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.42/app-debug.apk",
-                    changelog = "Versión 1.1.42: Estandarización universal de botones (Azul foco, Rojo selección) y robustez en reproducción de series.",
+                    versionCode = 54,
+                    versionName = "1.1.43",
+                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.43/app-debug.apk",
+                    changelog = "Versión 1.1.43: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción.",
                     isMandatory = false
                 )
                 _latestUpdateInfo.value = fallbackInfo
