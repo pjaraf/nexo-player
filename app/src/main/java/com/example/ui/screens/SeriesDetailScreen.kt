@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -345,8 +346,8 @@ private fun SeriesDetailPhoneScreen(
                 }
 
                 // Episode list
-                items(currentEpisodes) { ep ->
-                    val epIndex = currentEpisodes.indexOf(ep)
+                itemsIndexed(currentEpisodes) { epIndex, ep ->
+                    
                     val nextEp = currentEpisodes.getOrNull(epIndex + 1)
                     val epImage = ep.info?.movieImage ?: seriesCover
                     val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
@@ -1191,14 +1192,14 @@ private fun SeriesDetailTvScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 contentPadding = PaddingValues(vertical = 4.dp)
                             ) {
-                                items(currentEpisodes) { ep ->
+                                itemsIndexed(currentEpisodes) { epIndex, ep ->
                                     val isSelected = selectedEpisode?.epId == ep.epId
                                     val interactionSource = remember { MutableInteractionSource() }
                                     val isFocused by interactionSource.collectIsFocusedAsState()
 
                                     Surface(
                                         onClick = {
-                                            val epIndex = currentEpisodes.indexOfFirst { it.epId == ep.epId }
+                                            
                                             val nextEp = if (epIndex >= 0 && epIndex + 1 < currentEpisodes.size) currentEpisodes[epIndex + 1] else null
                                             val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
                                             val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }

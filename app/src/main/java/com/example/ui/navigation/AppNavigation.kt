@@ -33,19 +33,19 @@ object Routes {
     const val MANAGE_PROFILES = "manage_profiles"
     const val PIN = "pin/{action}"
     const val TABS = "tabs"
-    const val MOVIE_DETAIL = "movie/{id}"
-    const val SERIES_DETAIL = "series/{id}"
+    const val MOVIE_DETAIL = "movie?id={id}"
+    const val SERIES_DETAIL = "series?id={id}"
     const val FAVORITES = "favorites"
     const val PLAYER = "player?url={url}&title={title}&isLive={isLive}&channelId={channelId}&categoryId={categoryId}&kind={kind}&contentId={contentId}&image={image}&resumeMs={resumeMs}&nextUrl={nextUrl}&nextTitle={nextTitle}&nextContentId={nextContentId}&nextEpImage={nextEpImage}"
 
     fun pin(action: String) = "pin/$action"
     fun movieDetail(id: String): String {
         val encoded = if (id.isNotBlank()) java.net.URLEncoder.encode(id, "UTF-8").replace("+", "%20") else "empty"
-        return "movie/$encoded"
+        return "movie?id=$encoded"
     }
     fun seriesDetail(id: String): String {
         val encoded = if (id.isNotBlank()) java.net.URLEncoder.encode(id, "UTF-8").replace("+", "%20") else "empty"
-        return "series/$encoded"
+        return "series?id=$encoded"
     }
 
     fun player(
@@ -236,7 +236,7 @@ fun AppNavigation(
 
         composable(
             route = Routes.MOVIE_DETAIL,
-            arguments = listOf(navArgument("id") { type = NavType.StringType })
+            arguments = listOf(navArgument("id") { type = NavType.StringType; defaultValue = "empty" })
         ) { entry ->
             val movieId = entry.arguments?.getString("id") ?: ""
             MovieDetailScreen(
@@ -264,7 +264,7 @@ fun AppNavigation(
 
         composable(
             route = Routes.SERIES_DETAIL,
-            arguments = listOf(navArgument("id") { type = NavType.StringType })
+            arguments = listOf(navArgument("id") { type = NavType.StringType; defaultValue = "empty" })
         ) { entry ->
             val seriesId = entry.arguments?.getString("id") ?: ""
             SeriesDetailScreen(
