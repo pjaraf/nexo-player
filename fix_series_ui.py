@@ -1,4 +1,6 @@
-package com.example.ui.screens
+import re
+
+content = """package com.example.ui.screens
 
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -23,7 +25,6 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -426,7 +427,7 @@ fun SeriesDetailTvScreen(
                     ) {
                         AsyncImage(
                             model = seriesCover,
-                            contentDescription = seriesTitle,
+                            contentDescription = title,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -579,7 +580,7 @@ fun SeriesDetailTvScreen(
     }
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 fun SeriesDetailPhoneScreen(
     seriesId: String,
@@ -785,3 +786,8 @@ fun SeriesDetailPhoneScreen(
         }
     }
 }
+"""
+
+with open('app/src/main/java/com/example/ui/screens/SeriesDetailScreen.kt', 'w') as f:
+    f.write(content)
+
