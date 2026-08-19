@@ -40,11 +40,11 @@ object Routes {
 
     fun pin(action: String) = "pin/$action"
     fun movieDetail(id: String): String {
-        val encoded = if (id.isNotBlank()) java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8.toString()) else "empty"
+        val encoded = if (id.isNotBlank()) java.net.URLEncoder.encode(id, "UTF-8").replace("+", "%20") else "empty"
         return "movie/$encoded"
     }
     fun seriesDetail(id: String): String {
-        val encoded = if (id.isNotBlank()) java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8.toString()) else "empty"
+        val encoded = if (id.isNotBlank()) java.net.URLEncoder.encode(id, "UTF-8").replace("+", "%20") else "empty"
         return "series/$encoded"
     }
 
@@ -63,7 +63,7 @@ object Routes {
         nextContentId: String? = null,
         nextEpImage: String? = null
     ): String {
-        fun encode(s: String?) = s?.let { URLEncoder.encode(it, StandardCharsets.UTF_8.toString()) } ?: ""
+        fun encode(s: String?) = s?.let { URLEncoder.encode(it, "UTF-8").replace("+", "%20") } ?: ""
         return "player?url=${encode(url)}&title=${encode(title)}&isLive=$isLive&channelId=${encode(channelId)}&categoryId=${encode(categoryId)}&kind=${encode(kind)}&contentId=${encode(contentId)}&image=${encode(image)}&resumeMs=$resumeMs&nextUrl=${encode(nextUrl)}&nextTitle=${encode(nextTitle)}&nextContentId=${encode(nextContentId)}&nextEpImage=${encode(nextEpImage)}"
     }
 }

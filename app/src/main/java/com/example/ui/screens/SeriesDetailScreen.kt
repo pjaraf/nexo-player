@@ -545,7 +545,7 @@ private fun SeriesDetailTvScreen(
             try {
                 playButtonFocusRequester.requestFocus()
                 hasRequestedInitialFocus = true
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 // ignore
             }
         }
@@ -710,7 +710,7 @@ private fun SeriesDetailTvScreen(
                     exoPlayer.play()
                     isPlaying = true
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e("SeriesDetailTv", "Error loading episode stream for ${ep.displayTitle}", e)
                 isPreviewLoading = false
                 previewError = true
@@ -1637,7 +1637,7 @@ private fun SeriesDetailTvScreen(
                                             availableAudioTracks = availableAudioTracks.map {
                                                 it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
                                             }
-                                        } catch (e: Exception) {
+                                        } catch (e: Throwable) {
                                             Log.e("SeriesDetailTv", "Error selecting audio track", e)
                                         }
                                     },
@@ -1683,7 +1683,7 @@ private fun SeriesDetailTvScreen(
                                         .build()
                                     isSubtitlesDisabled = true
                                     availableSubtitleTracks = availableSubtitleTracks.map { it.copy(isSelected = false) }
-                                } catch (e: Exception) {
+                                } catch (e: Throwable) {
                                     Log.e("SeriesDetailTv", "Error disabling subtitles", e)
                                 }
                             },
@@ -1729,7 +1729,7 @@ private fun SeriesDetailTvScreen(
                                         availableSubtitleTracks = availableSubtitleTracks.map {
                                             it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
                                         }
-                                    } catch (e: Exception) {
+                                    } catch (e: Throwable) {
                                         Log.e("SeriesDetailTv", "Error selecting subtitle", e)
                                     }
                                 },

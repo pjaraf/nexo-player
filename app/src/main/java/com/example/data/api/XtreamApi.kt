@@ -95,7 +95,7 @@ object XtreamApi {
                 Log.w(TAG, "Fetch failed for action=$action code=${response.code}")
                 null
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "Network error for action=$action: ${e.message}")
             null
         }
@@ -125,7 +125,7 @@ object XtreamApi {
                 Log.w(TAG, "Login rejected by server validation. auth=$authRaw, status=$status, user=$user")
                 null
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Login parse error", e)
             null
         }
@@ -145,7 +145,7 @@ object XtreamApi {
                 Log.w(TAG, "Failed to download M3U live list code=${response.code}")
                 null
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Error downloading M3U live list", e)
             null
         }
@@ -166,7 +166,7 @@ object XtreamApi {
                         parsedLiveChannels = list
                         return@withContext list
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     Log.e(TAG, "Failed to parse xtream live streams", e)
                 }
             }
@@ -299,7 +299,7 @@ object XtreamApi {
             val type = object : TypeToken<List<VodCategory>>() {}.type
             val list: List<VodCategory> = gson.fromJson(json, type) ?: emptyList()
             list
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Error parsing vod categories", e)
             emptyList()
         }
@@ -324,7 +324,7 @@ object XtreamApi {
             val type = object : TypeToken<List<VodStream>>() {}.type
             val list: List<VodStream> = gson.fromJson(json, type) ?: emptyList()
             list
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Error parsing vod streams", e)
             emptyList()
         }
@@ -339,7 +339,7 @@ object XtreamApi {
         val json = fetch(action = "get_vod_info", extraParams = mapOf("vod_id" to streamId)) ?: return null
         return try {
             gson.fromJson(json, VodDetailResponse::class.java)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "VodDetail parse error: ${e.message}")
             null
         }
@@ -354,7 +354,7 @@ object XtreamApi {
             val type = object : TypeToken<List<SeriesCategory>>() {}.type
             val list: List<SeriesCategory> = gson.fromJson(json, type) ?: emptyList()
             list
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Error parsing series categories", e)
             emptyList()
         }
@@ -379,7 +379,7 @@ object XtreamApi {
             val type = object : TypeToken<List<SeriesItem>>() {}.type
             val list: List<SeriesItem> = gson.fromJson(json, type) ?: emptyList()
             list
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Error parsing series list", e)
             emptyList()
         }
@@ -408,7 +408,7 @@ object XtreamApi {
                 }
             }
             Pair(info, episodesMap)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "SeriesDetail parse error: ${e.message}")
             Pair(null, emptyMap())
         }
