@@ -1,4 +1,6 @@
-package com.example.ui.screens
+import os
+
+content = """package com.example.ui.screens
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -112,7 +114,7 @@ fun SeriesDetailTvScreen(
 
         if (loading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFE50914))
+                CircularProgressIndicator(color = tvFocusBlue)
             }
         } else {
             Column(
@@ -146,7 +148,7 @@ fun SeriesDetailTvScreen(
                             if (rating != null) {
                                 Box(
                                     modifier = Modifier
-                                        .background(Color(0xFFE50914), RoundedCornerShape(4.dp))
+                                        .background(tvFocusBlue, RoundedCornerShape(4.dp))
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Text(rating, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -169,7 +171,7 @@ fun SeriesDetailTvScreen(
                         // Season and Episode Label
                         Text(
                             text = "T$selectedSeason - E${selectedEpisode?.epNumber ?: "1"}",
-                            color = Color(0xFFE50914),
+                            color = tvFocusBlue,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -270,7 +272,7 @@ fun SeriesDetailTvScreen(
                         Spacer(modifier = Modifier.width(20.dp))
                         
                         // Episode Preview Image
-                        val epImage = selectedEpisode?.info?.movieImage ?: seriesCover
+                        val epImage = selectedEpisode?.info?.movieImage ?: selectedEpisode?.info?.cover ?: seriesCover
                         Box(
                             modifier = Modifier
                                 .width(380.dp)
@@ -404,7 +406,7 @@ fun SeriesDetailPhoneScreen(
 
         if (loading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFE50914))
+                CircularProgressIndicator(color = tvFocusBlue)
             }
         } else {
             LazyColumn(
@@ -483,7 +485,7 @@ fun SeriesDetailPhoneScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "T$selectedSeason - E${selectedEpisode?.epNumber ?: ""}",
-                            color = Color(0xFFE50914),
+                            color = tvFocusBlue,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -569,3 +571,8 @@ fun SeriesDetailPhoneScreen(
         }
     }
 }
+"""
+
+with open('app/src/main/java/com/example/ui/screens/SeriesDetailScreen.kt', 'w') as f:
+    f.write(content)
+

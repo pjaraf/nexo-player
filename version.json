@@ -1,6 +1,6 @@
 {
-    "versionCode": 63,
-    "versionName": "1.1.52",
+    "versionCode": 64,
+    "versionName": "1.1.53",
     "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.49/app-debug.apk",
     "changelog": "Versi\u00f3n 1.1.49: Soluci\u00f3n de cierre inesperado al abrir series con IDs especiales o nulos y mejor compatibilidad con metadatos da\u00f1ados desde el servidor.",
     "isMandatory": false
