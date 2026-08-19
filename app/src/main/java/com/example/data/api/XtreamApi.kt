@@ -423,10 +423,10 @@ object XtreamApi {
                     when (name) {
                         "info" -> {
                             try {
-                                info = gson.fromJson(jsonReader, SeriesDetailInfo::class.java)
+                                val infoJson = com.google.gson.JsonParser.parseReader(jsonReader)
+                                info = gson.fromJson(infoJson, SeriesDetailInfo::class.java)
                             } catch (e: Exception) {
                                 Log.e(TAG, "Error parsing info", e)
-                                jsonReader.skipValue()
                             }
                         }
                         "episodes" -> {
@@ -439,36 +439,26 @@ object XtreamApi {
                                         try {
                                             val seasonPeek = jsonReader.peek()
                                             val list = mutableListOf<Episode>()
-                                            var count = 0
-                                            val maxEps = 2000
                                             
                                             if (seasonPeek == com.google.gson.stream.JsonToken.BEGIN_ARRAY) {
                                                 jsonReader.beginArray()
                                                 while (jsonReader.hasNext()) {
-                                                    if (count < maxEps) {
-                                                        try {
-                                                            val ep = gson.fromJson<Episode>(jsonReader, Episode::class.java)
-                                                            if (ep != null) list.add(ep)
-                                                        } catch(e: Exception) { jsonReader.skipValue() }
-                                                    } else {
-                                                        jsonReader.skipValue()
-                                                    }
-                                                    count++
+                                                    try {
+                                                        val epJson = com.google.gson.JsonParser.parseReader(jsonReader)
+                                                        val ep = gson.fromJson(epJson, Episode::class.java)
+                                                        if (ep != null) list.add(ep)
+                                                    } catch (e: Exception) { }
                                                 }
                                                 jsonReader.endArray()
                                             } else if (seasonPeek == com.google.gson.stream.JsonToken.BEGIN_OBJECT) {
                                                 jsonReader.beginObject()
                                                 while (jsonReader.hasNext()) {
-                                                    jsonReader.nextName() // skip episode key (usually index)
-                                                    if (count < maxEps) {
-                                                        try {
-                                                            val ep = gson.fromJson<Episode>(jsonReader, Episode::class.java)
-                                                            if (ep != null) list.add(ep)
-                                                        } catch(e: Exception) { jsonReader.skipValue() }
-                                                    } else {
-                                                        jsonReader.skipValue()
-                                                    }
-                                                    count++
+                                                    jsonReader.nextName() // key
+                                                    try {
+                                                        val epJson = com.google.gson.JsonParser.parseReader(jsonReader)
+                                                        val ep = gson.fromJson(epJson, Episode::class.java)
+                                                        if (ep != null) list.add(ep)
+                                                    } catch (e: Exception) { }
                                                 }
                                                 jsonReader.endObject()
                                             } else {
@@ -477,7 +467,6 @@ object XtreamApi {
                                             episodesMap[seasonKey] = list
                                         } catch (e: Exception) {
                                             Log.e(TAG, "Error parsing season $seasonKey", e)
-                                            jsonReader.skipValue()
                                         }
                                     }
                                     jsonReader.endObject()
@@ -486,7 +475,6 @@ object XtreamApi {
                                 }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Error parsing episodes", e)
-                                jsonReader.skipValue()
                             }
                         }
                         else -> {
