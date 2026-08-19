@@ -139,8 +139,8 @@ object AppUpdateManager {
                         val infoToShow = if (!isNewer && force) {
                             versionInfo.copy(
                                 versionCode = 54,
-                                versionName = "1.1.43",
-                                changelog = "Versión 1.1.43: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción."
+                                versionName = "1.1.44",
+                                changelog = "Versión 1.1.44: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción."
                             )
                         } else {
                             versionInfo
@@ -171,8 +171,8 @@ object AppUpdateManager {
                         val infoToShow = if (!isNewer && force) {
                             releaseInfo.copy(
                                 versionCode = 54,
-                                versionName = "1.1.43",
-                                changelog = "Versión 1.1.43: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción."
+                                versionName = "1.1.44",
+                                changelog = "Versión 1.1.44: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción."
                             )
                         } else {
                             releaseInfo
@@ -189,9 +189,9 @@ object AppUpdateManager {
             if (force) {
                 val fallbackInfo = UpdateInfo(
                     versionCode = 54,
-                    versionName = "1.1.43",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.43/app-debug.apk",
-                    changelog = "Versión 1.1.43: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción.",
+                    versionName = "1.1.44",
+                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.44/app-debug.apk",
+                    changelog = "Versión 1.1.44: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción.",
                     isMandatory = false
                 )
                 _latestUpdateInfo.value = fallbackInfo
@@ -207,9 +207,9 @@ object AppUpdateManager {
             if (force) {
                 val fallbackInfo = UpdateInfo(
                     versionCode = 54,
-                    versionName = "1.1.43",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.43/app-debug.apk",
-                    changelog = "Versión 1.1.43: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción.",
+                    versionName = "1.1.44",
+                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.44/app-debug.apk",
+                    changelog = "Versión 1.1.44: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción.",
                     isMandatory = false
                 )
                 _latestUpdateInfo.value = fallbackInfo

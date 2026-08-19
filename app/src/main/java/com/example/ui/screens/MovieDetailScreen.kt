@@ -1,4 +1,5 @@
 package com.example.ui.screens
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 
 import android.net.Uri
 import android.util.Log
@@ -182,10 +183,6 @@ private fun MovieDetailTvScreen(
                 Lifecycle.Event.ON_RESUME -> {
                     exoPlayer.playWhenReady = true
                     isPlaying = true
-                }
-                Lifecycle.Event.ON_DESTROY -> {
-                    exoPlayer.stop()
-                    exoPlayer.release()
                 }
                 else -> {}
             }
@@ -525,11 +522,13 @@ private fun MovieDetailTvScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 // Button "Pantalla completa" (Blue on focus)
-                                var isFullBtnFocused by remember { mutableStateOf(false) }
+                                val fullInteractionSource = remember { MutableInteractionSource() }
+                                val isFullBtnFocused by fullInteractionSource.collectIsFocusedAsState()
                                 Surface(
                                     onClick = {
                                         isFullScreenMode = true
                                     },
+                                    interactionSource = fullInteractionSource,
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                     border = if (isFullBtnFocused) {
@@ -540,22 +539,6 @@ private fun MovieDetailTvScreen(
                                     modifier = Modifier
                                         .height(42.dp)
                                         .focusRequester(playButtonFocusRequester)
-                                        .onFocusChanged { isFullBtnFocused = it.isFocused }
-                                        .focusable()
-                                        .onKeyEvent { keyEvent ->
-                                            if (keyEvent.type == KeyEventType.KeyDown) {
-                                                when (keyEvent.nativeKeyEvent.keyCode) {
-                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                    AndroidKeyEvent.KEYCODE_ENTER,
-                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                        isFullScreenMode = true
-                                                        true
-                                                    }
-                                                    else -> false
-                                                }
-                                            } else false
-                                        }
                                         .testTag("btn_movie_fullscreen")
                                 ) {
                                     Row(
@@ -581,9 +564,11 @@ private fun MovieDetailTvScreen(
                                 }
 
                                 // Secondary Button "Idioma y subtítulos" (Blue on focus)
-                                var isTracksBtnFocused by remember { mutableStateOf(false) }
+                                val tracksInteractionSource = remember { MutableInteractionSource() }
+                                val isTracksBtnFocused by tracksInteractionSource.collectIsFocusedAsState()
                                 Surface(
                                     onClick = { showTracksDialog = true },
+                                    interactionSource = tracksInteractionSource,
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isTracksBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                     border = if (isTracksBtnFocused) {
@@ -593,8 +578,6 @@ private fun MovieDetailTvScreen(
                                     },
                                     modifier = Modifier
                                         .height(42.dp)
-                                        .focusable()
-                                        .onFocusChanged { isTracksBtnFocused = it.isFocused }
                                         .testTag("btn_movie_tracks")
                                 ) {
                                     Row(
@@ -620,11 +603,13 @@ private fun MovieDetailTvScreen(
                                 }
 
                                 // Favorite Button
-                                var isFavFocused by remember { mutableStateOf(false) }
+                                val favInteractionSource = remember { MutableInteractionSource() }
+                                val isFavFocused by favInteractionSource.collectIsFocusedAsState()
                                 Surface(
                                     onClick = {
                                         isFav = viewModel.toggleFavorite("movies", movieId, title, cover)
                                     },
+                                    interactionSource = favInteractionSource,
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isFavFocused) tvFocusBlue else tvButtonDefaultBg,
                                     border = if (isFavFocused) {
@@ -634,8 +619,6 @@ private fun MovieDetailTvScreen(
                                     },
                                     modifier = Modifier
                                         .height(42.dp)
-                                        .focusable()
-                                        .onFocusChanged { isFavFocused = it.isFocused }
                                         .testTag("btn_movie_fav")
                                 ) {
                                     Row(
@@ -822,20 +805,16 @@ private fun MovieDetailTvScreen(
                                 contentPadding = PaddingValues(vertical = 4.dp)
                             ) {
                                 items(relatedMovies, key = { it.id }) { relMovie ->
-                                    var isItemFocused by remember { mutableStateOf(false) }
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val isItemFocused by interactionSource.collectIsFocusedAsState()
 
                                     Surface(
+                                        onClick = { onNavigateMovie(relMovie.id) },
+                                        interactionSource = interactionSource,
                                         modifier = Modifier
                                             .width(130.dp)
                                             .height(80.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .focusable()
-                                            .onFocusChanged { state ->
-                                                isItemFocused = state.isFocused
-                                            }
-                                            .clickable {
-                                                onNavigateMovie(relMovie.id)
-                                            }
                                             .testTag("related_movie_${relMovie.id}"),
                                         shape = RoundedCornerShape(8.dp),
                                         color = if (isItemFocused) tvFocusBlue else tvButtonDefaultBg,

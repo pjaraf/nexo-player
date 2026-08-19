@@ -1,4 +1,5 @@
 package com.example.ui.screens
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 
 import android.app.Activity
 import android.net.Uri
@@ -573,10 +574,6 @@ private fun SeriesDetailTvScreen(
                     exoPlayer.playWhenReady = true
                     isPlaying = true
                 }
-                Lifecycle.Event.ON_DESTROY -> {
-                    exoPlayer.stop()
-                    exoPlayer.release()
-                }
                 else -> {}
             }
         }
@@ -889,11 +886,12 @@ private fun SeriesDetailTvScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 // Button "Pantalla completa" (Same style as others, Blue on focus)
-                                var isFullBtnFocused by remember { mutableStateOf(false) }
+                                val interactionSourceFullBtn = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isFullBtnFocused by interactionSourceFullBtn.collectIsFocusedAsState()
                                 Surface(
                                     onClick = {
                                         isFullScreenMode = true
                                     },
+                                    interactionSource = interactionSourceFullBtn,
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                     border = if (isFullBtnFocused) {
@@ -904,8 +902,6 @@ private fun SeriesDetailTvScreen(
                                     modifier = Modifier
                                         .height(42.dp)
                                         .focusRequester(playButtonFocusRequester)
-                                        .onFocusChanged { isFullBtnFocused = it.isFocused }
-                                        .focusable()
                                         .onKeyEvent { keyEvent ->
                                             if (keyEvent.type == KeyEventType.KeyDown) {
                                                 when (keyEvent.nativeKeyEvent.keyCode) {
@@ -945,9 +941,10 @@ private fun SeriesDetailTvScreen(
                                 }
 
                                 // Secondary Button "Idioma y subtítulos" (Blue on focus)
-                                var isTracksBtnFocused by remember { mutableStateOf(false) }
+                                val interactionSourceTracksBtn = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isTracksBtnFocused by interactionSourceTracksBtn.collectIsFocusedAsState()
                                 Surface(
                                     onClick = { showTracksDialog = true },
+                                    interactionSource = interactionSourceTracksBtn,
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isTracksBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                     border = if (isTracksBtnFocused) {
@@ -957,8 +954,6 @@ private fun SeriesDetailTvScreen(
                                     },
                                     modifier = Modifier
                                         .height(42.dp)
-                                        .focusable()
-                                        .onFocusChanged { isTracksBtnFocused = it.isFocused }
                                         .testTag("btn_series_tracks")
                                 ) {
                                     Row(
@@ -1005,7 +1000,7 @@ private fun SeriesDetailTvScreen(
                         }
 
                         // Right Column: Embedded Live Video Preview Player
-                        var isPreviewFocused by remember { mutableStateOf(false) }
+                        val interactionSourcePreview = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isPreviewFocused by interactionSourcePreview.collectIsFocusedAsState()
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -1017,11 +1012,13 @@ private fun SeriesDetailTvScreen(
                                     if (isPreviewFocused) tvFocusBlue else Color.White.copy(alpha = 0.25f),
                                     RoundedCornerShape(14.dp)
                                 )
-                                .focusable()
-                                .onFocusChanged { isPreviewFocused = it.isFocused }
-                                .clickable {
-                                    isFullScreenMode = true
-                                }
+                                .clickable(
+                                    interactionSource = interactionSourcePreview,
+                                    indication = androidx.compose.foundation.LocalIndication.current,
+                                    onClick = {
+                                        isFullScreenMode = true
+                                    }
+                                )
                                 .testTag("series_preview_player")
                         ) {
                             AndroidView(
@@ -1101,13 +1098,14 @@ private fun SeriesDetailTvScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Season Picker Button (Blue on focus)
-                            var isSeasonBtnFocused by remember { mutableStateOf(false) }
+                            val interactionSourceSeasonBtn = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isSeasonBtnFocused by interactionSourceSeasonBtn.collectIsFocusedAsState()
                             Surface(
                                 onClick = {
                                     if (episodesMap.size > 1) {
                                         showSeasonPicker = true
                                     }
                                 },
+                                interactionSource = interactionSourceSeasonBtn,
                                 shape = RoundedCornerShape(10.dp),
                                 color = if (isSeasonBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                 border = if (isSeasonBtnFocused) {
@@ -1116,8 +1114,6 @@ private fun SeriesDetailTvScreen(
                                     androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
                                 },
                                 modifier = Modifier
-                                    .focusable()
-                                    .onFocusChanged { isSeasonBtnFocused = it.isFocused }
                                     .testTag("btn_select_season")
                             ) {
                                 Row(
@@ -1175,39 +1171,37 @@ private fun SeriesDetailTvScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 contentPadding = PaddingValues(vertical = 4.dp)
                             ) {
-                                items(currentEpisodes, key = { it.epId }) { ep ->
+                                items(currentEpisodes) { ep ->
                                     val isSelected = selectedEpisode?.epId == ep.epId
-                                    var isFocused by remember { mutableStateOf(false) }
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val isFocused by interactionSource.collectIsFocusedAsState()
 
                                     Surface(
+                                        onClick = {
+                                            val epIndex = currentEpisodes.indexOfFirst { it.epId == ep.epId }
+                                            val nextEp = if (epIndex >= 0 && epIndex + 1 < currentEpisodes.size) currentEpisodes[epIndex + 1] else null
+                                            val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
+                                            val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+                                            val epImg = ep.info?.movieImage ?: seriesCover
+                                            val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
+                                            onPlayEpisode(
+                                                url,
+                                                "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
+                                                "series",
+                                                seriesId,
+                                                epImg,
+                                                if (isSelected) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L,
+                                                nextUrl,
+                                                nextEp?.displayTitle,
+                                                nextEp?.epId,
+                                                nextEpImg
+                                            )
+                                        },
+                                        interactionSource = interactionSource,
                                         modifier = Modifier
                                             .width(62.dp)
                                             .height(50.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .focusable()
-                                            .onFocusChanged { state ->
-                                                isFocused = state.isFocused
-                                            }
-                                            .clickable {
-                                                val epIndex = currentEpisodes.indexOfFirst { it.epId == ep.epId }
-                                                val nextEp = if (epIndex >= 0 && epIndex + 1 < currentEpisodes.size) currentEpisodes[epIndex + 1] else null
-                                                val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
-                                                val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
-                                                val epImg = ep.info?.movieImage ?: seriesCover
-                                                val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
-                                                onPlayEpisode(
-                                                    url,
-                                                    "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
-                                                    "series",
-                                                    seriesId,
-                                                    epImg,
-                                                    if (isSelected) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L,
-                                                    nextUrl,
-                                                    nextEp?.displayTitle,
-                                                    nextEp?.epId,
-                                                    nextEpImg
-                                                )
-                                            }
                                             .testTag("episode_block_${ep.epNumber}"),
                                         shape = RoundedCornerShape(8.dp),
                                         color = when {
@@ -1328,15 +1322,14 @@ private fun SeriesDetailTvScreen(
                                 horizontalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
                                 // Collapse / Exit Full Screen button (Blue on focus)
-                                var isExitFocused by remember { mutableStateOf(false) }
+                                val interactionSourceExit = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isExitFocused by interactionSourceExit.collectIsFocusedAsState()
                                 Surface(
                                     onClick = { isFullScreenMode = false },
+                                    interactionSource = interactionSourceExit,
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isExitFocused) tvFocusBlue else Color.Black.copy(alpha = 0.5f),
                                     border = if (isExitFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
                                     modifier = Modifier
-                                        .focusable()
-                                        .onFocusChanged { isExitFocused = it.isFocused }
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1367,15 +1360,14 @@ private fun SeriesDetailTvScreen(
                             }
 
                             // Audio & Subtitles button in Full Screen (Blue on focus)
-                            var isTracksFsFocused by remember { mutableStateOf(false) }
+                            val interactionSourceTracksFs = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isTracksFsFocused by interactionSourceTracksFs.collectIsFocusedAsState()
                             Surface(
                                 onClick = { showTracksDialog = true },
+                                interactionSource = interactionSourceTracksFs,
                                 shape = RoundedCornerShape(10.dp),
                                 color = if (isTracksFsFocused) tvFocusBlue else Color.Black.copy(alpha = 0.5f),
                                 border = if (isTracksFsFocused) androidx.compose.foundation.BorderStroke(2.dp, Color.White) else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
                                 modifier = Modifier
-                                    .focusable()
-                                    .onFocusChanged { isTracksFsFocused = it.isFocused }
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1395,24 +1387,23 @@ private fun SeriesDetailTvScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // -10s Rewind button
-                            var isRewindFocused by remember { mutableStateOf(false) }
+                            val interactionSourceRewind = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isRewindFocused by interactionSourceRewind.collectIsFocusedAsState()
                             IconButton(
                                 onClick = {
                                     exoPlayer.seekTo((exoPlayer.currentPosition - 10000).coerceAtLeast(0L))
                                 },
+                                interactionSource = interactionSourceRewind,
                                 modifier = Modifier
                                     .size(52.dp)
                                     .clip(CircleShape)
                                     .background(if (isRewindFocused) tvFocusBlue else Color.Black.copy(alpha = 0.55f))
                                     .border(if (isRewindFocused) 2.dp else 1.dp, Color.White, CircleShape)
-                                    .focusable()
-                                    .onFocusChanged { isRewindFocused = it.isFocused }
                             ) {
                                 Icon(Icons.Default.Replay10, contentDescription = "-10s", tint = Color.White, modifier = Modifier.size(28.dp))
                             }
 
                             // Play / Pause center button
-                            var isPlayCenterFocused by remember { mutableStateOf(false) }
+                            val interactionSourcePlayCenter = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isPlayCenterFocused by interactionSourcePlayCenter.collectIsFocusedAsState()
                             IconButton(
                                 onClick = {
                                     if (exoPlayer.isPlaying) {
@@ -1423,13 +1414,12 @@ private fun SeriesDetailTvScreen(
                                         isPlaying = true
                                     }
                                 },
+                                interactionSource = interactionSourcePlayCenter,
                                 modifier = Modifier
                                     .size(68.dp)
                                     .clip(CircleShape)
                                     .background(if (isPlayCenterFocused) tvFocusBlue else Color.White.copy(alpha = 0.25f))
                                     .border(if (isPlayCenterFocused) 2.5.dp else 1.5.dp, Color.White, CircleShape)
-                                    .focusable()
-                                    .onFocusChanged { isPlayCenterFocused = it.isFocused }
                             ) {
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -1440,20 +1430,19 @@ private fun SeriesDetailTvScreen(
                             }
 
                             // +10s Forward button
-                            var isForwardFocused by remember { mutableStateOf(false) }
+                            val interactionSourceForward = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isForwardFocused by interactionSourceForward.collectIsFocusedAsState()
                             IconButton(
                                 onClick = {
                                     val d = exoPlayer.duration.coerceAtLeast(0L)
                                     val target = if (d > 0) (exoPlayer.currentPosition + 10000).coerceAtMost(d) else (exoPlayer.currentPosition + 10000)
                                     exoPlayer.seekTo(target)
                                 },
+                                interactionSource = interactionSourceForward,
                                 modifier = Modifier
                                     .size(52.dp)
                                     .clip(CircleShape)
                                     .background(if (isForwardFocused) tvFocusBlue else Color.Black.copy(alpha = 0.55f))
                                     .border(if (isForwardFocused) 2.dp else 1.dp, Color.White, CircleShape)
-                                    .focusable()
-                                    .onFocusChanged { isForwardFocused = it.isFocused }
                             ) {
                                 Icon(Icons.Default.Forward10, contentDescription = "+10s", tint = Color.White, modifier = Modifier.size(28.dp))
                             }
@@ -1496,17 +1485,16 @@ private fun SeriesDetailTvScreen(
                                 val currentIdx = currentEpisodes.indexOfFirst { it.epId == selectedEpisode?.epId }
                                 if (currentIdx >= 0 && currentIdx + 1 < currentEpisodes.size) {
                                     val nextEp = currentEpisodes[currentIdx + 1]
-                                    var isNextEpFocused by remember { mutableStateOf(false) }
+                                    val interactionSourceNextEp = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }; val isNextEpFocused by interactionSourceNextEp.collectIsFocusedAsState()
                                     Surface(
                                         onClick = {
                                             selectedEpisode = nextEp
                                         },
+                                        interactionSource = interactionSourceNextEp,
                                         shape = RoundedCornerShape(8.dp),
                                         color = if (isNextEpFocused) tvFocusBlue else Color.White.copy(alpha = 0.18f),
                                         border = if (isNextEpFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null,
                                         modifier = Modifier
-                                            .focusable()
-                                            .onFocusChanged { isNextEpFocused = it.isFocused }
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -1543,18 +1531,18 @@ private fun SeriesDetailTvScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         sortedSeasons.forEach { seasonKey ->
                             val isCurrent = seasonKey == selectedSeason
-                            var isRowFocused by remember { mutableStateOf(false) }
+                            val interactionSourceRow = remember { MutableInteractionSource() }
+                            val isRowFocused by interactionSourceRow.collectIsFocusedAsState()
                             Surface(
+                                onClick = {
+                                    selectedSeason = seasonKey
+                                    selectedEpisode = episodesMap[seasonKey]?.firstOrNull()
+                                    showSeasonPicker = false
+                                },
+                                interactionSource = interactionSourceRow,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .focusable()
-                                    .onFocusChanged { isRowFocused = it.isFocused }
-                                    .clickable {
-                                        selectedSeason = seasonKey
-                                        selectedEpisode = episodesMap[seasonKey]?.firstOrNull()
-                                        showSeasonPicker = false
-                                    },
+                                    .clip(RoundedCornerShape(10.dp)),
                                 shape = RoundedCornerShape(10.dp),
                                 color = when {
                                     isRowFocused -> tvFocusBlue      // Foco azul
@@ -1615,28 +1603,28 @@ private fun SeriesDetailTvScreen(
                             Text("Audio predeterminado", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
                         } else {
                             availableAudioTracks.forEach { track ->
-                                var isTrackFocused by remember { mutableStateOf(false) }
+                                val interactionSourceTrack = remember { MutableInteractionSource() }
+                                val isTrackFocused by interactionSourceTrack.collectIsFocusedAsState()
                                 Surface(
+                                    onClick = {
+                                        try {
+                                            val override = TrackSelectionOverride(track.trackGroup.mediaTrackGroup, listOf(track.trackIndex))
+                                            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                                                .buildUpon()
+                                                .setOverrideForType(override)
+                                                .setPreferredAudioLanguage(track.language)
+                                                .build()
+                                            availableAudioTracks = availableAudioTracks.map {
+                                                it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e("SeriesDetailTv", "Error selecting audio track", e)
+                                        }
+                                    },
+                                    interactionSource = interactionSourceTrack,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .focusable()
-                                        .onFocusChanged { isTrackFocused = it.isFocused }
-                                        .clickable {
-                                            try {
-                                                val override = TrackSelectionOverride(track.trackGroup.mediaTrackGroup, listOf(track.trackIndex))
-                                                exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                                                    .buildUpon()
-                                                    .setOverrideForType(override)
-                                                    .setPreferredAudioLanguage(track.language)
-                                                    .build()
-                                                availableAudioTracks = availableAudioTracks.map {
-                                                    it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
-                                                }
-                                            } catch (e: Exception) {
-                                                Log.e("SeriesDetailTv", "Error selecting audio track", e)
-                                            }
-                                        },
+                                        .clip(RoundedCornerShape(8.dp)),
                                     shape = RoundedCornerShape(8.dp),
                                     color = when {
                                         isTrackFocused -> tvFocusBlue
@@ -1664,25 +1652,25 @@ private fun SeriesDetailTvScreen(
                         // Subtítulos
                         Text("SUBTÍTULOS", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                         // Desactivar Subtítulos Option
-                        var isDisableSubFocused by remember { mutableStateOf(false) }
+                        val interactionSourceDisableSub = remember { MutableInteractionSource() }
+                        val isDisableSubFocused by interactionSourceDisableSub.collectIsFocusedAsState()
                         Surface(
+                            onClick = {
+                                try {
+                                    exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                                        .buildUpon()
+                                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                                        .build()
+                                    isSubtitlesDisabled = true
+                                    availableSubtitleTracks = availableSubtitleTracks.map { it.copy(isSelected = false) }
+                                } catch (e: Exception) {
+                                    Log.e("SeriesDetailTv", "Error disabling subtitles", e)
+                                }
+                            },
+                            interactionSource = interactionSourceDisableSub,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .focusable()
-                                .onFocusChanged { isDisableSubFocused = it.isFocused }
-                                .clickable {
-                                    try {
-                                        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                                            .buildUpon()
-                                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                                            .build()
-                                        isSubtitlesDisabled = true
-                                        availableSubtitleTracks = availableSubtitleTracks.map { it.copy(isSelected = false) }
-                                    } catch (e: Exception) {
-                                        Log.e("SeriesDetailTv", "Error disabling subtitles", e)
-                                    }
-                                },
+                                .clip(RoundedCornerShape(8.dp)),
                             shape = RoundedCornerShape(8.dp),
                             color = when {
                                 isDisableSubFocused -> tvFocusBlue
@@ -1704,31 +1692,31 @@ private fun SeriesDetailTvScreen(
                         }
 
                         availableSubtitleTracks.forEach { track ->
-                            var isSubFocused by remember { mutableStateOf(false) }
+                            val interactionSourceSub = remember { MutableInteractionSource() }
+                            val isSubFocused by interactionSourceSub.collectIsFocusedAsState()
                             val isChosen = track.isSelected && !isSubtitlesDisabled
                             Surface(
+                                onClick = {
+                                    try {
+                                        val override = TrackSelectionOverride(track.trackGroup.mediaTrackGroup, listOf(track.trackIndex))
+                                        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                                            .buildUpon()
+                                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                            .setOverrideForType(override)
+                                            .setPreferredTextLanguage(track.language)
+                                            .build()
+                                        isSubtitlesDisabled = false
+                                        availableSubtitleTracks = availableSubtitleTracks.map {
+                                            it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("SeriesDetailTv", "Error selecting subtitle", e)
+                                    }
+                                },
+                                interactionSource = interactionSourceSub,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .focusable()
-                                    .onFocusChanged { isSubFocused = it.isFocused }
-                                    .clickable {
-                                        try {
-                                            val override = TrackSelectionOverride(track.trackGroup.mediaTrackGroup, listOf(track.trackIndex))
-                                            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                                                .buildUpon()
-                                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-                                                .setOverrideForType(override)
-                                                .setPreferredTextLanguage(track.language)
-                                                .build()
-                                            isSubtitlesDisabled = false
-                                            availableSubtitleTracks = availableSubtitleTracks.map {
-                                                it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
-                                            }
-                                        } catch (e: Exception) {
-                                            Log.e("SeriesDetailTv", "Error selecting subtitle", e)
-                                        }
-                                    },
+                                    .clip(RoundedCornerShape(8.dp)),
                                 shape = RoundedCornerShape(8.dp),
                                 color = when {
                                     isSubFocused -> tvFocusBlue

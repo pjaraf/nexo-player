@@ -1,4 +1,5 @@
 package com.example.ui.screens
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
@@ -426,12 +427,6 @@ fun PlayerScreen(
                     playerManager?.pause() ?: run {
                         exoPlayer.pause()
                         exoPlayer.playWhenReady = false
-                    }
-                }
-                Lifecycle.Event.ON_DESTROY -> {
-                    playerManager?.release() ?: run {
-                        exoPlayer.stop()
-                        exoPlayer.release()
                     }
                 }
                 else -> {}
@@ -1391,7 +1386,8 @@ fun PlayerScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // Botón Idiomas y Subtítulos
-                                        var isAudioBtnFocused by remember { mutableStateOf(false) }
+                                        val interactionSourceAudioBtn = remember { MutableInteractionSource() }
+                                        val isAudioBtnFocused by interactionSourceAudioBtn.collectIsFocusedAsState()
                                         val isAudioActive = !isSubtitlesDisabled && availableSubtitleTracks.isNotEmpty()
                                         val audioBgColor = when {
                                             isAudioBtnFocused -> TvFocusBlue
@@ -1405,13 +1401,12 @@ fun PlayerScreen(
                                         }
 
                                         Surface(
+                                            onClick = { showAudioSubtitlesDialog = true },
+                                            interactionSource = interactionSourceAudioBtn,
                                             shape = RoundedCornerShape(999.dp),
                                             color = audioBgColor,
                                             border = audioBorder,
                                             modifier = Modifier
-                                                .focusable()
-                                                .onFocusChanged { isAudioBtnFocused = it.isFocused }
-                                                .clickable { showAudioSubtitlesDialog = true }
                                                 .testTag("player_audio_subtitles_btn")
                                         ) {
                                             Row(
@@ -1435,7 +1430,8 @@ fun PlayerScreen(
                                         }
 
                                         // Botón Expandir Pantalla Completa (Aspect Ratio - mismo estilo que los otros botones)
-                                        var isResizeBtnFocused by remember { mutableStateOf(false) }
+                                        val interactionSourceResizeBtn = remember { MutableInteractionSource() }
+                                        val isResizeBtnFocused by interactionSourceResizeBtn.collectIsFocusedAsState()
                                         val isResizeActive = currentResizeMode != ScreenResizeMode.FIT
                                         val resizeBgColor = when {
                                             isResizeBtnFocused -> TvFocusBlue
@@ -1449,13 +1445,12 @@ fun PlayerScreen(
                                         }
 
                                         Surface(
+                                            onClick = { cycleResizeMode() },
+                                            interactionSource = interactionSourceResizeBtn,
                                             shape = RoundedCornerShape(999.dp),
                                             color = resizeBgColor,
                                             border = resizeBorder,
                                             modifier = Modifier
-                                                .focusable()
-                                                .onFocusChanged { isResizeBtnFocused = it.isFocused }
-                                                .clickable { cycleResizeMode() }
                                                 .testTag("player_expand_fullscreen_btn")
                                         ) {
                                             Row(
@@ -1484,7 +1479,8 @@ fun PlayerScreen(
 
                                         // Botón Siguiente Episodio (si es serie)
                                         if (kind == "series" && (currentEpisodeIndex + 1 < seriesEpisodes.size || !nextUrl.isNullOrBlank())) {
-                                            var isNextBtnFocused by remember { mutableStateOf(false) }
+                                            val interactionSourceNextBtn = remember { MutableInteractionSource() }
+                                            val isNextBtnFocused by interactionSourceNextBtn.collectIsFocusedAsState()
                                             val nextBgColor = when {
                                                 isNextBtnFocused -> TvFocusBlue
                                                 else -> Color.White.copy(alpha = 0.15f)
@@ -1495,13 +1491,12 @@ fun PlayerScreen(
                                             }
 
                                             Surface(
+                                                onClick = { playNextEpisode() },
+                                                interactionSource = interactionSourceNextBtn,
                                                 shape = RoundedCornerShape(999.dp),
                                                 color = nextBgColor,
                                                 border = nextBorder,
                                                 modifier = Modifier
-                                                    .focusable()
-                                                    .onFocusChanged { isNextBtnFocused = it.isFocused }
-                                                    .clickable { playNextEpisode() }
                                                     .testTag("player_skip_next_episode_bottom_btn")
                                             ) {
                                                 Row(
@@ -1685,16 +1680,23 @@ fun AudioSubtitlesDialog(
                                 items(availableAudioTracks.size) { idx ->
                                     val track = availableAudioTracks[idx]
                                     val isSelected = track.isSelected
+                                    val interactionSourceAudio = remember { MutableInteractionSource() }
+                                    val isAudioFocused by interactionSourceAudio.collectIsFocusedAsState()
+
                                     Surface(
+                                        onClick = { onSelectAudio(track) },
+                                        interactionSource = interactionSourceAudio,
                                         shape = RoundedCornerShape(12.dp),
-                                        color = if (isSelected) NexusPrimary.copy(alpha = 0.18f) else Color(0xFF222222),
+                                        color = when {
+                                            isAudioFocused -> TvFocusBlue
+                                            isSelected -> NexusPrimary.copy(alpha = 0.18f)
+                                            else -> Color(0xFF222222)
+                                        },
                                         border = androidx.compose.foundation.BorderStroke(
                                             1.dp,
-                                            if (isSelected) NexusPrimary else Color.Transparent
+                                            if (isAudioFocused) Color.White else if (isSelected) NexusPrimary else Color.Transparent
                                         ),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { onSelectAudio(track) }
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -1723,16 +1725,23 @@ fun AudioSubtitlesDialog(
                         ) {
                             // "Desactivados" option
                             item {
+                                val interactionSourceDisableSub = remember { MutableInteractionSource() }
+                                val isDisableSubFocused by interactionSourceDisableSub.collectIsFocusedAsState()
+
                                 Surface(
+                                    onClick = { onSelectSubtitle(null) },
+                                    interactionSource = interactionSourceDisableSub,
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (isSubtitlesDisabled) NexusPrimary.copy(alpha = 0.18f) else Color(0xFF222222),
+                                    color = when {
+                                        isDisableSubFocused -> TvFocusBlue
+                                        isSubtitlesDisabled -> NexusPrimary.copy(alpha = 0.18f)
+                                        else -> Color(0xFF222222)
+                                    },
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
-                                        if (isSubtitlesDisabled) NexusPrimary else Color.Transparent
+                                        if (isDisableSubFocused) Color.White else if (isSubtitlesDisabled) NexusPrimary else Color.Transparent
                                     ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onSelectSubtitle(null) }
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -1772,16 +1781,23 @@ fun AudioSubtitlesDialog(
                                 items(availableSubtitleTracks.size) { idx ->
                                     val track = availableSubtitleTracks[idx]
                                     val isSelected = !isSubtitlesDisabled && track.isSelected
+                                    val interactionSourceSub = remember { MutableInteractionSource() }
+                                    val isSubFocused by interactionSourceSub.collectIsFocusedAsState()
+
                                     Surface(
+                                        onClick = { onSelectSubtitle(track) },
+                                        interactionSource = interactionSourceSub,
                                         shape = RoundedCornerShape(12.dp),
-                                        color = if (isSelected) NexusPrimary.copy(alpha = 0.18f) else Color(0xFF222222),
+                                        color = when {
+                                            isSubFocused -> TvFocusBlue
+                                            isSelected -> NexusPrimary.copy(alpha = 0.18f)
+                                            else -> Color(0xFF222222)
+                                        },
                                         border = androidx.compose.foundation.BorderStroke(
                                             1.dp,
-                                            if (isSelected) NexusPrimary else Color.Transparent
+                                            if (isSubFocused) Color.White else if (isSelected) NexusPrimary else Color.Transparent
                                         ),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { onSelectSubtitle(track) }
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
