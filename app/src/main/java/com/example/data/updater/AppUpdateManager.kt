@@ -138,9 +138,9 @@ object AppUpdateManager {
                     } else {
                         val infoToShow = if (!isNewer && force) {
                             versionInfo.copy(
-                                versionCode = 51,
-                                versionName = "1.1.40",
-                                changelog = "Versión 1.1.40: Estandarización de botones de enfoque (Azul) y selección (Rojo) en vistas de detalle y reproductor de TV."
+                                versionCode = 52,
+                                versionName = "1.1.41",
+                                changelog = "Versión 1.1.41: Compatibilidad total con D-Pad, indicadores visuales de enfoque (Azul) y selección (Rojo) en todos los dispositivos."
                             )
                         } else {
                             versionInfo
@@ -170,9 +170,9 @@ object AppUpdateManager {
                     } else {
                         val infoToShow = if (!isNewer && force) {
                             releaseInfo.copy(
-                                versionCode = 51,
-                                versionName = "1.1.40",
-                                changelog = "Versión 1.1.40: Estandarización de botones de enfoque (Azul) y selección (Rojo) en vistas de detalle y reproductor de TV."
+                                versionCode = 52,
+                                versionName = "1.1.41",
+                                changelog = "Versión 1.1.41: Compatibilidad total con D-Pad, indicadores visuales de enfoque (Azul) y selección (Rojo) en todos los dispositivos."
                             )
                         } else {
                             releaseInfo
@@ -188,10 +188,10 @@ object AppUpdateManager {
             // Fallback for manual check if network didn't yield newer or failed
             if (force) {
                 val fallbackInfo = UpdateInfo(
-                    versionCode = 51,
-                    versionName = "1.1.40",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.40/app-debug.apk",
-                    changelog = "Versión 1.1.40: Estandarización de botones de enfoque (Azul) y selección (Rojo) en vistas de detalle y reproductor de TV.",
+                    versionCode = 52,
+                    versionName = "1.1.41",
+                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.41/app-debug.apk",
+                    changelog = "Versión 1.1.41: Compatibilidad total con D-Pad, indicadores visuales de enfoque (Azul) y selección (Rojo) en todos los dispositivos.",
                     isMandatory = false
                 )
                 _latestUpdateInfo.value = fallbackInfo
@@ -206,10 +206,10 @@ object AppUpdateManager {
             Log.e(TAG, "Error during update check: ${e.message}")
             if (force) {
                 val fallbackInfo = UpdateInfo(
-                    versionCode = 51,
-                    versionName = "1.1.40",
-                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.40/app-debug.apk",
-                    changelog = "Versión 1.1.40: Estandarización de botones de enfoque (Azul) y selección (Rojo) en vistas de detalle y reproductor de TV.",
+                    versionCode = 52,
+                    versionName = "1.1.41",
+                    apkUrl = "https://github.com/pjaraf/nexo-player/releases/download/v1.1.41/app-debug.apk",
+                    changelog = "Versión 1.1.41: Compatibilidad total con D-Pad, indicadores visuales de enfoque (Azul) y selección (Rojo) en todos los dispositivos.",
                     isMandatory = false
                 )
                 _latestUpdateInfo.value = fallbackInfo
