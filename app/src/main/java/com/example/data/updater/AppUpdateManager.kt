@@ -131,24 +131,15 @@ object AppUpdateManager {
                     currentVersionCode = currentVersionCode
                 )
 
-                if (isNewer || force) {
+                if (isNewer) {
                     val dismissed = AppStorage.getDismissedUpdateVersion()
                     if (!force && dismissed == versionInfo.versionName) {
                         Log.d(TAG, "Update v${versionInfo.versionName} was previously dismissed")
                     } else {
-                        val infoToShow = if (!isNewer && force) {
-                            versionInfo.copy(
-                                versionCode = 54,
-                                versionName = "1.1.44",
-                                changelog = "Versión 1.1.44: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción."
-                            )
-                        } else {
-                            versionInfo
-                        }
-                        Log.i(TAG, "New update found: v${infoToShow.versionName} (code=${infoToShow.versionCode})")
-                        _latestUpdateInfo.value = infoToShow
+                        Log.i(TAG, "New update found: v${versionInfo.versionName} (code=${versionInfo.versionCode})")
+                        _latestUpdateInfo.value = versionInfo
                         AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                        return@withContext infoToShow
+                        return@withContext versionInfo
                     }
                 }
             }
@@ -163,24 +154,15 @@ object AppUpdateManager {
                     currentVersionCode = currentVersionCode
                 )
 
-                if (isNewer || force) {
+                if (isNewer) {
                     val dismissed = AppStorage.getDismissedUpdateVersion()
                     if (!force && dismissed == releaseInfo.versionName) {
                         Log.d(TAG, "Update v${releaseInfo.versionName} was previously dismissed")
                     } else {
-                        val infoToShow = if (!isNewer && force) {
-                            releaseInfo.copy(
-                                versionCode = 54,
-                                versionName = "1.1.44",
-                                changelog = "Versión 1.1.44: Indicadores visuales de navegación TV mejorados (Azul intenso y borde resaltado) y mayor estabilidad para evitar cierres en reproducción."
-                            )
-                        } else {
-                            releaseInfo
-                        }
-                        Log.i(TAG, "New update found via GitHub: v${infoToShow.versionName}")
-                        _latestUpdateInfo.value = infoToShow
+                        Log.i(TAG, "New update found via GitHub: v${releaseInfo.versionName}")
+                        _latestUpdateInfo.value = releaseInfo
                         AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                        return@withContext infoToShow
+                        return@withContext releaseInfo
                     }
                 }
             }

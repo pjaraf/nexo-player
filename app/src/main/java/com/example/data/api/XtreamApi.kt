@@ -245,8 +245,8 @@ object XtreamApi {
         return@withContext channels
     }
 
-    suspend fun getLiveCategories(): List<LiveCategory> {
-        parsedLiveCategories?.let { return it }
+    suspend fun getLiveCategories(): List<LiveCategory> = withContext(Dispatchers.IO) {
+        parsedLiveCategories?.let { return@withContext it }
 
         // Attempt live categories from xtream server first if present
         val json = fetch(action = "get_live_categories")
@@ -257,13 +257,13 @@ object XtreamApi {
                 if (list.isNotEmpty()) {
                     val sorted = sortCategories(list)
                     parsedLiveCategories = sorted
-                    return sorted
+                    return@withContext sorted
                 }
             } catch (_: Exception) {}
         }
 
         parseAndCacheLiveList()
-        return parsedLiveCategories ?: emptyList()
+        return@withContext parsedLiveCategories ?: emptyList()
     }
 
     private fun sortCategories(list: List<LiveCategory>): List<LiveCategory> {
@@ -281,20 +281,20 @@ object XtreamApi {
         }.thenBy { it.categoryName.lowercase() })
     }
 
-    suspend fun getLiveChannels(categoryId: String? = null): List<LiveChannel> {
+    suspend fun getLiveChannels(categoryId: String? = null): List<LiveChannel> = withContext(Dispatchers.IO) {
         val allChannels = parseAndCacheLiveList()
-        return if (categoryId.isNullOrBlank() || categoryId == "ALL") {
+        return@withContext if (categoryId.isNullOrBlank() || categoryId == "ALL") {
             allChannels
         } else {
             allChannels.filter { it.categoryId == categoryId }
         }
     }
 
-    suspend fun getVodCategories(): List<VodCategory> {
+    suspend fun getVodCategories(): List<VodCategory> = withContext(Dispatchers.IO) {
         val cacheKey = "vod_cats"
-        (memoryCache[cacheKey] as? List<VodCategory>)?.let { return it }
+        (memoryCache[cacheKey] as? List<VodCategory>)?.let { return@withContext it }
 
-        val json = fetch(action = "get_vod_categories") ?: return emptyList()
+        val json = fetch(action = "get_vod_categories") ?: return@withContext emptyList()
         val result = try {
             val type = object : TypeToken<List<VodCategory>>() {}.type
             val list: List<VodCategory> = gson.fromJson(json, type) ?: emptyList()
@@ -307,19 +307,19 @@ object XtreamApi {
         if (result.isNotEmpty()) {
             memoryCache[cacheKey] = result
         }
-        return result
+        return@withContext result
     }
 
-    suspend fun getVodStreams(categoryId: String? = null): List<VodStream> {
+    suspend fun getVodStreams(categoryId: String? = null): List<VodStream> = withContext(Dispatchers.IO) {
         val cacheKey = "vod_streams_${categoryId ?: "ALL"}"
-        (memoryCache[cacheKey] as? List<VodStream>)?.let { return it }
+        (memoryCache[cacheKey] as? List<VodStream>)?.let { return@withContext it }
 
         val params = mutableMapOf<String, String>()
         if (!categoryId.isNullOrBlank() && categoryId != "ALL") {
             params["category_id"] = categoryId
         }
 
-        val json = fetch(action = "get_vod_streams", extraParams = params) ?: return emptyList()
+        val json = fetch(action = "get_vod_streams", extraParams = params) ?: return@withContext emptyList()
         val result = try {
             val type = object : TypeToken<List<VodStream>>() {}.type
             val list: List<VodStream> = gson.fromJson(json, type) ?: emptyList()
@@ -332,12 +332,12 @@ object XtreamApi {
         if (result.isNotEmpty()) {
             memoryCache[cacheKey] = result
         }
-        return result
+        return@withContext result
     }
 
-    suspend fun getVodDetail(streamId: String): VodDetailResponse? {
-        val json = fetch(action = "get_vod_info", extraParams = mapOf("vod_id" to streamId)) ?: return null
-        return try {
+    suspend fun getVodDetail(streamId: String): VodDetailResponse? = withContext(Dispatchers.IO) {
+        val json = fetch(action = "get_vod_info", extraParams = mapOf("vod_id" to streamId)) ?: return@withContext null
+        return@withContext try {
             gson.fromJson(json, VodDetailResponse::class.java)
         } catch (e: Throwable) {
             Log.w(TAG, "VodDetail parse error: ${e.message}")
@@ -345,11 +345,11 @@ object XtreamApi {
         }
     }
 
-    suspend fun getSeriesCategories(): List<SeriesCategory> {
+    suspend fun getSeriesCategories(): List<SeriesCategory> = withContext(Dispatchers.IO) {
         val cacheKey = "series_cats"
-        (memoryCache[cacheKey] as? List<SeriesCategory>)?.let { return it }
+        (memoryCache[cacheKey] as? List<SeriesCategory>)?.let { return@withContext it }
 
-        val json = fetch(action = "get_series_categories") ?: return emptyList()
+        val json = fetch(action = "get_series_categories") ?: return@withContext emptyList()
         val result = try {
             val type = object : TypeToken<List<SeriesCategory>>() {}.type
             val list: List<SeriesCategory> = gson.fromJson(json, type) ?: emptyList()
@@ -362,19 +362,19 @@ object XtreamApi {
         if (result.isNotEmpty()) {
             memoryCache[cacheKey] = result
         }
-        return result
+        return@withContext result
     }
 
-    suspend fun getSeriesList(categoryId: String? = null): List<SeriesItem> {
+    suspend fun getSeriesList(categoryId: String? = null): List<SeriesItem> = withContext(Dispatchers.IO) {
         val cacheKey = "series_list_${categoryId ?: "ALL"}"
-        (memoryCache[cacheKey] as? List<SeriesItem>)?.let { return it }
+        (memoryCache[cacheKey] as? List<SeriesItem>)?.let { return@withContext it }
 
         val params = mutableMapOf<String, String>()
         if (!categoryId.isNullOrBlank() && categoryId != "ALL") {
             params["category_id"] = categoryId
         }
 
-        val json = fetch(action = "get_series", extraParams = params) ?: return emptyList()
+        val json = fetch(action = "get_series", extraParams = params) ?: return@withContext emptyList()
         val result = try {
             val type = object : TypeToken<List<SeriesItem>>() {}.type
             val list: List<SeriesItem> = gson.fromJson(json, type) ?: emptyList()
@@ -387,12 +387,12 @@ object XtreamApi {
         if (result.isNotEmpty()) {
             memoryCache[cacheKey] = result
         }
-        return result
+        return@withContext result
     }
 
-    suspend fun getSeriesDetail(seriesId: String): Pair<SeriesDetailInfo?, Map<String, List<Episode>>> {
-        val json = fetch(action = "get_series_info", extraParams = mapOf("series_id" to seriesId)) ?: return Pair(null, emptyMap())
-        return try {
+    suspend fun getSeriesDetail(seriesId: String): Pair<SeriesDetailInfo?, Map<String, List<Episode>>> = withContext(Dispatchers.IO) {
+        val json = fetch(action = "get_series_info", extraParams = mapOf("series_id" to seriesId)) ?: return@withContext Pair(null, emptyMap())
+        return@withContext try {
             val jsonObj = gson.fromJson(json, JsonObject::class.java)
             val infoObj = jsonObj.getAsJsonObject("info")
             val info = infoObj?.let { gson.fromJson(it, SeriesDetailInfo::class.java) }

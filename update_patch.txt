@@ -1,0 +1,11 @@
+                if (isNewer) {
+                    val dismissed = AppStorage.getDismissedUpdateVersion()
+                    if (!force && dismissed == versionInfo.versionName) {
+                        Log.d(TAG, "Update v${versionInfo.versionName} was previously dismissed")
+                    } else {
+                        Log.i(TAG, "New update found: v${versionInfo.versionName} (code=${versionInfo.versionCode})")
+                        _latestUpdateInfo.value = versionInfo
+                        AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
+                        return@withContext versionInfo
+                    }
+                }
