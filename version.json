@@ -1,7 +1,7 @@
 {
-    "versionCode": 76,
-    "versionName": "1.1.65",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.65/app-debug.apk",
-    "changelog": "Versión 1.1.65: Integración del servidor Nexo Fusion (https://nexo.fusionx.cl) como predeterminado con aislamiento total de listas de canales y selector rápido de servidor.",
+    "versionCode": 77,
+    "versionName": "1.1.66",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.66/app-debug.apk",
+    "changelog": "Versión 1.1.66: Detección automática del servidor por credenciales y botón para cargar listas M3U con soporte total para control remoto D-Pad.",
     "isMandatory": false
 }

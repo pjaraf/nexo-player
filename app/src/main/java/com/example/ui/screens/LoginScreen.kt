@@ -67,18 +67,12 @@ fun LoginScreen(
     val isLargeTv = isTv || configuration.screenWidthDp >= 900
     var username by remember { mutableStateOf(AppStorage.getUsername()) }
     var password by remember { mutableStateOf(AppStorage.getPassword()) }
-    var selectedServerUrl by remember { mutableStateOf(AppStorage.getServerUrl()) }
-    var isCustomServer by remember {
-        mutableStateOf(
-            selectedServerUrl != AppStorage.SERVER_NEXO_FUSION &&
-            selectedServerUrl != AppStorage.SERVER_ELITE_PLUS
-        )
-    }
     var showPassword by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(true) }
     var showSubscribeDialog by remember { mutableStateOf(false) }
     var showTvQrDialog by remember { mutableStateOf(false) }
     var showPhoneLinkDialog by remember { mutableStateOf(false) }
+    var showM3uDialog by remember { mutableStateOf(false) }
 
     val isOnline by viewModel.isOnline.collectAsState()
     val loading by viewModel.loginLoading.collectAsState()
@@ -210,170 +204,6 @@ fun LoginScreen(
                         }
                     }
 
-                    // --- Server Selector Section ---
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Dns,
-                                contentDescription = null,
-                                tint = TvFocusBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "SERVIDOR XTREAM",
-                                color = Color(0xFFCCCCCC),
-                                fontSize = if (isLargeTv) 11.sp else 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val isFusion = selectedServerUrl == AppStorage.SERVER_NEXO_FUSION && !isCustomServer
-                            var isFusionFocused by remember { mutableStateOf(false) }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isFusionFocused) TvFocusBlue else if (isFusion) Color(0xFFE50914).copy(alpha = 0.85f) else Color(0xFF222230),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    if (isFusionFocused) 2.dp else if (isFusion) 1.5.dp else 1.dp,
-                                    if (isFusionFocused) Color(0xFFFFC107) else if (isFusion) Color(0xFFE50914) else Color.White.copy(alpha = 0.12f)
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(if (isLargeTv) 40.dp else 44.dp)
-                                    .onFocusChanged { isFusionFocused = it.isFocused }
-                                    .focusable()
-                                    .clickable {
-                                        isCustomServer = false
-                                        selectedServerUrl = AppStorage.SERVER_NEXO_FUSION
-                                        AppStorage.setServerUrl(AppStorage.SERVER_NEXO_FUSION)
-                                    }
-                                    .testTag("login_server_nexo_fusion")
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Nexo Fusion",
-                                        color = Color.White,
-                                        fontSize = if (isLargeTv) 12.sp else 13.sp,
-                                        fontWeight = if (isFusion || isFusionFocused) FontWeight.Bold else FontWeight.Normal,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-
-                            val isElite = selectedServerUrl == AppStorage.SERVER_ELITE_PLUS && !isCustomServer
-                            var isEliteFocused by remember { mutableStateOf(false) }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isEliteFocused) TvFocusBlue else if (isElite) Color(0xFFE50914).copy(alpha = 0.85f) else Color(0xFF222230),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    if (isEliteFocused) 2.dp else if (isElite) 1.5.dp else 1.dp,
-                                    if (isEliteFocused) Color(0xFFFFC107) else if (isElite) Color(0xFFE50914) else Color.White.copy(alpha = 0.12f)
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(if (isLargeTv) 40.dp else 44.dp)
-                                    .onFocusChanged { isEliteFocused = it.isFocused }
-                                    .focusable()
-                                    .clickable {
-                                        isCustomServer = false
-                                        selectedServerUrl = AppStorage.SERVER_ELITE_PLUS
-                                        AppStorage.setServerUrl(AppStorage.SERVER_ELITE_PLUS)
-                                    }
-                                    .testTag("login_server_elite_plus")
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Elite Plus",
-                                        color = Color.White,
-                                        fontSize = if (isLargeTv) 12.sp else 13.sp,
-                                        fontWeight = if (isElite || isEliteFocused) FontWeight.Bold else FontWeight.Normal,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-
-                            var isCustomFocused by remember { mutableStateOf(false) }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isCustomFocused) TvFocusBlue else if (isCustomServer) Color(0xFFE50914).copy(alpha = 0.85f) else Color(0xFF222230),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    if (isCustomFocused) 2.dp else if (isCustomServer) 1.5.dp else 1.dp,
-                                    if (isCustomFocused) Color(0xFFFFC107) else if (isCustomServer) Color(0xFFE50914) else Color.White.copy(alpha = 0.12f)
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(if (isLargeTv) 40.dp else 44.dp)
-                                    .onFocusChanged { isCustomFocused = it.isFocused }
-                                    .focusable()
-                                    .clickable {
-                                        isCustomServer = true
-                                    }
-                                    .testTag("login_server_custom")
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Otro Servidor",
-                                        color = Color.White,
-                                        fontSize = if (isLargeTv) 11.sp else 12.sp,
-                                        fontWeight = if (isCustomServer || isCustomFocused) FontWeight.Bold else FontWeight.Normal,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                        }
-
-                        if (isCustomServer) {
-                            var isCustomInputFocused by remember { mutableStateOf(false) }
-                            TextField(
-                                value = selectedServerUrl,
-                                onValueChange = { selectedServerUrl = it },
-                                placeholder = {
-                                    Text("https://servidor.com:8080", color = Color(0xFF888888), fontSize = 12.sp)
-                                },
-                                singleLine = true,
-                                shape = RoundedCornerShape(6.dp),
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Black.copy(alpha = 0.45f),
-                                    unfocusedContainerColor = Color.Black.copy(alpha = 0.45f),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = Color.White,
-                                    focusedIndicatorColor = TvFocusBlue,
-                                    unfocusedIndicatorColor = Color.Transparent
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(if (isLargeTv) 48.dp else 52.dp)
-                                    .onFocusChanged { isCustomInputFocused = it.isFocused }
-                                    .border(
-                                        width = if (isCustomInputFocused) 2.dp else 1.dp,
-                                        color = if (isCustomInputFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(6.dp)
-                                    )
-                                    .testTag("login_input_custom_server")
-                            )
-                        }
-                    }
-
                     // Username input field
                     var isUsernameFocused by remember { mutableStateOf(false) }
                     TextField(
@@ -457,7 +287,7 @@ fun LoginScreen(
                         ),
                         keyboardActions = KeyboardActions(
                             onDone = {
-                                viewModel.login(username, password, selectedServerUrl, onLoginSuccess)
+                                viewModel.login(username, password, onSuccess = onLoginSuccess)
                             }
                         ),
                         modifier = Modifier
@@ -478,7 +308,7 @@ fun LoginScreen(
                     var isLoginBtnFocused by remember { mutableStateOf(false) }
                     Button(
                         onClick = {
-                            viewModel.login(username, password, selectedServerUrl, onLoginSuccess)
+                            viewModel.login(username, password, onSuccess = onLoginSuccess)
                         },
                         enabled = !loading,
                         shape = RoundedCornerShape(6.dp),
@@ -498,7 +328,7 @@ fun LoginScreen(
                                         AndroidKeyEvent.KEYCODE_ENTER,
                                         AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
                                         AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                            viewModel.login(username, password, selectedServerUrl, onLoginSuccess)
+                                            viewModel.login(username, password, onSuccess = onLoginSuccess)
                                             true
                                         }
                                         else -> false
@@ -555,6 +385,60 @@ fun LoginScreen(
                                 text = "Recuérdame",
                                 color = Color(0xFFB3B3B3),
                                 fontSize = if (isLargeTv) 12.sp else 13.sp
+                            )
+                        }
+                    }
+
+                    // Load M3U Button (With TV focus & D-Pad support)
+                    var isM3uBtnFocused by remember { mutableStateOf(false) }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isM3uBtnFocused) TvFocusBlue else Color(0xFF1E1E2C),
+                        border = androidx.compose.foundation.BorderStroke(
+                            if (isM3uBtnFocused) 2.5.dp else 1.dp,
+                            if (isM3uBtnFocused) Color(0xFFFFC107) else Color.White.copy(alpha = 0.2f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (isLargeTv) 44.dp else 48.dp)
+                            .onFocusChanged { isM3uBtnFocused = it.isFocused }
+                            .focusable()
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.nativeKeyEvent.keyCode) {
+                                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                        AndroidKeyEvent.KEYCODE_ENTER,
+                                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                            showM3uDialog = true
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                } else false
+                            }
+                            .clickable { showM3uDialog = true }
+                            .testTag("login_load_m3u_btn")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PlaylistPlay,
+                                contentDescription = "Cargar lista M3U",
+                                tint = if (isM3uBtnFocused) Color.White else Color(0xFFFFC107),
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Cargar lista M3U",
+                                color = Color.White,
+                                fontSize = if (isLargeTv) 13.sp else 14.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -678,8 +562,21 @@ fun LoginScreen(
                     showTvQrDialog = false
                     username = user
                     password = pass
-                    selectedServerUrl = serverUrl
                     viewModel.login(user, pass, serverUrl, onLoginSuccess)
+                }
+            )
+        }
+
+        // M3U Playlist Dialog
+        if (showM3uDialog) {
+            M3uPlaylistDialog(
+                loading = loading,
+                onDismiss = { showM3uDialog = false },
+                onLoad = { url, name ->
+                    viewModel.loadM3uPlaylist(url, name) {
+                        showM3uDialog = false
+                        onLoginSuccess()
+                    }
                 }
             )
         }
@@ -782,5 +679,181 @@ fun LoginScreen(
             )
         }
     }
+}
+
+@Composable
+fun M3uPlaylistDialog(
+    loading: Boolean,
+    onDismiss: () -> Unit,
+    onLoad: (url: String, name: String) -> Unit
+) {
+    var m3uUrl by remember { mutableStateOf(AppStorage.getM3uUrl()) }
+    var playlistName by remember { mutableStateOf("Mi Lista M3U") }
+    var urlFocused by remember { mutableStateOf(false) }
+    var nameFocused by remember { mutableStateOf(false) }
+    var confirmFocused by remember { mutableStateOf(false) }
+    var cancelFocused by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(16.dp),
+        containerColor = Color(0xFF1A1A24),
+        titleContentColor = Color.White,
+        textContentColor = Color(0xFFCCCCCC),
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(TvFocusBlue.copy(alpha = 0.2f))
+                    .border(1.5.dp, TvFocusBlue, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.PlaylistPlay,
+                    contentDescription = "Lista M3U",
+                    tint = TvFocusBlue,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "Cargar Lista M3U",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Ingresa el enlace URL de tu lista de canales M3U:",
+                    fontSize = 13.sp,
+                    color = Color(0xFFB0B0B0)
+                )
+
+                // M3U URL Input
+                TextField(
+                    value = m3uUrl,
+                    onValueChange = { m3uUrl = it },
+                    placeholder = {
+                        Text("https://ejemplo.com/lista.m3u", color = Color(0xFF707080), fontSize = 13.sp)
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                        unfocusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedIndicatorColor = TvFocusBlue,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { urlFocused = it.isFocused }
+                        .border(
+                            width = if (urlFocused) 2.dp else 1.dp,
+                            color = if (urlFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .testTag("m3u_input_url")
+                )
+
+                // Playlist Name (Optional)
+                Text(
+                    text = "Nombre para la lista (opcional):",
+                    fontSize = 12.sp,
+                    color = Color(0xFF9090A0)
+                )
+
+                TextField(
+                    value = playlistName,
+                    onValueChange = { playlistName = it },
+                    placeholder = {
+                        Text("Mi Lista M3U", color = Color(0xFF707080), fontSize = 13.sp)
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                        unfocusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedIndicatorColor = TvFocusBlue,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { nameFocused = it.isFocused }
+                        .border(
+                            width = if (nameFocused) 2.dp else 1.dp,
+                            color = if (nameFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .testTag("m3u_input_name")
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (m3uUrl.isNotBlank()) {
+                        onLoad(m3uUrl, playlistName)
+                    }
+                },
+                enabled = !loading && m3uUrl.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (confirmFocused) TvFocusBlue else TvSelectedRed,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .onFocusChanged { confirmFocused = it.isFocused }
+                    .border(
+                        width = if (confirmFocused) 2.dp else 0.dp,
+                        color = if (confirmFocused) Color(0xFFFFC107) else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .testTag("m3u_confirm_btn")
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Cargar Lista", fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color.White
+                ),
+                modifier = Modifier
+                    .onFocusChanged { cancelFocused = it.isFocused }
+                    .border(
+                        width = if (cancelFocused) 2.dp else 1.dp,
+                        color = if (cancelFocused) TvFocusBlue else Color.White.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .testTag("m3u_cancel_btn")
+            ) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 

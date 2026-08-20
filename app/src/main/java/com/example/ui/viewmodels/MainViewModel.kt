@@ -207,10 +207,9 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
     }
 
     // --- Login / Logout ---
-    fun login(user: String, pass: String, serverUrl: String = AppStorage.getServerUrl(), onSuccess: () -> Unit) {
+    fun login(user: String, pass: String, customServerUrl: String? = null, onSuccess: () -> Unit) {
         val trimmedUser = user.trim()
         val trimmedPass = pass.trim()
-        val trimmedServer = serverUrl.trim().trimEnd('/')
 
         if (trimmedUser.isBlank() || trimmedPass.isBlank()) {
             _loginError.value = "Por favor ingresa usuario y contraseña"
@@ -218,7 +217,7 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
         }
 
         if (!isOnline.value) {
-            _loginError.value = "Sin conexión a internet. Conéctate a una red para iniciar sesión en el servidor."
+            _loginError.value = "Sin conexión a internet. Conéctate a una red para iniciar sesión."
             return
         }
 
@@ -226,9 +225,8 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
             _loginLoading.value = true
             _loginError.value = null
             try {
-                AppStorage.setServerUrl(trimmedServer)
+                // Clear any leftover previous session data
                 XtreamApi.clearCache()
-                // Clear any leftover server data
                 _liveChannels.value = emptyList()
                 _liveCategories.value = emptyList()
                 _vodStreams.value = emptyList()
@@ -240,21 +238,104 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
                 _homeSeriesRow.value = emptyList()
                 _homeHeroItem.value = null
 
-                val res = XtreamApi.login(trimmedUser, trimmedPass)
-                if (res != null && res.userInfo != null) {
-                    AppStorage.saveSession(trimmedUser, trimmedPass, res.userInfo, trimmedServer)
+                // Determine candidate servers to automatically detect
+                val candidateServers: List<String> = if (!customServerUrl.isNullOrBlank()) {
+                    listOf(customServerUrl.trim().trimEnd('/'))
+                } else {
+                    AppStorage.AUTO_DETECT_SERVERS
+                }
+
+                var authenticatedResult: Pair<String, UserInfo>? = null
+
+                for (server in candidateServers) {
+                    try {
+                        AppStorage.setServerUrl(server)
+                        XtreamApi.clearCache()
+                        val res = XtreamApi.login(trimmedUser, trimmedPass)
+                        if (res != null && res.userInfo != null) {
+                            authenticatedResult = Pair(server, res.userInfo)
+                            break
+                        }
+                    } catch (_: Throwable) {
+                        // Continue checking other servers
+                    }
+                }
+
+                if (authenticatedResult != null) {
+                    val (detectedServer, userInfo) = authenticatedResult
+                    AppStorage.setServerUrl(detectedServer)
+                    AppStorage.saveSession(trimmedUser, trimmedPass, userInfo, detectedServer)
                     _isLoggedIn.value = true
-                    _userInfo.value = res.userInfo
+                    _userInfo.value = userInfo
                     _loginLoading.value = false
                     loadHomeContent()
                     onSuccess()
                 } else {
                     _loginLoading.value = false
-                    _loginError.value = "Usuario o contraseña incorrectos en el servidor ($trimmedServer). Verifica tus credenciales."
+                    _loginError.value = "Usuario o contraseña incorrectos. Verifica tus credenciales."
                 }
             } catch (e: Exception) {
                 _loginLoading.value = false
-                _loginError.value = "Error al conectar con el servidor ($trimmedServer). Verifica tu conexión a internet e inténtalo de nuevo."
+                _loginError.value = "Error al conectar con el servidor. Verifica tu conexión a internet e inténtalo de nuevo."
+            }
+        }
+    }
+
+    fun loadM3uPlaylist(url: String, playlistName: String = "Mi Lista M3U", onSuccess: () -> Unit) {
+        val trimmedUrl = url.trim()
+        if (trimmedUrl.isBlank() || (!trimmedUrl.startsWith("http://", ignoreCase = true) && !trimmedUrl.startsWith("https://", ignoreCase = true))) {
+            _loginError.value = "Por favor ingresa un enlace URL válido que empiece con http:// o https://"
+            return
+        }
+
+        if (!isOnline.value) {
+            _loginError.value = "Sin conexión a internet para descargar la lista M3U."
+            return
+        }
+
+        viewModelScope.launch {
+            _loginLoading.value = true
+            _loginError.value = null
+            try {
+                XtreamApi.clearCache()
+                _liveChannels.value = emptyList()
+                _liveCategories.value = emptyList()
+                _vodStreams.value = emptyList()
+                _vodCategories.value = emptyList()
+                _seriesList.value = emptyList()
+                _seriesCategories.value = emptyList()
+                _homeLiveRow.value = emptyList()
+                _homeMoviesRow.value = emptyList()
+                _homeSeriesRow.value = emptyList()
+                _homeHeroItem.value = null
+
+                val content = XtreamApi.loadM3uContent(trimmedUrl)
+                if (content.isNullOrBlank()) {
+                    _loginLoading.value = false
+                    _loginError.value = "No se pudo descargar la lista M3U desde el enlace ingresado."
+                    return@launch
+                }
+
+                val (channels, categories) = XtreamApi.parseM3uText(content)
+                if (channels.isEmpty()) {
+                    _loginLoading.value = false
+                    _loginError.value = "No se encontraron canales válidos en el archivo M3U."
+                    return@launch
+                }
+
+                val name = playlistName.trim().ifBlank { "Mi Lista M3U" }
+                AppStorage.saveM3uSession(trimmedUrl, name)
+                _isLoggedIn.value = true
+                _userInfo.value = AppStorage.getUserInfo()
+                _liveChannels.value = channels
+                _liveCategories.value = categories
+                _homeLiveRow.value = channels.take(15)
+                _loginLoading.value = false
+                loadHomeContent()
+                onSuccess()
+            } catch (e: Exception) {
+                _loginLoading.value = false
+                _loginError.value = "Error al procesar la lista M3U: ${e.localizedMessage ?: "Error desconocido"}"
             }
         }
     }

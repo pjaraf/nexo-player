@@ -30,6 +30,11 @@ object AppStorage {
     const val SERVER_NEXO_FUSION = "https://nexo.fusionx.cl"
     const val SERVER_ELITE_PLUS = "http://eliteplusec.com:8080"
 
+    val AUTO_DETECT_SERVERS = listOf(
+        SERVER_NEXO_FUSION,
+        SERVER_ELITE_PLUS
+    )
+
     val SERVER_PRESETS = listOf(
         "Nexo Fusion" to SERVER_NEXO_FUSION,
         "Elite Plus" to SERVER_ELITE_PLUS
@@ -51,8 +56,33 @@ object AppStorage {
             .putString("server_url", targetServer)
             .putString("user_json", user?.let { gson.toJson(it) } ?: "")
             .putBoolean("is_logged_in", true)
+            .putBoolean("is_m3u_mode", false)
+            .remove("m3u_url")
             .apply()
     }
+
+    fun saveM3uSession(playlistUrl: String, playlistName: String = "Lista M3U") {
+        val cleanUrl = playlistUrl.trim()
+        val name = playlistName.trim().ifBlank { "Lista M3U" }
+        val dummyUser = UserInfo(
+            username = name,
+            status = "Active",
+            expDate = "Ilimitado",
+            auth = 1
+        )
+        prefs.edit()
+            .putString("username", name)
+            .putString("password", "m3u_direct")
+            .putString("server_url", cleanUrl)
+            .putString("m3u_url", cleanUrl)
+            .putString("user_json", gson.toJson(dummyUser))
+            .putBoolean("is_logged_in", true)
+            .putBoolean("is_m3u_mode", true)
+            .apply()
+    }
+
+    fun isM3uMode(): Boolean = prefs.getBoolean("is_m3u_mode", false)
+    fun getM3uUrl(): String = prefs.getString("m3u_url", "") ?: ""
 
     fun getUsername(): String = prefs.getString("username", "") ?: ""
     fun getPassword(): String = prefs.getString("password", "") ?: ""
@@ -78,6 +108,8 @@ object AppStorage {
             .remove("username")
             .remove("password")
             .remove("user_json")
+            .remove("is_m3u_mode")
+            .remove("m3u_url")
             .putBoolean("is_logged_in", false)
             .remove("active_profile_id")
             .apply()
