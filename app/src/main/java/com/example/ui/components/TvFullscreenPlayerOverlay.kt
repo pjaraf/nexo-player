@@ -194,29 +194,30 @@ fun TvFullscreenPlayerOverlay(
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(width = 60.dp, height = 40.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                .size(width = 100.dp, height = 145.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                         )
                     } else {
                         // Fallback icon if no thumbnail
                         Box(
                             modifier = Modifier
-                                .size(width = 60.dp, height = 40.dp)
-                                .clip(RoundedCornerShape(4.dp))
+                                .size(width = 100.dp, height = 145.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(Color(0xFF333333)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Tv, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Tv, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
                         }
                     }
                     Text(
                         text = title,
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 350.dp)
                     )
                 }
 
@@ -293,7 +294,7 @@ private fun TvOverlayIconButton(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.18f else 1.0f,
+        targetValue = if (isFocused) 1.20f else 1.0f,
         animationSpec = tween(150),
         label = "icon_btn_scale"
     )
@@ -301,22 +302,23 @@ private fun TvOverlayIconButton(
     val focusColor = Color(0xFFE50914)
     val focusGold = Color(0xFFFFC107)
 
-    Surface(
-        onClick = onClick,
-        shape = if (isCircularBadge) CircleShape else RoundedCornerShape(8.dp),
-        color = when {
-            isFocused -> focusColor
-            isCircularBadge -> Color.White.copy(alpha = 0.15f)
-            else -> Color.Transparent
-        },
-        border = when {
-            isFocused -> androidx.compose.foundation.BorderStroke(2.5.dp, focusGold)
-            isCircularBadge -> androidx.compose.foundation.BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f))
-            else -> null
-        },
+    Box(
         modifier = Modifier
-            .size(48.dp)
+            .size(52.dp)
             .scale(scale)
+            .clip(if (isCircularBadge) CircleShape else RoundedCornerShape(10.dp))
+            .background(
+                when {
+                    isFocused -> focusColor
+                    isCircularBadge -> Color.White.copy(alpha = 0.15f)
+                    else -> Color.Transparent
+                }
+            )
+            .border(
+                width = if (isFocused) 2.5.dp else if (isCircularBadge) 1.5.dp else 0.dp,
+                color = if (isFocused) focusGold else if (isCircularBadge) Color.White.copy(alpha = 0.4f) else Color.Transparent,
+                shape = if (isCircularBadge) CircleShape else RoundedCornerShape(10.dp)
+            )
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
             .onKeyEvent { keyEvent ->
@@ -333,18 +335,15 @@ private fun TvOverlayIconButton(
                     }
                 } else false
             }
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = description,
-                tint = if (isFocused) Color.White else Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(if (isCircularBadge) 26.dp else 24.dp)
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = if (isFocused) Color.White else Color.White.copy(alpha = 0.9f),
+            modifier = Modifier.size(if (isCircularBadge) 28.dp else 26.dp)
+        )
     }
 }
 

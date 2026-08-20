@@ -1,7 +1,7 @@
 {
-    "versionCode": 73,
-    "versionName": "1.1.62",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.62/app-debug.apk",
-    "changelog": "Versión 1.1.62: Navegación y compatibilidad al 100% con control remoto físico (D-Pad/Smart TV) en todas las pantallas y reproductor.",
+    "versionCode": 74,
+    "versionName": "1.1.63",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.63/app-debug.apk",
+    "changelog": "Versión 1.1.63: Mayor tamaño de carátula en el reproductor (TV) y botones inferiores completamente operativos con control remoto físico.",
     "isMandatory": false
 }
