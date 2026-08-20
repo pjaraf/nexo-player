@@ -1,5 +1,9 @@
 package com.example.ui.components
 
+import android.view.KeyEvent as AndroidKeyEvent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,11 +19,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,11 +52,12 @@ fun TvFullscreenPlayerOverlay(
     onAspectRatio: (() -> Unit)? = null
 ) {
     val focusColor = Color(0xFFE50914) // Netflix Red
+    val focusGold = Color(0xFFFFC107)
     val playPauseFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         try {
-            delay(100)
+            delay(150)
             playPauseFocusRequester.requestFocus()
         } catch (e: Exception) {}
     }
@@ -72,24 +81,45 @@ fun TvFullscreenPlayerOverlay(
     ) {
         // Big Center Play/Pause Button
         var isCenterPlayFocused by remember { mutableStateOf(false) }
+        val centerScale by animateFloatAsState(
+            targetValue = if (isCenterPlayFocused) 1.15f else 1.0f,
+            animationSpec = tween(150),
+            label = "center_play_scale"
+        )
+
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(80.dp)
+                .scale(centerScale)
+                .size(84.dp)
                 .clip(CircleShape)
-                .background(if (isCenterPlayFocused || !isPlaying) focusColor else Color.Transparent)
-                .border(2.dp, if (isCenterPlayFocused) Color.White else focusColor, CircleShape)
+                .background(if (isCenterPlayFocused || !isPlaying) focusColor else Color.Black.copy(alpha = 0.6f))
+                .border(3.dp, if (isCenterPlayFocused) focusGold else focusColor, CircleShape)
                 .focusable()
                 .onFocusChanged { isCenterPlayFocused = it.isFocused }
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown) {
+                        when (keyEvent.nativeKeyEvent.keyCode) {
+                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                            AndroidKeyEvent.KEYCODE_ENTER,
+                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                onPlayPause()
+                                true
+                            }
+                            else -> false
+                        }
+                    } else false
+                }
                 .clickable { onPlayPause() }
                 .focusRequester(playPauseFocusRequester),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = null,
+                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
                 tint = Color.White,
-                modifier = Modifier.size(50.dp)
+                modifier = Modifier.size(52.dp)
             )
         }
 
@@ -100,10 +130,10 @@ fun TvFullscreenPlayerOverlay(
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.95f))
                     )
                 )
-                .padding(horizontal = 40.dp, vertical = 30.dp),
+                .padding(horizontal = 40.dp, vertical = 28.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Progress Row
@@ -193,109 +223,128 @@ fun TvFullscreenPlayerOverlay(
                 // Right: Control Icons
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Back / Exit
-                    var focusExit by remember { mutableStateOf(false) }
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Salir",
-                        tint = if (focusExit) focusColor else Color.White,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .focusable()
-                            .onFocusChanged { focusExit = it.isFocused }
-                            .clickable { onExit() }
+                    TvOverlayIconButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        description = "Salir",
+                        onClick = onExit
                     )
 
-                    // Rewind
-                    var focusRew by remember { mutableStateOf(false) }
-                    Icon(
-                        imageVector = Icons.Default.FastRewind,
-                        contentDescription = "Retroceder",
-                        tint = if (focusRew) focusColor else Color.White,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .focusable()
-                            .onFocusChanged { focusRew = it.isFocused }
-                            .clickable { onRewind() }
+                    // Rewind 10s
+                    TvOverlayIconButton(
+                        icon = Icons.Default.FastRewind,
+                        description = "Retroceder 10 segundos",
+                        onClick = onRewind
                     )
 
-                    // Play/Pause (Circle)
-                    var focusPlay by remember { mutableStateOf(false) }
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, if (focusPlay) focusColor else Color.White, CircleShape)
-                            .focusable()
-                            .onFocusChanged { focusPlay = it.isFocused }
-                            .clickable { onPlayPause() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Reproducir",
-                            tint = if (focusPlay) focusColor else Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    // Play / Pause Mini Button
+                    TvOverlayIconButton(
+                        icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        description = if (isPlaying) "Pausar" else "Reproducir",
+                        isCircularBadge = true,
+                        isPlaying = isPlaying,
+                        onClick = onPlayPause
+                    )
 
-                    // Forward
-                    var focusFwd by remember { mutableStateOf(false) }
-                    Icon(
-                        imageVector = Icons.Default.FastForward,
-                        contentDescription = "Avanzar",
-                        tint = if (focusFwd) focusColor else Color.White,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .focusable()
-                            .onFocusChanged { focusFwd = it.isFocused }
-                            .clickable { onForward() }
+                    // Forward 10s
+                    TvOverlayIconButton(
+                        icon = Icons.Default.FastForward,
+                        description = "Avanzar 10 segundos",
+                        onClick = onForward
                     )
 
                     // Skip Next (Optional)
                     if (onSkipNext != null) {
-                        var focusSkip by remember { mutableStateOf(false) }
-                        Icon(
-                            imageVector = Icons.Default.SkipNext,
-                            contentDescription = "Siguiente",
-                            tint = if (focusSkip) focusColor else Color.White,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .focusable()
-                                .onFocusChanged { focusSkip = it.isFocused }
-                                .clickable { onSkipNext() }
+                        TvOverlayIconButton(
+                            icon = Icons.Default.SkipNext,
+                            description = "Siguiente episodio",
+                            onClick = onSkipNext
                         )
                     }
 
-                    // Subtitles
-                    var focusSubs by remember { mutableStateOf(false) }
-                    Icon(
-                        imageVector = Icons.Default.Language,
-                        contentDescription = "Subtítulos",
-                        tint = if (focusSubs) focusColor else Color.White,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .focusable()
-                            .onFocusChanged { focusSubs = it.isFocused }
-                            .clickable { onSubtitles() }
+                    // Subtitles / Audio
+                    TvOverlayIconButton(
+                        icon = Icons.Default.Language,
+                        description = "Audio y Subtítulos",
+                        onClick = onSubtitles
                     )
 
-                    // PIP / Aspect Ratio
-                    var focusPip by remember { mutableStateOf(false) }
-                    Icon(
-                        imageVector = Icons.Default.PictureInPictureAlt,
-                        contentDescription = "Aspect Ratio",
-                        tint = if (focusPip) focusColor else Color.White,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .focusable()
-                            .onFocusChanged { focusPip = it.isFocused }
-                            .clickable { onAspectRatio?.invoke() }
+                    // Aspect Ratio
+                    TvOverlayIconButton(
+                        icon = Icons.Default.PictureInPictureAlt,
+                        description = "Formato de Pantalla",
+                        onClick = { onAspectRatio?.invoke() }
                     )
                 }
             }
         }
     }
 }
+
+@Composable
+private fun TvOverlayIconButton(
+    icon: ImageVector,
+    description: String,
+    isCircularBadge: Boolean = false,
+    isPlaying: Boolean = false,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.18f else 1.0f,
+        animationSpec = tween(150),
+        label = "icon_btn_scale"
+    )
+
+    val focusColor = Color(0xFFE50914)
+    val focusGold = Color(0xFFFFC107)
+
+    Surface(
+        onClick = onClick,
+        shape = if (isCircularBadge) CircleShape else RoundedCornerShape(8.dp),
+        color = when {
+            isFocused -> focusColor
+            isCircularBadge -> Color.White.copy(alpha = 0.15f)
+            else -> Color.Transparent
+        },
+        border = when {
+            isFocused -> androidx.compose.foundation.BorderStroke(2.5.dp, focusGold)
+            isCircularBadge -> androidx.compose.foundation.BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f))
+            else -> null
+        },
+        modifier = Modifier
+            .size(48.dp)
+            .scale(scale)
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                            onClick()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = description,
+                tint = if (isFocused) Color.White else Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.size(if (isCircularBadge) 26.dp else 24.dp)
+            )
+        }
+    }
+}
+

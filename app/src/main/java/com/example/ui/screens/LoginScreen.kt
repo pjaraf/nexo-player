@@ -22,7 +22,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.*
+import android.view.KeyEvent as AndroidKeyEvent
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -71,6 +76,17 @@ fun LoginScreen(
     val isOnline by viewModel.isOnline.collectAsState()
     val loading by viewModel.loginLoading.collectAsState()
     val error by viewModel.loginError.collectAsState()
+
+    val initialFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        if (isTv) {
+            delay(200)
+            try {
+                initialFocusRequester.requestFocus()
+            } catch (e: Exception) {}
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -217,6 +233,7 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(if (isLargeTv) 50.dp else 56.dp)
+                            .focusRequester(initialFocusRequester)
                             .onFocusChanged { isUsernameFocused = it.isFocused }
                             .border(
                                 width = if (isUsernameFocused) 2.dp else 1.dp,
@@ -303,9 +320,23 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(if (isLargeTv) 46.dp else 50.dp)
                             .onFocusChanged { isLoginBtnFocused = it.isFocused }
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.nativeKeyEvent.keyCode) {
+                                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                        AndroidKeyEvent.KEYCODE_ENTER,
+                                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                            viewModel.login(username, password, onLoginSuccess)
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                } else false
+                            }
                             .border(
-                                width = if (isLoginBtnFocused) 2.dp else 0.dp,
-                                color = if (isLoginBtnFocused) Color.White else Color.Transparent,
+                                width = if (isLoginBtnFocused) 2.5.dp else 0.dp,
+                                color = if (isLoginBtnFocused) Color(0xFFFFC107) else Color.Transparent,
                                 shape = RoundedCornerShape(6.dp)
                             )
                             .testTag("login_submit_btn")
@@ -361,12 +392,32 @@ fun LoginScreen(
                         Spacer(modifier = Modifier.height(if (isLargeTv) 8.dp else 14.dp))
 
                         // TV Quick Login via Mobile Code / PIN Box (Shown ONLY on Smart TV / Google TV)
+                        var isTvQrFocused by remember { mutableStateOf(false) }
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF222232).copy(alpha = 0.8f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                            color = if (isTvQrFocused) TvFocusBlue else Color(0xFF222232).copy(alpha = 0.8f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                if (isTvQrFocused) 2.5.dp else 1.dp,
+                                if (isTvQrFocused) Color(0xFFFFC107) else Color.White.copy(alpha = 0.15f)
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .onFocusChanged { isTvQrFocused = it.isFocused }
+                                .focusable()
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.nativeKeyEvent.keyCode) {
+                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                            AndroidKeyEvent.KEYCODE_ENTER,
+                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                showTvQrDialog = true
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                }
                                 .clickable { showTvQrDialog = true }
                                 .testTag("login_tv_qr_btn")
                         ) {

@@ -553,13 +553,27 @@ private fun MovieDetailTvScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                     border = if (isFullBtnFocused) {
-                                        androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                        androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
                                     } else {
                                         androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
                                     },
                                     modifier = Modifier
                                         .height(42.dp)
                                         .focusRequester(playButtonFocusRequester)
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        isFullScreenMode = true
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
                                         .testTag("btn_movie_fullscreen")
                                 ) {
                                     Row(
@@ -593,12 +607,26 @@ private fun MovieDetailTvScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isTracksBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                     border = if (isTracksBtnFocused) {
-                                        androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                        androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
                                     } else {
                                         androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
                                     },
                                     modifier = Modifier
                                         .height(42.dp)
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        showTracksDialog = true
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
                                         .testTag("btn_movie_tracks")
                                 ) {
                                     Row(
@@ -634,12 +662,26 @@ private fun MovieDetailTvScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isFavFocused) tvFocusBlue else tvButtonDefaultBg,
                                     border = if (isFavFocused) {
-                                        androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                        androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
                                     } else {
                                         androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
                                     },
                                     modifier = Modifier
                                         .height(42.dp)
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        isFav = viewModel.toggleFavorite("movies", movieId, title, cover)
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
                                         .testTag("btn_movie_fav")
                                 ) {
                                     Row(

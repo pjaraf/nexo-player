@@ -59,6 +59,8 @@ import androidx.annotation.OptIn
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.*
+import android.view.KeyEvent as AndroidKeyEvent
 
 @Composable
 fun SeriesDetailScreen(
@@ -322,45 +324,61 @@ fun SeriesDetailTvScreen(
                             // "Pantalla completa" button
                             val fullInteractionSource = remember { MutableInteractionSource() }
                             val isFullBtnFocused by fullInteractionSource.collectIsFocusedAsState()
+
+                            fun launchFullScreen() {
+                                selectedEpisode?.let { ep ->
+                                    val epIndex = currentEpisodes.indexOf(ep)
+                                    val nextEp = currentEpisodes.getOrNull(epIndex + 1)
+                                    
+                                    val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
+                                    val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+                                    val epImg = ep.info?.movieImage ?: seriesCover
+                                    val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
+                                    
+                                    exoPlayer.pause()
+                                    
+                                    onPlayEpisode(
+                                        url,
+                                        "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
+                                        "series",
+                                        seriesId,
+                                        epImg,
+                                        0L,
+                                        nextUrl,
+                                        nextEp?.displayTitle,
+                                        nextEp?.epId,
+                                        nextEpImg
+                                    )
+                                }
+                            }
                             
                             Surface(
-                                onClick = {
-                                    selectedEpisode?.let { ep ->
-                                        val epIndex = currentEpisodes.indexOf(ep)
-                                        val nextEp = currentEpisodes.getOrNull(epIndex + 1)
-                                        
-                                        val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
-                                        val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
-                                        val epImg = ep.info?.movieImage ?: seriesCover
-                                        val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
-                                        
-                                        exoPlayer.pause()
-                                        
-                                        onPlayEpisode(
-                                            url,
-                                            "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
-                                            "series",
-                                            seriesId,
-                                            epImg,
-                                            0L,
-                                            nextUrl,
-                                            nextEp?.displayTitle,
-                                            nextEp?.epId,
-                                            nextEpImg
-                                        )
-                                    }
-                                },
+                                onClick = { launchFullScreen() },
                                 interactionSource = fullInteractionSource,
                                 shape = RoundedCornerShape(10.dp),
                                 color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                 border = if (isFullBtnFocused) {
-                                    androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                    androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
                                 } else {
                                     androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
                                 },
                                 modifier = Modifier
                                     .height(42.dp)
                                     .focusRequester(playButtonFocusRequester)
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                    launchFullScreen()
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        } else false
+                                    }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -394,12 +412,26 @@ fun SeriesDetailTvScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 color = if (isBackBtnFocused) tvFocusBlue else tvButtonDefaultBg,
                                 border = if (isBackBtnFocused) {
-                                    androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                    androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
                                 } else {
                                     androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
                                 },
                                 modifier = Modifier
                                     .size(42.dp)
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                    onBack()
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        } else false
+                                    }
                             ) {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Icon(
@@ -526,13 +558,32 @@ fun SeriesDetailTvScreen(
                                 Surface(
                                     onClick = { selectedSeason = sKey },
                                     interactionSource = seasonInteractionSource,
-                                    color = Color.Transparent
+                                    color = Color.Transparent,
+                                    shape = RoundedCornerShape(6.dp),
+                                    border = if (isSeasonFocused) androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFC107)) else null,
+                                    modifier = Modifier
+                                        .padding(4.dp)
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        selectedSeason = sKey
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
                                 ) {
                                     Text(
                                         text = "Temporada $sKey",
-                                        color = if (isSelected || isSeasonFocused) Color.White else Color.Gray,
+                                        color = if (isSeasonFocused) Color(0xFFFFC107) else if (isSelected) Color.White else Color.Gray,
                                         fontSize = 16.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        fontWeight = if (isSelected || isSeasonFocused) FontWeight.Bold else FontWeight.Normal,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
                             }
@@ -553,11 +604,26 @@ fun SeriesDetailTvScreen(
                             Surface(
                                 onClick = { selectedEpisode = ep },
                                 interactionSource = epInteractionSource,
-                                modifier = Modifier.size(54.dp),
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                    selectedEpisode = ep
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        } else false
+                                    },
                                 color = if (isSelected) Color.White else if (isEpFocused) tvFocusBlue else Color.White.copy(alpha = 0.1f),
                                 shape = RoundedCornerShape(8.dp),
-                                border = if (isEpFocused && !isSelected) {
-                                    androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                border = if (isEpFocused) {
+                                    androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
                                 } else if (!isSelected) {
                                     androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
                                 } else null
