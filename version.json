@@ -1,7 +1,7 @@
 {
-    "versionCode": 74,
-    "versionName": "1.1.63",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.63/app-debug.apk",
-    "changelog": "Versión 1.1.63: Mayor tamaño de carátula en el reproductor (TV) y botones inferiores completamente operativos con control remoto físico.",
+    "versionCode": 75,
+    "versionName": "1.1.64",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.64/app-debug.apk",
+    "changelog": "Versión 1.1.64: Carátula de mayor tamaño reubicada al lado de la barra de progreso en películas y series con soporte total para control remoto de TV.",
     "isMandatory": false
 }

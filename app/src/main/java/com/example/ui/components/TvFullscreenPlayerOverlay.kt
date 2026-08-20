@@ -123,106 +123,125 @@ fun TvFullscreenPlayerOverlay(
             )
         }
 
-        // Bottom Controls
-        Column(
+        // Bottom Controls Row: Large Poster Cover on left, Info + Progress Bar + Control Buttons on right
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.95f))
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f), Color.Black.copy(alpha = 0.98f))
                     )
                 )
-                .padding(horizontal = 40.dp, vertical = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 36.dp, vertical = 24.dp),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(22.dp)
         ) {
-            // Progress Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = formatTime(currentPositionMs),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+            // 1. CARÁTULA / PÓSTER GRANDE (AL LADO DE LA BARRA DE PROGRESO)
+            if (thumbnailUrl.isNotBlank()) {
+                AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(width = 110.dp, height = 160.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .shadow(16.dp, RoundedCornerShape(12.dp))
+                        .border(2.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                 )
-                
-                // Progress Bar
-                Box(modifier = Modifier.weight(1f).height(24.dp), contentAlignment = Alignment.CenterStart) {
-                    // Background track
-                    Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(Color.White.copy(alpha = 0.3f), CircleShape))
-                    
-                    val progress = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-                    // Active track
-                    Box(modifier = Modifier.fillMaxWidth(progress).height(4.dp).background(focusColor, CircleShape))
-                    
-                    // Thumb
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progress)
-                            .wrapContentWidth(Alignment.End)
-                    ) {
-                        Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(focusColor))
-                    }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(width = 110.dp, height = 160.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF222222))
+                        .border(2.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Tv, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
-                
-                Text(
-                    text = formatTime(durationMs),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
             }
 
-            // Info & Buttons Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // 2. COLUMNA DERECHA: TÍTULO, BARRA DE PROGRESO Y BOTONES
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(bottom = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Left: Thumbnail + Title
+                // Movie / Series Title
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // BARRA DE PROGRESO (Directamente al lado de la carátula)
                 Row(
-                    modifier = Modifier.weight(1f).padding(end = 24.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    if (thumbnailUrl.isNotBlank()) {
-                        AsyncImage(
-                            model = thumbnailUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(width = 100.dp, height = 145.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                        )
-                    } else {
-                        // Fallback icon if no thumbnail
+                    Text(
+                        text = formatTime(currentPositionMs),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+
+                    // Progress Bar
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(24.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        // Background track
                         Box(
                             modifier = Modifier
-                                .size(width = 100.dp, height = 145.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF333333)),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .height(5.dp)
+                                .background(Color.White.copy(alpha = 0.3f), CircleShape)
+                        )
+
+                        val progress = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+                        // Active track
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress)
+                                .height(5.dp)
+                                .background(focusColor, CircleShape)
+                        )
+
+                        // Thumb
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress)
+                                .wrapContentWidth(Alignment.End)
                         ) {
-                            Icon(Icons.Default.Tv, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(focusGold)
+                            )
                         }
                     }
+
                     Text(
-                        text = title,
-                        color = Color.White,
-                        fontSize = 22.sp,
+                        text = formatTime(durationMs),
+                        color = Color.White.copy(alpha = 0.85f),
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 350.dp)
+                        fontSize = 15.sp
                     )
                 }
 
-                // Right: Control Icons
+                // Control Buttons Row
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -256,7 +275,7 @@ fun TvFullscreenPlayerOverlay(
                         onClick = onForward
                     )
 
-                    // Skip Next (Optional)
+                    // Skip Next (Optional for Series)
                     if (onSkipNext != null) {
                         TvOverlayIconButton(
                             icon = Icons.Default.SkipNext,

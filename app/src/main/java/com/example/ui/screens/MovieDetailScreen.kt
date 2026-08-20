@@ -166,6 +166,7 @@ private fun MovieDetailTvScreen(
     var availableAudioTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
     var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
     var isSubtitlesDisabled by remember { mutableStateOf(false) }
+    var fullScreenResizeMode by remember { mutableStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
 
     val progressList by viewModel.progressList.collectAsState()
     val savedProgress = remember(progressList, movieId) {
@@ -931,7 +932,7 @@ private fun MovieDetailTvScreen(
                             player = exoPlayer
                             useController = false
                             keepScreenOn = true
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            resizeMode = fullScreenResizeMode
                             layoutParams = FrameLayout.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -940,6 +941,7 @@ private fun MovieDetailTvScreen(
                     },
                     update = { playerView ->
                         playerView.player = exoPlayer
+                        playerView.resizeMode = fullScreenResizeMode
                     },
                     modifier = Modifier
                         .fillMaxSize()
@@ -956,7 +958,6 @@ private fun MovieDetailTvScreen(
                     }
                 }
 
-                // Full Screen Controls Overlay
                 // Full Screen Controls Overlay
                 AnimatedVisibility(
                     visible = showPlayerControls,
@@ -986,7 +987,14 @@ private fun MovieDetailTvScreen(
                             exoPlayer.seekTo(target)
                         },
                         onExit = { isFullScreenMode = false },
-                        onSubtitles = { showTracksDialog = true }
+                        onSubtitles = { showTracksDialog = true },
+                        onAspectRatio = {
+                            fullScreenResizeMode = when (fullScreenResizeMode) {
+                                AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            }
+                        }
                     )
                 }
             }
