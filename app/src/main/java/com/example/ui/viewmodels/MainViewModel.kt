@@ -340,6 +340,52 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
         }
     }
 
+    fun loadM3uFileContent(fileName: String, content: String, onSuccess: () -> Unit) {
+        if (content.isBlank()) {
+            _loginError.value = "El archivo M3U seleccionado está vacío o no contiene texto válido."
+            return
+        }
+
+        viewModelScope.launch {
+            _loginLoading.value = true
+            _loginError.value = null
+            try {
+                XtreamApi.clearCache()
+                _liveChannels.value = emptyList()
+                _liveCategories.value = emptyList()
+                _vodStreams.value = emptyList()
+                _vodCategories.value = emptyList()
+                _seriesList.value = emptyList()
+                _seriesCategories.value = emptyList()
+                _homeLiveRow.value = emptyList()
+                _homeMoviesRow.value = emptyList()
+                _homeSeriesRow.value = emptyList()
+                _homeHeroItem.value = null
+
+                val (channels, categories) = XtreamApi.parseM3uText(content)
+                if (channels.isEmpty()) {
+                    _loginLoading.value = false
+                    _loginError.value = "No se encontraron canales válidos (#EXTINF) en el archivo M3U."
+                    return@launch
+                }
+
+                val name = fileName.trim().ifBlank { "Archivo M3U" }
+                AppStorage.saveM3uLocalFileSession(name, content)
+                _isLoggedIn.value = true
+                _userInfo.value = AppStorage.getUserInfo()
+                _liveChannels.value = channels
+                _liveCategories.value = categories
+                _homeLiveRow.value = channels.take(15)
+                _loginLoading.value = false
+                loadHomeContent()
+                onSuccess()
+            } catch (e: Exception) {
+                _loginLoading.value = false
+                _loginError.value = "Error al procesar el archivo M3U: ${e.localizedMessage ?: "Error desconocido"}"
+            }
+        }
+    }
+
     fun logout() {
         XtreamApi.clearCache()
         AppStorage.clearSession()

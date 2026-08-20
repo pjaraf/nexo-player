@@ -2,6 +2,9 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -572,8 +575,14 @@ fun LoginScreen(
             M3uPlaylistDialog(
                 loading = loading,
                 onDismiss = { showM3uDialog = false },
-                onLoad = { url, name ->
+                onLoadUrl = { url, name ->
                     viewModel.loadM3uPlaylist(url, name) {
+                        showM3uDialog = false
+                        onLoginSuccess()
+                    }
+                },
+                onLoadFile = { fileName, content ->
+                    viewModel.loadM3uFileContent(fileName, content) {
                         showM3uDialog = false
                         onLoginSuccess()
                     }
@@ -685,12 +694,61 @@ fun LoginScreen(
 fun M3uPlaylistDialog(
     loading: Boolean,
     onDismiss: () -> Unit,
-    onLoad: (url: String, name: String) -> Unit
+    onLoadUrl: (url: String, name: String) -> Unit,
+    onLoadFile: (fileName: String, content: String) -> Unit
 ) {
-    var m3uUrl by remember { mutableStateOf(AppStorage.getM3uUrl()) }
-    var playlistName by remember { mutableStateOf("Mi Lista M3U") }
-    var urlFocused by remember { mutableStateOf(false) }
-    var nameFocused by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Subir Archivo, 1 = Enlace URL
+
+    // State for File Upload
+    var selectedFileName by remember { mutableStateOf<String?>(null) }
+    var selectedFileContent by remember { mutableStateOf<String?>(null) }
+    var parsedChannelCount by remember { mutableStateOf<Int?>(null) }
+    var fileErrorMessage by remember { mutableStateOf<String?>(null) }
+    var customFilePlaylistName by remember { mutableStateOf("") }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                var fileName = "lista.m3u"
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex != -1 && cursor.moveToFirst()) {
+                        fileName = cursor.getString(nameIndex) ?: "lista.m3u"
+                    }
+                }
+                val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                if (content.isNullOrBlank()) {
+                    fileErrorMessage = "El archivo seleccionado está vacío"
+                    selectedFileName = null
+                    selectedFileContent = null
+                    parsedChannelCount = null
+                } else {
+                    fileErrorMessage = null
+                    selectedFileName = fileName
+                    selectedFileContent = content
+                    customFilePlaylistName = fileName.substringBeforeLast(".")
+                    val count = Regex("""#EXTINF:""", RegexOption.IGNORE_CASE).findAll(content).count()
+                    parsedChannelCount = count
+                }
+            } catch (e: Exception) {
+                fileErrorMessage = "Error al leer archivo: ${e.localizedMessage ?: "Error desconocido"}"
+            }
+        }
+    }
+
+    // State for URL
+    var m3uUrl by remember { mutableStateOf(AppStorage.getM3uUrl().takeIf { !it.startsWith("local://") } ?: "") }
+    var urlPlaylistName by remember { mutableStateOf("Mi Lista M3U") }
+
+    var tabFileFocused by remember { mutableStateOf(false) }
+    var tabUrlFocused by remember { mutableStateOf(false) }
+    var selectFileBtnFocused by remember { mutableStateOf(false) }
+    var fileNameInputFocused by remember { mutableStateOf(false) }
+    var urlInputFocused by remember { mutableStateOf(false) }
+    var urlNameInputFocused by remember { mutableStateOf(false) }
     var confirmFocused by remember { mutableStateOf(false) }
     var cancelFocused by remember { mutableStateOf(false) }
 
@@ -710,7 +768,7 @@ fun M3uPlaylistDialog(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.PlaylistPlay,
+                    if (selectedTab == 0) Icons.Default.FileUpload else Icons.Default.Link,
                     contentDescription = "Lista M3U",
                     tint = TvFocusBlue,
                     modifier = Modifier.size(30.dp)
@@ -729,87 +787,315 @@ fun M3uPlaylistDialog(
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = "Ingresa el enlace URL de tu lista de canales M3U:",
-                    fontSize = 13.sp,
-                    color = Color(0xFFB0B0B0)
-                )
-
-                // M3U URL Input
-                TextField(
-                    value = m3uUrl,
-                    onValueChange = { m3uUrl = it },
-                    placeholder = {
-                        Text("https://ejemplo.com/lista.m3u", color = Color(0xFF707080), fontSize = 13.sp)
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(8.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Black.copy(alpha = 0.5f),
-                        unfocusedContainerColor = Color.Black.copy(alpha = 0.5f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedIndicatorColor = TvFocusBlue,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
+                // Tab Selector (Subir Archivo vs Enlace URL)
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .onFocusChanged { urlFocused = it.isFocused }
-                        .border(
-                            width = if (urlFocused) 2.dp else 1.dp,
-                            color = if (urlFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .testTag("m3u_input_url")
-                )
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF111118))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Tab 0: Subir Archivo
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (tabFileFocused) TvFocusBlue else if (selectedTab == 0) Color(0xFFE50914) else Color.Transparent,
+                        border = androidx.compose.foundation.BorderStroke(
+                            if (tabFileFocused) 2.dp else 0.dp,
+                            if (tabFileFocused) Color(0xFFFFC107) else Color.Transparent
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .onFocusChanged { tabFileFocused = it.isFocused }
+                            .focusable()
+                            .clickable { selectedTab = 0 }
+                            .testTag("m3u_tab_file")
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Subir Archivo",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = if (selectedTab == 0 || tabFileFocused) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
 
-                // Playlist Name (Optional)
-                Text(
-                    text = "Nombre para la lista (opcional):",
-                    fontSize = 12.sp,
-                    color = Color(0xFF9090A0)
-                )
+                    // Tab 1: Enlace URL
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (tabUrlFocused) TvFocusBlue else if (selectedTab == 1) Color(0xFFE50914) else Color.Transparent,
+                        border = androidx.compose.foundation.BorderStroke(
+                            if (tabUrlFocused) 2.dp else 0.dp,
+                            if (tabUrlFocused) Color(0xFFFFC107) else Color.Transparent
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .onFocusChanged { tabUrlFocused = it.isFocused }
+                            .focusable()
+                            .clickable { selectedTab = 1 }
+                            .testTag("m3u_tab_url")
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Link,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Enlace URL",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = if (selectedTab == 1 || tabUrlFocused) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
 
-                TextField(
-                    value = playlistName,
-                    onValueChange = { playlistName = it },
-                    placeholder = {
-                        Text("Mi Lista M3U", color = Color(0xFF707080), fontSize = 13.sp)
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(8.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Black.copy(alpha = 0.5f),
-                        unfocusedContainerColor = Color.Black.copy(alpha = 0.5f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedIndicatorColor = TvFocusBlue,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { nameFocused = it.isFocused }
-                        .border(
-                            width = if (nameFocused) 2.dp else 1.dp,
-                            color = if (nameFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(8.dp)
+                if (selectedTab == 0) {
+                    // --- TAB 0: SUBIR ARCHIVO M3U ---
+                    Text(
+                        text = "Selecciona un archivo .m3u o .m3u8 desde tu dispositivo o almacenamiento:",
+                        fontSize = 12.sp,
+                        color = Color(0xFFB0B0B0)
+                    )
+
+                    // Button to launch file picker
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selectFileBtnFocused) TvFocusBlue else Color(0xFF222230),
+                        border = androidx.compose.foundation.BorderStroke(
+                            if (selectFileBtnFocused) 2.dp else 1.dp,
+                            if (selectFileBtnFocused) Color(0xFFFFC107) else Color.White.copy(alpha = 0.2f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .onFocusChanged { selectFileBtnFocused = it.isFocused }
+                            .focusable()
+                            .clickable {
+                                filePickerLauncher.launch("*/*")
+                            }
+                            .testTag("m3u_select_file_btn")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.FileUpload,
+                                contentDescription = "Elegir archivo",
+                                tint = if (selectFileBtnFocused) Color.White else Color(0xFFFFC107),
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (selectedFileName != null) "Cambiar archivo seleccionado" else "Examinar y elegir archivo M3U",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    // Display selected file info or error
+                    if (fileErrorMessage != null) {
+                        Text(
+                            text = fileErrorMessage ?: "",
+                            color = Color(0xFFFF5252),
+                            fontSize = 12.sp
                         )
-                        .testTag("m3u_input_name")
-                )
+                    } else if (selectedFileName != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF142E1F),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4CAF50).copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color(0xFF4CAF50),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = selectedFileName ?: "",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (parsedChannelCount != null) {
+                                        Text(
+                                            text = "$parsedChannelCount canales detectados",
+                                            color = Color(0xFF81C784),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Custom name for the list
+                        Text(
+                            text = "Nombre para la lista (opcional):",
+                            fontSize = 12.sp,
+                            color = Color(0xFF9090A0)
+                        )
+
+                        TextField(
+                            value = customFilePlaylistName,
+                            onValueChange = { customFilePlaylistName = it },
+                            placeholder = {
+                                Text("Mi Lista M3U", color = Color(0xFF707080), fontSize = 13.sp)
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                                unfocusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = Color.White,
+                                focusedIndicatorColor = TvFocusBlue,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { fileNameInputFocused = it.isFocused }
+                                .border(
+                                    width = if (fileNameInputFocused) 2.dp else 1.dp,
+                                    color = if (fileNameInputFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .testTag("m3u_file_input_name")
+                        )
+                    }
+                } else {
+                    // --- TAB 1: ENLACE URL M3U ---
+                    Text(
+                        text = "Ingresa el enlace URL de tu lista de canales M3U:",
+                        fontSize = 12.sp,
+                        color = Color(0xFFB0B0B0)
+                    )
+
+                    // M3U URL Input
+                    TextField(
+                        value = m3uUrl,
+                        onValueChange = { m3uUrl = it },
+                        placeholder = {
+                            Text("https://ejemplo.com/lista.m3u", color = Color(0xFF707080), fontSize = 13.sp)
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                            unfocusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color.White,
+                            focusedIndicatorColor = TvFocusBlue,
+                            unfocusedIndicatorColor = Color.Transparent
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { urlInputFocused = it.isFocused }
+                            .border(
+                                width = if (urlInputFocused) 2.dp else 1.dp,
+                                color = if (urlInputFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .testTag("m3u_input_url")
+                    )
+
+                    // Playlist Name (Optional)
+                    Text(
+                        text = "Nombre para la lista (opcional):",
+                        fontSize = 12.sp,
+                        color = Color(0xFF9090A0)
+                    )
+
+                    TextField(
+                        value = urlPlaylistName,
+                        onValueChange = { urlPlaylistName = it },
+                        placeholder = {
+                            Text("Mi Lista M3U", color = Color(0xFF707080), fontSize = 13.sp)
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                            unfocusedContainerColor = Color.Black.copy(alpha = 0.5f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color.White,
+                            focusedIndicatorColor = TvFocusBlue,
+                            unfocusedIndicatorColor = Color.Transparent
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { urlNameInputFocused = it.isFocused }
+                            .border(
+                                width = if (urlNameInputFocused) 2.dp else 1.dp,
+                                color = if (urlNameInputFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .testTag("m3u_input_name")
+                    )
+                }
             }
         },
         confirmButton = {
+            val canConfirm = if (selectedTab == 0) {
+                !selectedFileContent.isNullOrBlank()
+            } else {
+                m3uUrl.isNotBlank()
+            }
+
             Button(
                 onClick = {
-                    if (m3uUrl.isNotBlank()) {
-                        onLoad(m3uUrl, playlistName)
+                    if (selectedTab == 0) {
+                        val content = selectedFileContent
+                        if (!content.isNullOrBlank()) {
+                            val name = customFilePlaylistName.ifBlank { selectedFileName ?: "Archivo M3U" }
+                            onLoadFile(name, content)
+                        }
+                    } else {
+                        if (m3uUrl.isNotBlank()) {
+                            onLoadUrl(m3uUrl, urlPlaylistName)
+                        }
                     }
                 },
-                enabled = !loading && m3uUrl.isNotBlank(),
+                enabled = !loading && canConfirm,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (confirmFocused) TvFocusBlue else TvSelectedRed,
                     contentColor = Color.White
@@ -831,7 +1117,10 @@ fun M3uPlaylistDialog(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Cargar Lista", fontWeight = FontWeight.Bold)
+                    Text(
+                        if (selectedTab == 0) "Cargar Archivo" else "Cargar Lista",
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         },

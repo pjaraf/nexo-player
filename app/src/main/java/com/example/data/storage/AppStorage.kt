@@ -2,6 +2,7 @@ package com.example.data.storage
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.example.NexusApp
 import com.example.data.models.FavItem
 import com.example.data.models.Profile
@@ -12,6 +13,7 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
 import java.util.UUID
 
 object AppStorage {
@@ -75,13 +77,54 @@ object AppStorage {
             .putString("password", "m3u_direct")
             .putString("server_url", cleanUrl)
             .putString("m3u_url", cleanUrl)
+            .putBoolean("m3u_is_local_file", false)
+            .remove("m3u_file_name")
             .putString("user_json", gson.toJson(dummyUser))
             .putBoolean("is_logged_in", true)
             .putBoolean("is_m3u_mode", true)
             .apply()
     }
 
+    fun saveM3uLocalFileSession(fileName: String, content: String): Boolean {
+        return try {
+            val file = File(NexusApp.instance.filesDir, "custom_playlist.m3u")
+            file.writeText(content)
+            val name = fileName.trim().ifBlank { "Archivo M3U" }
+            val dummyUser = UserInfo(
+                username = name,
+                status = "Active",
+                expDate = "Ilimitado",
+                auth = 1
+            )
+            prefs.edit()
+                .putString("username", name)
+                .putString("password", "m3u_local_file")
+                .putString("server_url", "local://custom_playlist.m3u")
+                .putString("m3u_url", "local://custom_playlist.m3u")
+                .putString("m3u_file_name", name)
+                .putBoolean("m3u_is_local_file", true)
+                .putString("user_json", gson.toJson(dummyUser))
+                .putBoolean("is_logged_in", true)
+                .putBoolean("is_m3u_mode", true)
+                .apply()
+            true
+        } catch (e: Exception) {
+            Log.e("AppStorage", "Error saving local M3U file", e)
+            false
+        }
+    }
+
+    fun getLocalM3uFileContent(): String? {
+        return try {
+            val file = File(NexusApp.instance.filesDir, "custom_playlist.m3u")
+            if (file.exists()) file.readText() else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun isM3uMode(): Boolean = prefs.getBoolean("is_m3u_mode", false)
+    fun isLocalM3uFile(): Boolean = prefs.getBoolean("m3u_is_local_file", false)
     fun getM3uUrl(): String = prefs.getString("m3u_url", "") ?: ""
 
     fun getUsername(): String = prefs.getString("username", "") ?: ""
@@ -104,12 +147,18 @@ object AppStorage {
     fun isLoggedIn(): Boolean = prefs.getBoolean("is_logged_in", false) && getUsername().isNotBlank()
 
     fun clearSession() {
+        try {
+            val file = File(NexusApp.instance.filesDir, "custom_playlist.m3u")
+            if (file.exists()) file.delete()
+        } catch (_: Exception) {}
         prefs.edit()
             .remove("username")
             .remove("password")
             .remove("user_json")
             .remove("is_m3u_mode")
             .remove("m3u_url")
+            .remove("m3u_file_name")
+            .remove("m3u_is_local_file")
             .putBoolean("is_logged_in", false)
             .remove("active_profile_id")
             .apply()

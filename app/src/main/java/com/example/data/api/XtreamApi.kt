@@ -237,7 +237,11 @@ object XtreamApi {
         parsedLiveChannels?.let { return@withContext it }
 
         if (AppStorage.isM3uMode()) {
-            val content = loadM3uContent(AppStorage.getM3uUrl())
+            val content = if (AppStorage.isLocalM3uFile()) {
+                AppStorage.getLocalM3uFileContent()
+            } else {
+                loadM3uContent(AppStorage.getM3uUrl())
+            }
             if (!content.isNullOrBlank()) {
                 val (channels, categories) = parseM3uText(content)
                 parsedLiveChannels = channels
