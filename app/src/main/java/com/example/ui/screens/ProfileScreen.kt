@@ -348,6 +348,8 @@ fun ProfileScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        DetailRow("Servidor", AppStorage.getServerUrl())
+                        HorizontalDivider(color = NexusBorder)
                         DetailRow("Usuario", AppStorage.getUsername().ifBlank { "demo_user" })
                         HorizontalDivider(color = NexusBorder)
                         DetailRow("Vencimiento", userInfo?.expDate ?: "Ilimitado")

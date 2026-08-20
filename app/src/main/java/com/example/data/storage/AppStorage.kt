@@ -27,6 +27,14 @@ object AppStorage {
         "#A855F7", "#EC4899", "#3B82F6", "#F97316"
     )
 
+    const val SERVER_NEXO_FUSION = "https://nexo.fusionx.cl"
+    const val SERVER_ELITE_PLUS = "http://eliteplusec.com:8080"
+
+    val SERVER_PRESETS = listOf(
+        "Nexo Fusion" to SERVER_NEXO_FUSION,
+        "Elite Plus" to SERVER_ELITE_PLUS
+    )
+
     private val _activeProfileFlow = MutableStateFlow<Profile?>(null)
     val activeProfileFlow: StateFlow<Profile?> = _activeProfileFlow.asStateFlow()
 
@@ -36,10 +44,11 @@ object AppStorage {
 
     // --- Session ---
     fun saveSession(username: String, pass: String, user: UserInfo?, serverUrl: String = "") {
+        val targetServer = if (serverUrl.isNotBlank()) serverUrl else getServerUrl()
         prefs.edit()
             .putString("username", username)
             .putString("password", pass)
-            .putString("server_url", serverUrl)
+            .putString("server_url", targetServer)
             .putString("user_json", user?.let { gson.toJson(it) } ?: "")
             .putBoolean("is_logged_in", true)
             .apply()
@@ -47,9 +56,10 @@ object AppStorage {
 
     fun getUsername(): String = prefs.getString("username", "") ?: ""
     fun getPassword(): String = prefs.getString("password", "") ?: ""
-    fun getServerUrl(): String = prefs.getString("server_url", "http://xtream-server:8080") ?: "http://xtream-server:8080"
+    fun getServerUrl(): String = prefs.getString("server_url", SERVER_NEXO_FUSION)?.ifBlank { SERVER_NEXO_FUSION } ?: SERVER_NEXO_FUSION
     fun setServerUrl(url: String) {
-        prefs.edit().putString("server_url", url).apply()
+        val clean = url.trim().trimEnd('/')
+        prefs.edit().putString("server_url", clean).apply()
     }
 
     fun getUserInfo(): UserInfo? {

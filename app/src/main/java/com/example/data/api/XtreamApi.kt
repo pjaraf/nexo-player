@@ -20,9 +20,19 @@ import javax.net.ssl.X509TrustManager
 
 object XtreamApi {
     private const val TAG = "XtreamApi"
-    var SERVER_HOST = "http://eliteplusec.com:8080"
+    
+    var SERVER_HOST: String
+        get() = AppStorage.getServerUrl()
+        set(value) { AppStorage.setServerUrl(value) }
+
     val baseUrl: String
-        get() = SERVER_HOST.trimEnd('/')
+        get() {
+            val stored = AppStorage.getServerUrl()
+            if (stored.isNotBlank()) {
+                return stored.trimEnd('/')
+            }
+            return AppStorage.SERVER_NEXO_FUSION
+        }
 
     private const val DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 VLC/3.0.18 LibVLC/3.0.18"
 
@@ -49,7 +59,7 @@ object XtreamApi {
     // In-memory caching for faster screen transitions
     private val memoryCache = mutableMapOf<String, Any>()
 
-    // Dedicated M3U Playlist for Live TV
+    // Dedicated M3U Playlist for Legacy Live TV Server only
     const val LIVE_PLAYLIST_URL = "https://www.dropbox.com/scl/fi/c13v3nfgw2x81qfy0v1i6/CLIENTES.txt?rlkey=ge7xlg9kew1iaslgj68cgn59h&st=18m5wcdh&dl=1"
     private var parsedLiveChannels: List<LiveChannel>? = null
     private var parsedLiveCategories: List<LiveCategory>? = null
@@ -154,9 +164,39 @@ object XtreamApi {
     private suspend fun parseAndCacheLiveList(): List<LiveChannel> = withContext(Dispatchers.IO) {
         parsedLiveChannels?.let { return@withContext it }
 
+        val currentUrl = baseUrl
+        val isLegacyDropboxServer = currentUrl.contains("eliteplusec.com", ignoreCase = true)
+
+        // For Nexo Fusion (https://nexo.fusionx.cl) and any other server:
+        // Use purely its own Xtream live channels to prevent mixing lists or showing unassociated channels
+        if (!isLegacyDropboxServer) {
+            val xtreamJson = fetch(action = "get_live_streams")
+            if (!xtreamJson.isNullOrBlank()) {
+                try {
+                    val type = object : TypeToken<List<LiveChannel>>() {}.type
+                    val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
+                    if (list.isNotEmpty()) {
+                        // Ensure categories are cached to match group names
+                        val cats = getLiveCategories()
+                        val catMap = cats.associate { it.categoryId to it.categoryName }
+                        list.forEach { ch ->
+                            if (ch.groupName.isBlank()) {
+                                ch.groupName = catMap[ch.categoryId] ?: "GENERAL"
+                            }
+                        }
+                        parsedLiveChannels = list
+                        return@withContext list
+                    }
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Failed to parse xtream live streams for $currentUrl", e)
+                }
+            }
+            return@withContext emptyList()
+        }
+
+        // Fallback for legacy Elite Plus server with custom dropbox list
         val content = fetchLiveM3uContent()
         if (content.isNullOrBlank()) {
-            // Try fetching live streams from server Xtream API
             val xtreamJson = fetch(action = "get_live_streams")
             if (!xtreamJson.isNullOrBlank()) {
                 try {
@@ -248,7 +288,10 @@ object XtreamApi {
     suspend fun getLiveCategories(): List<LiveCategory> = withContext(Dispatchers.IO) {
         parsedLiveCategories?.let { return@withContext it }
 
-        // Attempt live categories from xtream server first if present
+        val currentUrl = baseUrl
+        val isLegacyDropboxServer = currentUrl.contains("eliteplusec.com", ignoreCase = true)
+
+        // Directly fetch live categories for Nexo Fusion (https://nexo.fusionx.cl) and any standard server
         val json = fetch(action = "get_live_categories")
         if (!json.isNullOrBlank()) {
             try {
@@ -259,10 +302,14 @@ object XtreamApi {
                     parsedLiveCategories = sorted
                     return@withContext sorted
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to parse live categories for $currentUrl", e)
+            }
         }
 
-        parseAndCacheLiveList()
+        if (isLegacyDropboxServer) {
+            parseAndCacheLiveList()
+        }
         return@withContext parsedLiveCategories ?: emptyList()
     }
 

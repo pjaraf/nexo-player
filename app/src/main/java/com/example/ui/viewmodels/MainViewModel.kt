@@ -207,9 +207,10 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
     }
 
     // --- Login / Logout ---
-    fun login(user: String, pass: String, onSuccess: () -> Unit) {
+    fun login(user: String, pass: String, serverUrl: String = AppStorage.getServerUrl(), onSuccess: () -> Unit) {
         val trimmedUser = user.trim()
         val trimmedPass = pass.trim()
+        val trimmedServer = serverUrl.trim().trimEnd('/')
 
         if (trimmedUser.isBlank() || trimmedPass.isBlank()) {
             _loginError.value = "Por favor ingresa usuario y contraseña"
@@ -225,10 +226,23 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
             _loginLoading.value = true
             _loginError.value = null
             try {
+                AppStorage.setServerUrl(trimmedServer)
                 XtreamApi.clearCache()
+                // Clear any leftover server data
+                _liveChannels.value = emptyList()
+                _liveCategories.value = emptyList()
+                _vodStreams.value = emptyList()
+                _vodCategories.value = emptyList()
+                _seriesList.value = emptyList()
+                _seriesCategories.value = emptyList()
+                _homeLiveRow.value = emptyList()
+                _homeMoviesRow.value = emptyList()
+                _homeSeriesRow.value = emptyList()
+                _homeHeroItem.value = null
+
                 val res = XtreamApi.login(trimmedUser, trimmedPass)
                 if (res != null && res.userInfo != null) {
-                    AppStorage.saveSession(trimmedUser, trimmedPass, res.userInfo)
+                    AppStorage.saveSession(trimmedUser, trimmedPass, res.userInfo, trimmedServer)
                     _isLoggedIn.value = true
                     _userInfo.value = res.userInfo
                     _loginLoading.value = false
@@ -236,11 +250,11 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
                     onSuccess()
                 } else {
                     _loginLoading.value = false
-                    _loginError.value = "Usuario o contraseña incorrectos. Verifica tus credenciales reales del servidor."
+                    _loginError.value = "Usuario o contraseña incorrectos en el servidor ($trimmedServer). Verifica tus credenciales."
                 }
             } catch (e: Exception) {
                 _loginLoading.value = false
-                _loginError.value = "Error al conectar con el servidor. Verifica tu conexión a internet e inténtalo de nuevo."
+                _loginError.value = "Error al conectar con el servidor ($trimmedServer). Verifica tu conexión a internet e inténtalo de nuevo."
             }
         }
     }
@@ -250,6 +264,16 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
         AppStorage.clearSession()
         _isLoggedIn.value = false
         _userInfo.value = null
+        _liveChannels.value = emptyList()
+        _liveCategories.value = emptyList()
+        _vodStreams.value = emptyList()
+        _vodCategories.value = emptyList()
+        _seriesList.value = emptyList()
+        _seriesCategories.value = emptyList()
+        _homeLiveRow.value = emptyList()
+        _homeMoviesRow.value = emptyList()
+        _homeSeriesRow.value = emptyList()
+        _homeHeroItem.value = null
     }
 
     // --- Profile Management ---
