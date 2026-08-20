@@ -176,39 +176,45 @@ object AppUpdateManager {
         }
     }
     private fun fetchFromVersionJson(customUrl: String?): UpdateInfo? {
-        return try {
-            val rawUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
-            val normalized = normalizeUrl(rawUrl)
-            val cacheBuster = if (normalized.contains("?")) "&_cb=${System.currentTimeMillis()}" else "?_cb=${System.currentTimeMillis()}"
-            val targetUrl = "$normalized$cacheBuster"
+        val configuredUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
+        val candidateUrls = mutableListOf<String>()
+        candidateUrls.add(configuredUrl)
+        candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
+        candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/master/version.json")
 
-            val request = Request.Builder()
-                .url(targetUrl)
-                .header("User-Agent", "Nexo-Updater/${currentVersionName}")
-                .header("Cache-Control", "no-cache, no-store, must-revalidate")
-                .header("Pragma", "no-cache")
-                .build()
+        for (url in candidateUrls.distinct()) {
+            try {
+                val normalized = normalizeUrl(url)
+                val cacheBuster = if (normalized.contains("?")) "&_cb=${System.currentTimeMillis()}" else "?_cb=${System.currentTimeMillis()}"
+                val targetUrl = "$normalized$cacheBuster"
 
-            val response = httpClient.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body?.string()
-                if (!body.isNullOrBlank()) {
-                    val update = gson.fromJson(body, UpdateInfo::class.java)
-                    if (update != null && update.versionName.isNotBlank()) {
-                        val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
-                            normalizeUrl(update.apkUrl)
-                        } else {
-                            "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-debug.apk"
+                val request = Request.Builder()
+                    .url(targetUrl)
+                    .header("User-Agent", "Nexo-Updater/${currentVersionName}")
+                    .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                    .header("Pragma", "no-cache")
+                    .build()
+
+                val response = httpClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        val update = gson.fromJson(body, UpdateInfo::class.java)
+                        if (update != null && update.versionName.isNotBlank()) {
+                            val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
+                                normalizeUrl(update.apkUrl)
+                            } else {
+                                "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-debug.apk"
+                            }
+                            return update.copy(apkUrl = resolvedApkUrl)
                         }
-                        return update.copy(apkUrl = resolvedApkUrl)
                     }
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to fetch from version.json ($url): ${e.message}")
             }
-            null
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to fetch from version.json: ${e.message}")
-            null
         }
+        return null
     }
 
     private fun fetchFromGitHubReleases(): UpdateInfo? {

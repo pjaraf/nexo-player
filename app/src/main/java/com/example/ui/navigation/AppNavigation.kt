@@ -82,6 +82,10 @@ fun AppNavigation(
     LaunchedEffect(Unit) {
         AppStorage.setDismissedUpdateVersion(null)
         mainViewModel.checkForUpdates(manual = true)
+        kotlinx.coroutines.delay(2000)
+        if (mainViewModel.updateInfo.value == null) {
+            mainViewModel.checkForUpdates(manual = false)
+        }
     }
 
     if (updateInfo != null) {

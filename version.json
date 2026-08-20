@@ -1,7 +1,7 @@
 {
-    "versionCode": 78,
-    "versionName": "1.1.67",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.67/app-debug.apk",
-    "changelog": "Versión 1.1.67: Soporte para subir y examinar archivos locales M3U (.m3u, .m3u8), almacenamiento local persistente y carga por URL con soporte D-Pad para TV.",
-    "isMandatory": false
+    "versionCode": 79,
+    "versionName": "1.1.68",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.68/app-debug.apk",
+    "changelog": "Versión 1.1.68: Migración completa y exclusiva al reproductor VLC para máxima estabilidad en TV, auto-detección inteligente de servidor en Login y soporte integral para listas M3U locales y remotas.",
+    "isMandatory": true
 }

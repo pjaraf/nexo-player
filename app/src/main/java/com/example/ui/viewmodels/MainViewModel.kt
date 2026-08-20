@@ -122,11 +122,14 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
         AppStorage.setDismissedUpdateVersion(null)
         checkForUpdates(manual = true)
 
-        // React when device comes back online
+        // React when device comes back online or finishes validating network
         viewModelScope.launch {
             isOnline.collect { online ->
-                if (online && _isLoggedIn.value) {
-                    loadHomeContent()
+                if (online) {
+                    checkForUpdates(manual = false)
+                    if (_isLoggedIn.value) {
+                        loadHomeContent()
+                    }
                 }
             }
         }
@@ -134,15 +137,11 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
 
     fun checkForUpdates(manual: Boolean = false, customUrl: String? = null) {
         viewModelScope.launch {
-            if (!isOnline.value) {
-                if (manual) _updateStatusMessage.value = "Sin conexión a internet"
-                return@launch
-            }
             if (manual) {
                 AppStorage.setDismissedUpdateVersion(null)
+                _updateStatusMessage.value = "Buscando actualizaciones..."
             }
             _isCheckingUpdates.value = true
-            if (manual) _updateStatusMessage.value = "Buscando actualizaciones..."
             val result = AppUpdateManager.checkForUpdates(customUrl, force = manual)
             _isCheckingUpdates.value = false
             if (result != null) {
@@ -156,7 +155,7 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
                 }
             } else {
                 if (manual) {
-                    _updateStatusMessage.value = "Tu aplicación ya está actualizada a la última versión."
+                    _updateStatusMessage.value = if (!isOnline.value) "Sin conexión a internet" else "Tu aplicación ya está actualizada a la última versión."
                 }
             }
         }
