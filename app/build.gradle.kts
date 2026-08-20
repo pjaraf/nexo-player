@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexo.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 78
-        versionName = "1.1.67"
+        versionCode = 79
+        versionName = "1.1.68"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -69,12 +69,14 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose)
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.exoplayer.hls)
-    implementation(libs.androidx.media3.ui)
+    // Media3 removed - replaced exclusively with VLC Player
+    // implementation(libs.androidx.media3.exoplayer)
+    // implementation(libs.androidx.media3.exoplayer.hls)
+    // implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.gson)
     implementation(libs.zxing.core)
+    implementation(libs.libvlc.all)
 }

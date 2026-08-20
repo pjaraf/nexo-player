@@ -14,6 +14,7 @@ datastore = "1.1.2"
 okhttp = "4.12.0"
 gson = "2.11.0"
 zxing = "3.5.3"
+libvlc = "3.6.0-eap13"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -38,6 +39,7 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+libvlc-all = { group = "org.videolan.android", name = "libvlc-all", version.ref = "libvlc" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

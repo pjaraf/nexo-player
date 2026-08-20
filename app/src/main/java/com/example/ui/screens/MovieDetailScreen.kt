@@ -54,20 +54,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.Tracks
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.example.data.api.XtreamApi
 import com.example.data.models.VodDetailResponse
 import com.example.data.models.VodStream
+import com.example.player.PlayerManager
+import com.example.player.VlcPlayerView
 import com.example.ui.components.MediaPosterCard
 import com.example.ui.components.POSTER_FALLBACK
 import com.example.ui.theme.*
@@ -108,7 +100,6 @@ fun MovieDetailScreen(
 
 
 
-@OptIn(UnstableApi::class)
 @Composable
 private fun MovieDetailTvScreen(
     movieId: String,
@@ -136,13 +127,8 @@ private fun MovieDetailTvScreen(
     var currentPositionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
 
-    // ExoPlayer for continuous preview and full screen playback
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
-            repeatMode = Player.REPEAT_MODE_OFF
-        }
-    }
+    // PlayerManager for continuous preview and full screen playback
+    val playerManager = remember { PlayerManager(context) }
 
     var isPreviewLoading by remember { mutableStateOf(false) }
 
@@ -166,7 +152,24 @@ private fun MovieDetailTvScreen(
     var availableAudioTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
     var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
     var isSubtitlesDisabled by remember { mutableStateOf(false) }
-    var fullScreenResizeMode by remember { mutableStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    var fullScreenResizeModeIndex by remember { mutableIntStateOf(0) }
+    val resizeModes = listOf(
+        Triple("Ajustar (Original)", null, 0f),
+        Triple("Zoom (Pantalla Completa)", null, 1.25f),
+        Triple("Estirar (16:9)", "16:9", 0f)
+    )
+
+    fun refreshTracks() {
+        val audios = playerManager.getAudioTracks().map {
+            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+        }
+        val subs = playerManager.getSubtitleTracks().map {
+            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+        }
+        availableAudioTracks = audios
+        availableSubtitleTracks = subs
+        isSubtitlesDisabled = subs.none { it.isSelected } || playerManager.mediaPlayer.spuTrack == -1
+    }
 
     val progressList by viewModel.progressList.collectAsState()
     val savedProgress = remember(progressList, movieId) {
@@ -174,16 +177,15 @@ private fun MovieDetailTvScreen(
     }
 
     // Stop playback when leaving foreground
-    DisposableEffect(lifecycleOwner, exoPlayer) {
+    DisposableEffect(lifecycleOwner, playerManager) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
-                    exoPlayer.pause()
-                    exoPlayer.playWhenReady = false
+                    playerManager.pause()
                     isPlaying = false
                 }
                 Lifecycle.Event.ON_RESUME -> {
-                    exoPlayer.playWhenReady = true
+                    playerManager.resume()
                     isPlaying = true
                 }
                 else -> {}
@@ -192,86 +194,34 @@ private fun MovieDetailTvScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer.stop()
-            exoPlayer.release()
+            playerManager.release()
         }
     }
 
-    // ExoPlayer event listener
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> isPreviewLoading = true
-                    Player.STATE_READY -> {
-                        isPreviewLoading = false
-                        previewError = false
-                        durationMs = exoPlayer.duration.coerceAtLeast(0L)
-                    }
-                    Player.STATE_ENDED -> {
-                        isPreviewLoading = false
-                    }
-                    Player.STATE_IDLE -> {}
-                }
-            }
-
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                Log.w("MovieDetailTv", "Player error: ${error.message}")
+    // Setup VLC Player Callbacks
+    LaunchedEffect(playerManager) {
+        playerManager.onBuffering = { buffering, _ ->
+            isPreviewLoading = buffering
+        }
+        playerManager.onPlayingChanged = { playing ->
+            isPlaying = playing
+            if (playing) {
                 isPreviewLoading = false
-                previewError = true
-            }
-
-            override fun onTracksChanged(tracks: Tracks) {
-                val audioList = mutableListOf<MediaTrackOption>()
-                val subList = mutableListOf<MediaTrackOption>()
-                var subSelected = false
-
-                for (groupIndex in 0 until tracks.groups.size) {
-                    val group = tracks.groups[groupIndex]
-                    val trackType = group.type
-                    for (trackIndex in 0 until group.length) {
-                        val isSelected = group.isTrackSelected(trackIndex)
-                        val format = group.getTrackFormat(trackIndex)
-                        val lang = format.language
-                        val rawLabel = format.label
-                        val label = getFriendlyTrackName(trackType, rawLabel, lang, trackIndex)
-
-                        val option = MediaTrackOption(
-                            groupIndex = groupIndex,
-                            trackIndex = trackIndex,
-                            label = label,
-                            language = lang,
-                            isSelected = isSelected,
-                            trackGroup = group
-                        )
-
-                        if (trackType == C.TRACK_TYPE_AUDIO) {
-                            audioList.add(option)
-                        } else if (trackType == C.TRACK_TYPE_TEXT) {
-                            subList.add(option)
-                            if (isSelected) subSelected = true
-                        }
-                    }
-                }
-                availableAudioTracks = audioList
-                availableSubtitleTracks = subList
-                isSubtitlesDisabled = subList.isEmpty() || !subSelected
+                previewError = false
             }
         }
-        exoPlayer.addListener(listener)
-        onDispose { exoPlayer.removeListener(listener) }
-    }
-
-    // Periodic time tracker for playback position
-    LaunchedEffect(isPlaying, isFullScreenMode) {
-        while (true) {
-            currentPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-            durationMs = exoPlayer.duration.coerceAtLeast(0L)
-            delay(500)
+        playerManager.onTimeChanged = { timeMs ->
+            currentPositionMs = timeMs.coerceAtLeast(0L)
+        }
+        playerManager.onLengthChanged = { lenMs ->
+            durationMs = lenMs.coerceAtLeast(0L)
+        }
+        playerManager.onTracksChanged = {
+            refreshTracks()
+        }
+        playerManager.onError = {
+            previewError = true
+            isPreviewLoading = false
         }
     }
 
@@ -297,12 +247,8 @@ private fun MovieDetailTvScreen(
             if (streamUrl.isNotBlank()) {
                 isPreviewLoading = true
                 previewError = false
-                exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
-                if (savedProgress != null && savedProgress.positionMs > 0) {
-                    exoPlayer.seekTo(savedProgress.positionMs)
-                }
-                exoPlayer.prepare()
-                exoPlayer.play()
+                val startPos = savedProgress?.positionMs ?: 0L
+                playerManager.play(streamUrl, startPos)
                 isPlaying = true
             }
         } catch (e: Exception) {
@@ -748,24 +694,10 @@ private fun MovieDetailTvScreen(
                                 }
                                 .testTag("movie_preview_player")
                         ) {
-                            AndroidView(
-                                factory = { ctx ->
-                                    PlayerView(ctx).apply {
-                                        player = exoPlayer
-                                        useController = false
-                                        keepScreenOn = true
-                                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                        layoutParams = FrameLayout.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT
-                                        )
-                                    }
-                                },
-                                update = { playerView ->
-                                    playerView.player = exoPlayer
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
+                        VlcPlayerView(
+                            playerManager = playerManager,
+                            modifier = Modifier.fillMaxSize()
+                        )
 
                             // Loading spinner
                             if (isPreviewLoading) {
@@ -926,23 +858,9 @@ private fun MovieDetailTvScreen(
         } else {
             // Full Screen Mode Player View
             Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                AndroidView(
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            player = exoPlayer
-                            useController = false
-                            keepScreenOn = true
-                            resizeMode = fullScreenResizeMode
-                            layoutParams = FrameLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                        }
-                    },
-                    update = { playerView ->
-                        playerView.player = exoPlayer
-                        playerView.resizeMode = fullScreenResizeMode
-                    },
+                VlcPlayerView(
+                    playerManager = playerManager,
+                    enableSubtitles = true,
                     modifier = Modifier
                         .fillMaxSize()
                         .clickable { showPlayerControls = !showPlayerControls }
@@ -972,28 +890,27 @@ private fun MovieDetailTvScreen(
                         currentPositionMs = currentPositionMs,
                         durationMs = durationMs,
                         onPlayPause = {
-                            if (exoPlayer.isPlaying) {
-                                exoPlayer.pause()
+                            if (playerManager.mediaPlayer.isPlaying) {
+                                playerManager.pause()
                                 isPlaying = false
                             } else {
-                                exoPlayer.play()
+                                playerManager.resume()
                                 isPlaying = true
                             }
                         },
-                        onRewind = { exoPlayer.seekTo((exoPlayer.currentPosition - 10000).coerceAtLeast(0L)) },
+                        onRewind = { playerManager.seekTo((playerManager.mediaPlayer.time - 10000).coerceAtLeast(0L)) },
                         onForward = {
-                            val d = exoPlayer.duration.coerceAtLeast(0L)
-                            val target = if (d > 0) (exoPlayer.currentPosition + 10000).coerceAtMost(d) else (exoPlayer.currentPosition + 10000)
-                            exoPlayer.seekTo(target)
+                            val d = playerManager.mediaPlayer.length.coerceAtLeast(0L)
+                            val target = if (d > 0) (playerManager.mediaPlayer.time + 10000).coerceAtMost(d) else (playerManager.mediaPlayer.time + 10000)
+                            playerManager.seekTo(target)
                         },
                         onExit = { isFullScreenMode = false },
                         onSubtitles = { showTracksDialog = true },
                         onAspectRatio = {
-                            fullScreenResizeMode = when (fullScreenResizeMode) {
-                                AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                                AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                                else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                            }
+                            fullScreenResizeModeIndex = (fullScreenResizeModeIndex + 1) % resizeModes.size
+                            val mode = resizeModes[fullScreenResizeModeIndex]
+                            playerManager.setAspectRatio(mode.second)
+                            playerManager.setScale(mode.third)
                         }
                     )
                 }
@@ -1006,7 +923,7 @@ private fun MovieDetailTvScreen(
                 onDismissRequest = { showTracksDialog = false },
                 containerColor = Color(0xFF14151F),
                 title = {
-                    Text("Idioma y Subtítulos", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Idioma y Subtítulos (VLC)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 },
                 text = {
                     Column(
@@ -1030,15 +947,8 @@ private fun MovieDetailTvScreen(
                                         .onFocusChanged { isTrackFocused = it.isFocused }
                                         .clickable {
                                             try {
-                                                val override = TrackSelectionOverride(track.trackGroup.mediaTrackGroup, listOf(track.trackIndex))
-                                                exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                                                    .buildUpon()
-                                                    .setOverrideForType(override)
-                                                    .setPreferredAudioLanguage(track.language)
-                                                    .build()
-                                                availableAudioTracks = availableAudioTracks.map {
-                                                    it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
-                                                }
+                                                playerManager.setAudioTrack(track.id)
+                                                refreshTracks()
                                             } catch (e: Exception) {
                                                 Log.e("MovieDetailTv", "Error selecting audio track", e)
                                             }
@@ -1079,12 +989,9 @@ private fun MovieDetailTvScreen(
                                 .onFocusChanged { isDisableSubFocused = it.isFocused }
                             .clickable {
                                 try {
-                                    exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                                        .buildUpon()
-                                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                                        .build()
+                                    playerManager.setSubtitleTrack(-1)
                                     isSubtitlesDisabled = true
-                                    availableSubtitleTracks = availableSubtitleTracks.map { it.copy(isSelected = false) }
+                                    refreshTracks()
                                 } catch (e: Exception) {
                                     Log.e("MovieDetailTv", "Error disabling subtitles", e)
                                 }
@@ -1120,17 +1027,9 @@ private fun MovieDetailTvScreen(
                                     .onFocusChanged { isSubFocused = it.isFocused }
                                     .clickable {
                                         try {
-                                            val override = TrackSelectionOverride(track.trackGroup.mediaTrackGroup, listOf(track.trackIndex))
-                                            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                                                .buildUpon()
-                                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-                                                .setOverrideForType(override)
-                                                .setPreferredTextLanguage(track.language)
-                                                .build()
+                                            playerManager.setSubtitleTrack(track.id)
                                             isSubtitlesDisabled = false
-                                            availableSubtitleTracks = availableSubtitleTracks.map {
-                                                it.copy(isSelected = (it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex))
-                                            }
+                                            refreshTracks()
                                         } catch (e: Exception) {
                                             Log.e("MovieDetailTv", "Error selecting subtitle", e)
                                         }

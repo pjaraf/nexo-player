@@ -40,21 +40,17 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.example.data.api.XtreamApi
 import com.example.data.models.Episode
 import com.example.data.models.SeriesDetailInfo
+import com.example.player.PlayerManager
+import com.example.player.VlcPlayerView
 import com.example.ui.components.CinematicBackground
 import com.example.ui.components.POSTER_FALLBACK
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.delay
-import androidx.media3.common.util.UnstableApi
 import androidx.annotation.OptIn
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -79,7 +75,7 @@ fun SeriesDetailScreen(
     }
 }
 
-@OptIn(androidx.media3.common.util.UnstableApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SeriesDetailTvScreen(
     seriesId: String,
@@ -96,11 +92,9 @@ fun SeriesDetailTvScreen(
     var selectedSeason by remember { mutableStateOf("1") }
     var selectedEpisode by remember { mutableStateOf<Episode?>(null) }
     
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
-            repeatMode = Player.REPEAT_MODE_OFF
-            volume = 0f // Muted by default for preview
+    val playerManager = remember {
+        PlayerManager(context).apply {
+            mediaPlayer.volume = 0 // Muted by default for preview
         }
     }
     var isPreviewLoading by remember { mutableStateOf(false) }
@@ -110,14 +104,14 @@ fun SeriesDetailTvScreen(
     var hasRequestedInitialFocus by remember { mutableStateOf(false) }
 
     // Lifecycle
-    DisposableEffect(lifecycleOwner, exoPlayer) {
+    DisposableEffect(lifecycleOwner, playerManager) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
-                    exoPlayer.pause()
+                    playerManager.pause()
                 }
                 Lifecycle.Event.ON_RESUME -> {
-                    exoPlayer.play()
+                    playerManager.resume()
                 }
                 else -> {}
             }
@@ -125,8 +119,7 @@ fun SeriesDetailTvScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer.stop()
-            exoPlayer.release()
+            playerManager.release()
         }
     }
 
@@ -164,11 +157,9 @@ fun SeriesDetailTvScreen(
     LaunchedEffect(selectedEpisode) {
         if (selectedEpisode != null) {
             val url = XtreamApi.getSeriesStreamUrl(selectedEpisode!!.epId, selectedEpisode!!.containerExtension ?: "mp4")
-            exoPlayer.setMediaItem(MediaItem.fromUri(url))
-            exoPlayer.prepare()
-            exoPlayer.play()
+            playerManager.play(url)
         } else {
-            exoPlayer.stop()
+            playerManager.pause()
         }
     }
 
@@ -335,7 +326,7 @@ fun SeriesDetailTvScreen(
                                     val epImg = ep.info?.movieImage ?: seriesCover
                                     val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
                                     
-                                    exoPlayer.pause()
+                                    playerManager.pause()
                                     
                                     onPlayEpisode(
                                         url,
@@ -488,7 +479,7 @@ fun SeriesDetailTvScreen(
                                     val epImg = ep.info?.movieImage ?: seriesCover
                                     val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
                                     
-                                    exoPlayer.pause()
+                                    playerManager.pause()
                                     onPlayEpisode(
                                         url,
                                         "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
@@ -505,22 +496,8 @@ fun SeriesDetailTvScreen(
                             }
                             .testTag("series_preview_player")
                     ) {
-                        AndroidView(
-                            factory = { ctx ->
-                                PlayerView(ctx).apply {
-                                    player = exoPlayer
-                                    useController = false
-                                    keepScreenOn = true
-                                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                    layoutParams = FrameLayout.LayoutParams(
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.MATCH_PARENT
-                                    )
-                                }
-                            },
-                            update = { playerView ->
-                                playerView.player = exoPlayer
-                            },
+                        VlcPlayerView(
+                            playerManager = playerManager,
                             modifier = Modifier.fillMaxSize()
                         )
                         

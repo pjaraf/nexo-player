@@ -1,15 +1,10 @@
 package com.example.ui.screens
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
-import android.net.Uri
 import android.util.Log
-import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
-import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
@@ -24,65 +19,47 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import com.example.ui.components.TvFullscreenPlayerOverlay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.Tracks
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.example.data.api.XtreamApi
 import com.example.data.models.Episode
 import com.example.data.models.LiveChannel
 import com.example.data.models.ProgressItem
 import com.example.player.PlayerManager
-import com.example.ui.components.AppLogo
+import com.example.player.VlcPlayerView
 import com.example.ui.components.BreakingNewsTvBanner
+import com.example.ui.components.TvFullscreenPlayerOverlay
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.delay
@@ -91,50 +68,17 @@ import kotlin.math.abs
 
 // Data structures for tracks and screen aspect ratio mode
 data class MediaTrackOption(
-    val groupIndex: Int,
-    val trackIndex: Int,
+    val id: Int,
     val label: String,
-    val language: String?,
-    val isSelected: Boolean,
-    val trackGroup: Tracks.Group
+    val isSelected: Boolean
 )
 
-enum class ScreenResizeMode(val mode: Int, val title: String, val shortLabel: String) {
-    FIT(AspectRatioFrameLayout.RESIZE_MODE_FIT, "Ajustar (Original)", "Original"),
-    ZOOM(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, "Pantalla Completa (Zoom)", "Zoom"),
-    FILL(AspectRatioFrameLayout.RESIZE_MODE_FILL, "Estirar Pantalla (16:9)", "Estirar")
+enum class ScreenResizeMode(val ratio: String?, val scale: Float, val title: String, val shortLabel: String) {
+    FIT(null, 0f, "Ajustar (Original)", "Original"),
+    ZOOM(null, 1.25f, "Pantalla Completa (Zoom)", "Zoom"),
+    FILL("16:9", 0f, "Estirar Pantalla (16:9)", "Estirar")
 }
 
-fun getFriendlyTrackName(type: Int, rawLabel: String?, language: String?, index: Int): String {
-    val langCode = language?.lowercase()?.trim()
-    val baseLang = when (langCode) {
-        "es", "spa", "spanish" -> "Español"
-        "es-419", "es-la", "lat", "latam" -> "Español Latino"
-        "es-es" -> "Español (España)"
-        "en", "eng", "english" -> "Inglés"
-        "pt", "por", "portuguese" -> "Portugués"
-        "fr", "fra", "french" -> "Francés"
-        "it", "ita", "italian" -> "Italiano"
-        "de", "deu", "ger", "german" -> "Alemán"
-        "ja", "jpn", "japanese" -> "Japonés"
-        "ko", "kor", "korean" -> "Coreano"
-        "zh", "zho", "chi", "chinese" -> "Chino"
-        "ru", "rus", "russian" -> "Ruso"
-        else -> null
-    }
-
-    if (!rawLabel.isNullOrBlank() && rawLabel != language) {
-        return if (baseLang != null && !rawLabel.contains(baseLang, ignoreCase = true)) {
-            "$baseLang ($rawLabel)"
-        } else {
-            rawLabel
-        }
-    }
-    val typeName = if (type == C.TRACK_TYPE_AUDIO) "Audio" else "Subtítulo"
-    return baseLang ?: "$typeName ${index + 1}${if (!language.isNullOrBlank()) " ($language)" else ""}"
-}
-
-@OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(
     initialStreamUrl: String,
@@ -229,15 +173,13 @@ fun PlayerScreen(
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var showControls by remember { mutableStateOf(true) }
 
-    val playerFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val playerFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         delay(150)
         try {
             playerFocusRequester.requestFocus()
-        } catch (e: Exception) {
-            // ignore
-        }
+        } catch (_: Exception) {}
     }
 
     val coroutineScope = rememberCoroutineScope()
@@ -249,24 +191,15 @@ fun PlayerScreen(
     var isNextLoading by remember { mutableStateOf(false) }
     var nextLoadingTitle by remember { mutableStateOf("") }
 
-    // Fetch series episodes if kind == "series"
+    // Load full series detail in background to enable auto-advancing next episodes
     LaunchedEffect(kind, contentId) {
-        if (kind == "series" && !contentId.isNullOrBlank()) {
+        if (kind == "series" && contentId != null) {
             try {
-                val res = XtreamApi.getSeriesDetail(contentId)
-                seriesTitleName = res.first?.name ?: ""
-                if (currentCoverImage.isNullOrBlank() && !res.first?.cover.isNullOrBlank()) {
-                    currentCoverImage = res.first?.cover
-                }
-                val episodesMap = res.second
-                val sortedSeasons = episodesMap.keys.sortedBy { it.toIntOrNull() ?: 99 }
-                val flattened = mutableListOf<Episode>()
-                for (s in sortedSeasons) {
-                    val eps = episodesMap[s] ?: emptyList()
-                    flattened.addAll(eps)
-                }
+                val detail = XtreamApi.getSeriesDetail(contentId)
+                seriesTitleName = detail.first?.name ?: initialTitle
+                val map = detail.second
+                val flattened = map.values.flatten()
                 seriesEpisodes = flattened
-
                 val foundIdx = flattened.indexOfFirst { ep ->
                     val epUrl = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
                     epUrl == initialStreamUrl || (nextContentId != null && ep.epId == nextContentId) || initialTitle.contains(ep.displayTitle)
@@ -282,18 +215,72 @@ fun PlayerScreen(
         }
     }
 
-    // Live TV uses dedicated PlayerManager; Movies & Series use standard ExoPlayer
-    val playerManager = remember(isLive) {
-        if (isLive) PlayerManager(context) else null
+    // Dedicated VLC Player Manager
+    val playerManager = remember { PlayerManager(context) }
+
+    // VOD position tracking
+    var currentPosition by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(0L) }
+
+    // Audio, Subtitles, and Aspect Ratio / Fullscreen states
+    var availableAudioTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
+    var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
+    var isSubtitlesDisabled by remember { mutableStateOf(false) }
+    var showAudioSubtitlesDialog by remember { mutableStateOf(false) }
+    var currentResizeMode by remember(isLive) {
+        mutableStateOf(if (isLive) ScreenResizeMode.FILL else ScreenResizeMode.FIT)
+    }
+    var resizeToastText by remember { mutableStateOf<String?>(null) }
+
+    fun refreshTracks() {
+        val audios = playerManager.getAudioTracks().map {
+            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+        }
+        val subs = playerManager.getSubtitleTracks().map {
+            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+        }
+        availableAudioTracks = audios
+        availableSubtitleTracks = subs
+        isSubtitlesDisabled = subs.none { it.isSelected } || playerManager.mediaPlayer.spuTrack == -1
     }
 
-    val exoPlayer = remember(playerManager, isLive) {
-        if (isLive && playerManager != null) {
-            playerManager.exoPlayer
-        } else {
-            ExoPlayer.Builder(context).build().apply {
-                playWhenReady = true
+    fun applyResizeMode(mode: ScreenResizeMode) {
+        playerManager.setAspectRatio(mode.ratio)
+        playerManager.setScale(mode.scale)
+    }
+
+    fun cycleResizeMode() {
+        val nextMode = when (currentResizeMode) {
+            ScreenResizeMode.FIT -> ScreenResizeMode.ZOOM
+            ScreenResizeMode.ZOOM -> ScreenResizeMode.FILL
+            ScreenResizeMode.FILL -> ScreenResizeMode.FIT
+        }
+        currentResizeMode = nextMode
+        applyResizeMode(nextMode)
+        resizeToastText = nextMode.title
+    }
+
+    fun selectAudioTrack(option: MediaTrackOption) {
+        try {
+            playerManager.setAudioTrack(option.id)
+            refreshTracks()
+        } catch (e: Exception) {
+            Log.e("PlayerScreen", "Error setting audio track", e)
+        }
+    }
+
+    fun selectSubtitleTrack(option: MediaTrackOption?) {
+        try {
+            if (option == null) {
+                playerManager.setSubtitleTrack(-1)
+                isSubtitlesDisabled = true
+            } else {
+                playerManager.setSubtitleTrack(option.id)
+                isSubtitlesDisabled = false
             }
+            refreshTracks()
+        } catch (e: Exception) {
+            Log.e("PlayerScreen", "Error setting subtitle track", e)
         }
     }
 
@@ -314,9 +301,9 @@ fun PlayerScreen(
                 isNextLoading = true
                 nextLoadingTitle = fullNextTitle
                 try {
-                    exoPlayer.pause()
+                    playerManager.pause()
                 } catch (_: Exception) {}
-                delay(1800) // Show "Cargando siguiente episodio..." message
+                delay(1800)
                 currentEpisodeIndex += 1
                 currentTitle = fullNextTitle
                 if (!nextEp.info?.movieImage.isNullOrBlank()) {
@@ -332,7 +319,7 @@ fun PlayerScreen(
                 isNextLoading = true
                 nextLoadingTitle = nextTitle ?: "Siguiente Episodio"
                 try {
-                    exoPlayer.pause()
+                    playerManager.pause()
                 } catch (_: Exception) {}
                 delay(1800)
                 currentTitle = nextTitle ?: "Siguiente Episodio"
@@ -343,92 +330,22 @@ fun PlayerScreen(
                 isNextLoading = false
             }
         } else {
-            // No more episodes in this series: return to the series carátula screen
             onClose()
-        }
-    }
-
-    // VOD position tracking
-    var currentPosition by remember { mutableLongStateOf(0L) }
-    var duration by remember { mutableLongStateOf(0L) }
-    var isSeeking by remember { mutableStateOf(false) }
-    var seekProgress by remember { mutableFloatStateOf(0f) }
-
-    // Audio, Subtitles, and Aspect Ratio / Fullscreen states
-    var availableAudioTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
-    var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
-    var isSubtitlesDisabled by remember { mutableStateOf(false) }
-    var showAudioSubtitlesDialog by remember { mutableStateOf(false) }
-    var currentResizeMode by remember(isLive) {
-        mutableStateOf(if (isLive) ScreenResizeMode.FILL else ScreenResizeMode.FIT)
-    }
-    var resizeToastText by remember { mutableStateOf<String?>(null) }
-
-    fun cycleResizeMode() {
-        val nextMode = when (currentResizeMode) {
-            ScreenResizeMode.FIT -> ScreenResizeMode.ZOOM
-            ScreenResizeMode.ZOOM -> ScreenResizeMode.FILL
-            ScreenResizeMode.FILL -> ScreenResizeMode.FIT
-        }
-        currentResizeMode = nextMode
-        resizeToastText = nextMode.title
-    }
-
-    fun selectAudioTrack(option: MediaTrackOption) {
-        try {
-            val override = TrackSelectionOverride(option.trackGroup.mediaTrackGroup, listOf(option.trackIndex))
-            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                .buildUpon()
-                .setOverrideForType(override)
-                .setPreferredAudioLanguage(option.language)
-                .build()
-            availableAudioTracks = availableAudioTracks.map {
-                it.copy(isSelected = (it.groupIndex == option.groupIndex && it.trackIndex == option.trackIndex))
-            }
-        } catch (e: Exception) {
-            Log.e("PlayerScreen", "Error setting audio track", e)
-        }
-    }
-
-    fun selectSubtitleTrack(option: MediaTrackOption?) {
-        try {
-            if (option == null) {
-                exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                    .buildUpon()
-                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                    .build()
-                isSubtitlesDisabled = true
-                availableSubtitleTracks = availableSubtitleTracks.map { it.copy(isSelected = false) }
-            } else {
-                val override = TrackSelectionOverride(option.trackGroup.mediaTrackGroup, listOf(option.trackIndex))
-                exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                    .buildUpon()
-                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-                    .setOverrideForType(override)
-                    .setPreferredTextLanguage(option.language)
-                    .build()
-                isSubtitlesDisabled = false
-                availableSubtitleTracks = availableSubtitleTracks.map {
-                    it.copy(isSelected = (it.groupIndex == option.groupIndex && it.trackIndex == option.trackIndex))
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("PlayerScreen", "Error setting subtitle track", e)
         }
     }
 
     var liveChannels by remember { mutableStateOf<List<LiveChannel>>(emptyList()) }
     var liveIndex by remember { mutableStateOf(-1) }
 
-    // Stop playback immediately when app goes to background / onPause / onStop, release on dispose
-    DisposableEffect(lifecycleOwner, exoPlayer, playerManager) {
+    // Stop playback immediately when app goes to background, release on dispose
+    DisposableEffect(lifecycleOwner, playerManager) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
-                    playerManager?.pause() ?: run {
-                        exoPlayer.pause()
-                        exoPlayer.playWhenReady = false
-                    }
+                    playerManager.pause()
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    playerManager.resume()
                 }
                 else -> {}
             }
@@ -436,10 +353,7 @@ fun PlayerScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            playerManager?.release() ?: run {
-                exoPlayer.stop()
-                exoPlayer.release()
-            }
+            playerManager.release()
         }
     }
 
@@ -448,42 +362,75 @@ fun PlayerScreen(
         if (isLive) {
             val list = XtreamApi.getLiveChannels(if (categoryId == "ALL" || categoryId == "__FAVS__") null else categoryId)
             liveChannels = list
-            val idx = list.indexOfFirst { it.id == currentChannelId }
-            liveIndex = idx
-            if (idx >= 0) {
-                val target = list[idx]
-                bannerChannelNumber = (target.num?.toString()?.takeIf { it.isNotBlank() }) ?: "${idx + 1}"
-                bannerCategoryName = target.groupName.ifBlank { "TRANSMISIÓN EN VIVO HD" }
-                if (currentCoverImage.isNullOrBlank() && !target.streamIcon.isNullOrBlank()) {
-                    currentCoverImage = target.streamIcon
+            if (currentChannelId != null) {
+                val idx = list.indexOfFirst { it.id == currentChannelId }
+                if (idx >= 0) {
+                    liveIndex = idx
+                    val currentCh = list[idx]
+                    bannerChannelNumber = (currentCh.num?.toString()?.takeIf { it.isNotBlank() }) ?: "${idx + 1}"
+                    bannerCategoryName = currentCh.groupName.ifBlank { "TRANSMISIÓN EN VIVO HD" }
                 }
             }
         }
     }
 
-    // Prepare & play stream URL
+    // Setup VLC Player Callbacks
+    LaunchedEffect(playerManager) {
+        playerManager.onBuffering = { buffering, _ ->
+            isLoading = buffering
+        }
+        playerManager.onPlayingChanged = { playing ->
+            isPlaying = playing
+            if (playing) {
+                isLoading = false
+                errorMsg = null
+            }
+        }
+        playerManager.onTimeChanged = { timeMs ->
+            currentPosition = timeMs.coerceAtLeast(0L)
+        }
+        playerManager.onLengthChanged = { lenMs ->
+            duration = lenMs.coerceAtLeast(0L)
+        }
+        playerManager.onTracksChanged = {
+            refreshTracks()
+        }
+        playerManager.onEndReached = {
+            isLoading = false
+            if (kind == "movie") {
+                onClose()
+            } else if (kind == "series") {
+                playNextEpisode()
+            }
+        }
+        playerManager.onError = { error ->
+            Log.w("PlayerScreen", "VLC Player error on $streamUrl: $error")
+            if (isLive && candidateIndex + 1 < candidates.size) {
+                candidateIndex++
+                streamUrl = candidates[candidateIndex]
+            } else {
+                isLoading = false
+                errorMsg = if (isLive) "Canal en mantenimiento, cambie canal" else "Error al reproducir contenido"
+            }
+        }
+    }
+
+    // Play/Update stream URL in VLC
     LaunchedEffect(streamUrl) {
-        if (streamUrl.isNotBlank()) {
-            isLoading = true
-            errorMsg = null
-            try {
-                Log.d("PlayerScreen", "Preparing stream (candidate $candidateIndex/${candidates.size}): $streamUrl")
-                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-                exoPlayer.setMediaItem(mediaItem)
-                if (resumeMs > 5000 && !isLive && currentEpisodeIndex <= 0) {
-                    exoPlayer.seekTo(resumeMs)
-                }
-                exoPlayer.prepare()
-                exoPlayer.play()
-            } catch (e: Exception) {
-                Log.e("PlayerScreen", "Prepare failed for $streamUrl", e)
-                if (isLive && candidateIndex + 1 < candidates.size) {
-                    candidateIndex++
-                    streamUrl = candidates[candidateIndex]
-                } else {
-                    errorMsg = if (isLive) "Canal en mantenimiento, cambie canal" else "Próximamente"
-                    isLoading = false
-                }
+        isLoading = true
+        errorMsg = null
+        try {
+            val startPos = if (candidateIndex == 0) resumeMs else 0L
+            playerManager.play(streamUrl, startPos)
+            applyResizeMode(currentResizeMode)
+        } catch (e: Exception) {
+            Log.e("PlayerScreen", "Error starting VLC stream $streamUrl", e)
+            if (isLive && candidateIndex + 1 < candidates.size) {
+                candidateIndex++
+                streamUrl = candidates[candidateIndex]
+            } else {
+                errorMsg = if (isLive) "Canal en mantenimiento, cambie canal" else "Error de reproducción"
+                isLoading = false
             }
         }
     }
@@ -492,8 +439,8 @@ fun PlayerScreen(
     LaunchedEffect(streamUrl, isLive) {
         if (isLive && candidates.size > 1) {
             delay(6000)
-            if (isLoading && !exoPlayer.isPlaying) {
-                Log.w("PlayerScreen", "Stream loading watchdog triggered for $streamUrl, trying next format...")
+            if (isLoading && !playerManager.mediaPlayer.isPlaying) {
+                Log.w("PlayerScreen", "Watchdog triggered for $streamUrl, trying next candidate...")
                 if (candidateIndex + 1 < candidates.size) {
                     candidateIndex++
                     streamUrl = candidates[candidateIndex]
@@ -527,114 +474,17 @@ fun PlayerScreen(
         }
     }
 
-    // ExoPlayer listener for playback state, candidate fallback, tracks and auto-play next episode
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> {
-                        if (!exoPlayer.isPlaying) {
-                            isLoading = true
-                        }
-                    }
-                    Player.STATE_READY -> {
-                        isLoading = false
-                        errorMsg = null
-                        duration = exoPlayer.duration.coerceAtLeast(0L)
-                    }
-                    Player.STATE_ENDED -> {
-                        isLoading = false
-                        if (kind == "movie") {
-                            // Automatically return to movie cover/detail screen when movie finishes
-                            onClose()
-                        } else if (kind == "series") {
-                            // Automatically play next episode with loading notification
-                            playNextEpisode()
-                        }
-                    }
-                    Player.STATE_IDLE -> {}
-                }
-            }
-
-            override fun onTracksChanged(tracks: Tracks) {
-                val audioList = mutableListOf<MediaTrackOption>()
-                val subList = mutableListOf<MediaTrackOption>()
-                var subSelected = false
-
-                for (groupIndex in 0 until tracks.groups.size) {
-                    val group = tracks.groups[groupIndex]
-                    val trackType = group.type
-                    for (trackIndex in 0 until group.length) {
-                        val isSelected = group.isTrackSelected(trackIndex)
-                        val format = group.getTrackFormat(trackIndex)
-                        val lang = format.language
-                        val rawLabel = format.label
-                        val label = getFriendlyTrackName(trackType, rawLabel, lang, trackIndex)
-
-                        val option = MediaTrackOption(
-                            groupIndex = groupIndex,
-                            trackIndex = trackIndex,
-                            label = label,
-                            language = lang,
-                            isSelected = isSelected,
-                            trackGroup = group
-                        )
-
-                        if (trackType == C.TRACK_TYPE_AUDIO) {
-                            audioList.add(option)
-                        } else if (trackType == C.TRACK_TYPE_TEXT) {
-                            subList.add(option)
-                            if (isSelected) subSelected = true
-                        }
-                    }
-                }
-                availableAudioTracks = audioList
-                availableSubtitleTracks = subList
-                isSubtitlesDisabled = subList.isEmpty() || !subSelected
-            }
-
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-                if (playing) {
-                    isLoading = false
-                    errorMsg = null
-                }
-            }
-
-            override fun onRenderedFirstFrame() {
-                isLoading = false
-                errorMsg = null
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                Log.w("PlayerScreen", "Player error on $streamUrl (candidate $candidateIndex of ${candidates.size}): ${error.message}")
-                if (isLive && candidateIndex + 1 < candidates.size) {
-                    candidateIndex++
-                    streamUrl = candidates[candidateIndex]
-                } else {
-                    isLoading = false
-                    errorMsg = if (isLive) "Canal en mantenimiento, cambie canal" else "Próximamente"
-                }
-            }
-        }
-        exoPlayer.addListener(listener)
-
-        onDispose {
-            exoPlayer.removeListener(listener)
-        }
-    }
-
     // Periodic Progress & Position Tracking
-    LaunchedEffect(exoPlayer, isLive) {
+    LaunchedEffect(playerManager, isLive) {
         while (true) {
             delay(1000)
-            if (exoPlayer.isPlaying) {
-                currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
-                duration = exoPlayer.duration.coerceAtLeast(0L)
+            if (playerManager.mediaPlayer.isPlaying) {
+                currentPosition = playerManager.mediaPlayer.time.coerceAtLeast(0L)
+                duration = playerManager.mediaPlayer.length.coerceAtLeast(0L)
             }
-            if (!isLive && contentId != null && kind != null && exoPlayer.isPlaying) {
-                val currentPos = exoPlayer.currentPosition
-                val dur = exoPlayer.duration
+            if (!isLive && contentId != null && kind != null && playerManager.mediaPlayer.isPlaying) {
+                val currentPos = playerManager.mediaPlayer.time
+                val dur = playerManager.mediaPlayer.length
                 if (currentPos > 3000 && dur > 10000) {
                     val item = ProgressItem(
                         key = "${kind}:${contentId}",
@@ -686,45 +536,45 @@ fun PlayerScreen(
                             } else false
                         }
                         Key.MediaPlayPause -> {
-                            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                            if (playerManager.mediaPlayer.isPlaying) playerManager.pause() else playerManager.resume()
                             showControls = true
                             true
                         }
                         Key.MediaPlay -> {
-                            exoPlayer.play()
+                            playerManager.resume()
                             showControls = true
                             true
                         }
                         Key.MediaPause -> {
-                            exoPlayer.pause()
+                            playerManager.pause()
                             showControls = true
                             true
                         }
                         Key.DirectionLeft -> {
                             if (!showControls && !isLive) {
-                                val target = (exoPlayer.currentPosition - 10000L).coerceAtLeast(0L)
-                                exoPlayer.seekTo(target)
+                                val target = (playerManager.mediaPlayer.time - 10000L).coerceAtLeast(0L)
+                                playerManager.seekTo(target)
                                 showControls = true
                                 true
                             } else false
                         }
                         Key.DirectionRight -> {
                             if (!showControls && !isLive) {
-                                val target = (exoPlayer.currentPosition + 10000L).coerceAtMost(duration)
-                                exoPlayer.seekTo(target)
+                                val target = (playerManager.mediaPlayer.time + 10000L).coerceAtMost(duration)
+                                playerManager.seekTo(target)
                                 showControls = true
                                 true
                             } else false
                         }
                         Key.MediaFastForward -> {
-                            val target = (exoPlayer.currentPosition + 10000L).coerceAtMost(duration)
-                            exoPlayer.seekTo(target)
+                            val target = (playerManager.mediaPlayer.time + 10000L).coerceAtMost(duration)
+                            playerManager.seekTo(target)
                             showControls = true
                             true
                         }
                         Key.MediaRewind, Key.MediaPrevious -> {
-                            val target = (exoPlayer.currentPosition - 10000L).coerceAtLeast(0L)
-                            exoPlayer.seekTo(target)
+                            val target = (playerManager.mediaPlayer.time - 10000L).coerceAtLeast(0L)
+                            playerManager.seekTo(target)
                             showControls = true
                             true
                         }
@@ -759,7 +609,6 @@ fun PlayerScreen(
                     }
                 } else false
             }
-            // Tap gesture detector to toggle HUD controls
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = {
@@ -770,7 +619,6 @@ fun PlayerScreen(
                     }
                 )
             }
-            // Drag gesture detector to switch Live TV channels with swipe
             .then(
                 if (isLive) {
                     Modifier.pointerInput(liveChannels, liveIndex) {
@@ -790,18 +638,14 @@ fun PlayerScreen(
                                 val threshold = 55f
                                 if (abs(dragY) > abs(dragX)) {
                                     if (dragY < -threshold) {
-                                        // Swiped up -> Next channel
                                         jumpChannel(1, "up")
                                     } else if (dragY > threshold) {
-                                        // Swiped down -> Previous channel
                                         jumpChannel(-1, "down")
                                     }
                                 } else {
                                     if (dragX < -threshold) {
-                                        // Swiped left -> Next channel
                                         jumpChannel(1, "left")
                                     } else if (dragX > threshold) {
-                                        // Swiped right -> Previous channel
                                         jumpChannel(-1, "right")
                                     }
                                 }
@@ -812,24 +656,10 @@ fun PlayerScreen(
             )
             .testTag("player_screen")
     ) {
-        // Video View
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false
-                    keepScreenOn = true
-                    resizeMode = if (isLive) AspectRatioFrameLayout.RESIZE_MODE_FILL else currentResizeMode.mode
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-            },
-            update = { playerView ->
-                playerView.player = exoPlayer
-                playerView.resizeMode = if (isLive) AspectRatioFrameLayout.RESIZE_MODE_FILL else currentResizeMode.mode
-            },
+        // VLC Video View
+        VlcPlayerView(
+            playerManager = playerManager,
+            enableSubtitles = true,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -878,225 +708,104 @@ fun PlayerScreen(
                     Text(
                         text = resizeToastText ?: "",
                         color = Color.White,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
 
-        // "Cargando siguiente episodio" Animated Overlay
-        AnimatedVisibility(
-            visible = isNextLoading,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut(),
-            modifier = Modifier.align(Alignment.Center)
-        ) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Color.Black.copy(alpha = 0.95f),
-                border = androidx.compose.foundation.BorderStroke(1.5.dp, NexusPrimary),
-                shadowElevation = 24.dp,
-                modifier = Modifier
-                    .padding(24.dp)
-                    .widthIn(max = 440.dp)
-                    .testTag("player_loading_next_episode_banner")
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    CircularProgressIndicator(
-                        color = NexusPrimary,
-                        modifier = Modifier.size(52.dp),
-                        strokeWidth = 4.dp
-                    )
-
-                    Text(
-                        text = "Cargando siguiente episodio...",
-                        color = Color.White,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.5.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-
-                    if (nextLoadingTitle.isNotBlank()) {
-                        Text(
-                            text = nextLoadingTitle,
-                            color = NexusTextSecondary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        }
-
-        // Broadcast TV Breaking News style banner for Live TV channel changes (First banner from reference)
-        AnimatedVisibility(
-            visible = isLive && (showLiveChannelBanner || showControls),
-            enter = fadeIn(animationSpec = tween(260)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(300)),
-            exit = fadeOut(animationSpec = tween(220)) + slideOutVertically(targetOffsetY = { it / 2 }, animationSpec = tween(250)),
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(
-                    start = if (isLandscape) 32.dp else 14.dp,
-                    end = if (isLandscape) 32.dp else 14.dp,
-                    bottom = if (isLandscape) 28.dp else 20.dp
-                )
-                .testTag("player_breaking_news_live_banner")
-        ) {
-            BreakingNewsTvBanner(
-                channelName = currentTitle,
-                channelNumber = bannerChannelNumber ?: if (liveIndex >= 0) "${liveIndex + 1}" else "1",
-                categoryName = bannerCategoryName ?: "TRANSMISIÓN EN VIVO HD",
-                channelLogoUrl = currentCoverImage,
-                directionLabel = swipeBannerDirection,
-                totalChannels = liveChannels.size,
-                currentIndex = if (liveIndex >= 0) liveIndex + 1 else 1
-            )
-        }
-
-        // Error overlay with App Logo & Custom Notice
+        // Error message overlay
         if (errorMsg != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.92f))
-                    .padding(24.dp),
+                    .background(Color.Black.copy(alpha = 0.82f))
+                    .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.widthIn(max = 440.dp)
+                    modifier = Modifier.widthIn(max = 480.dp)
                 ) {
-                    // Application Logo above the message
-                    AppLogo(
-                        size = 72.dp,
-                        showText = true,
-                        modifier = Modifier.padding(bottom = 4.dp)
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = Color(0xFFFF5252),
+                        modifier = Modifier.size(64.dp)
                     )
-
-                    if (isLive) {
-                        // Live TV Maintenance Message
-                        Text(
-                            text = "Canal en mantenimiento\ncambie canal",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            lineHeight = 24.sp
-                        )
-
-                        Text(
-                            text = "Este canal está en ajustes técnicos temporales.",
-                            color = NexusTextSecondary,
-                            fontSize = 13.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Quick channel switcher buttons for Live TV
-                        if (liveChannels.size > 1) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Button(
-                                    onClick = {
-                                        errorMsg = null
-                                        isLoading = true
-                                        jumpChannel(-1)
-                                    },
-                                    shape = RoundedCornerShape(999.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = NexusSurfaceVariant),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
-                                    modifier = Modifier.testTag("player_error_prev_btn")
-                                ) {
-                                    Icon(Icons.Default.ChevronLeft, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Canal Anterior", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                                }
-
-                                Button(
-                                    onClick = {
-                                        errorMsg = null
-                                        isLoading = true
-                                        jumpChannel(1)
-                                    },
-                                    shape = RoundedCornerShape(999.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary),
-                                    modifier = Modifier.testTag("player_error_next_btn")
-                                ) {
-                                    Text("Siguiente Canal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-
-                        OutlinedButton(
-                            onClick = onClose,
-                            shape = RoundedCornerShape(999.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, NexusBorder),
-                            modifier = Modifier.testTag("player_error_back_btn")
-                        ) {
-                            Text("Volver", fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                        }
-                    } else {
-                        // Movies & Series "Próximamente" Message
-                        Text(
-                            text = "Próximamente",
-                            color = Color.White,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-
-                        Text(
-                            text = "Este contenido estará disponible muy pronto en la plataforma.",
-                            color = NexusTextSecondary,
-                            fontSize = 13.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Button(
-                            onClick = onClose,
-                            shape = RoundedCornerShape(999.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary),
-                            modifier = Modifier.testTag("player_error_back_btn")
-                        ) {
-                            Text("Volver", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
+                    Text(
+                        text = errorMsg ?: "",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Button(
+                        onClick = onClose,
+                        colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary)
+                    ) {
+                        Text("Regresar")
                     }
                 }
             }
         }
 
-        // Controls HUD Overlay
+        // Live Channel Banner (Breaking News style)
         AnimatedVisibility(
-            visible = showControls,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.fillMaxSize()
+            visible = isLive && showLiveChannelBanner,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
+            modifier = Modifier.align(Alignment.BottomStart)
         ) {
+            BreakingNewsTvBanner(
+                channelNumber = bannerChannelNumber ?: "1",
+                channelName = currentTitle,
+                categoryName = bannerCategoryName ?: "TRANSMISIÓN EN VIVO HD",
+                channelLogoUrl = currentCoverImage,
+                directionLabel = swipeBannerDirection
+            )
+        }
+
+        // Next Episode Loading Overlay
+        if (isNextLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(color = NexusPrimary)
+                    Text(
+                        text = "Cargando siguiente episodio...",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (nextLoadingTitle.isNotBlank()) {
+                        Text(
+                            text = nextLoadingTitle,
+                            color = Color.LightGray,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // Player Controls HUD Overlay
+        if (showControls) {
             if (isLive) {
-                // Live TV HUD: ONLY the Close (X) button at top-left
+                // Simplified Live TV HUD
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .padding(24.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -1119,19 +828,19 @@ fun PlayerScreen(
                     currentPositionMs = currentPosition,
                     durationMs = duration,
                     onPlayPause = {
-                        if (exoPlayer.isPlaying) {
-                            exoPlayer.pause()
+                        if (playerManager.mediaPlayer.isPlaying) {
+                            playerManager.pause()
                         } else {
-                            exoPlayer.play()
+                            playerManager.resume()
                         }
                     },
                     onRewind = {
-                        val target = (exoPlayer.currentPosition - 10000L).coerceAtLeast(0L)
-                        exoPlayer.seekTo(target)
+                        val target = (playerManager.mediaPlayer.time - 10000L).coerceAtLeast(0L)
+                        playerManager.seekTo(target)
                     },
                     onForward = {
-                        val target = (exoPlayer.currentPosition + 10000L).coerceAtMost(duration)
-                        exoPlayer.seekTo(target)
+                        val target = (playerManager.mediaPlayer.time + 10000L).coerceAtMost(duration)
+                        playerManager.seekTo(target)
                     },
                     onExit = onClose,
                     onSubtitles = { showAudioSubtitlesDialog = true },
@@ -1142,6 +851,7 @@ fun PlayerScreen(
                 )
             }
         }
+
         // Audio & Subtitles Selection Dialog
         if (showAudioSubtitlesDialog) {
             AudioSubtitlesDialog(
@@ -1170,7 +880,7 @@ fun AudioSubtitlesDialog(
         containerColor = Color(0xFF14151F),
         title = {
             Text(
-                "Idiomas y Subtítulos",
+                "Idiomas y Subtítulos (VLC)",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp

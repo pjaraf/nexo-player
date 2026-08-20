@@ -44,20 +44,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.example.data.api.XtreamApi
 import com.example.data.models.LiveCategory
 import com.example.data.models.LiveChannel
+import com.example.player.PlayerManager
+import com.example.player.VlcPlayerView
 import com.example.ui.components.BreakingNewsTvBanner
 import com.example.ui.components.CHANNEL_FALLBACK
 import com.example.ui.theme.*
@@ -79,7 +71,6 @@ enum class LiveSubTab {
     FAVORITOS
 }
 
-@OptIn(UnstableApi::class)
 @Composable
 fun LiveScreen(
     viewModel: MainViewModel,
@@ -110,7 +101,6 @@ fun LiveScreen(
  * - Pressing DPAD_LEFT (hacia el lado con el control remoto) or OK opens the floating Categories & Channels windows
  * - Full D-Pad Remote Control compatibility (DPAD_LEFT, DPAD_RIGHT, DPAD_UP, DPAD_DOWN, OK, BACK, CH+/CH-)
  */
-@OptIn(UnstableApi::class)
 @Composable
 private fun TvLiveFullscreenScreen(
     viewModel: MainViewModel,
@@ -142,44 +132,26 @@ private fun TvLiveFullscreenScreen(
     val categoriesListState = rememberLazyListState()
     val channelsListState = rememberLazyListState()
 
-    // Embedded Fullscreen ExoPlayer Instance
-    val exoPlayer = remember {
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(10000)
-            .setReadTimeoutMs(15000)
+    // Embedded Fullscreen VLC Player Instance
+    val playerManager = remember { PlayerManager(context) }
 
-        val defaultDataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
-        val mediaSourceFactory = DefaultMediaSourceFactory(defaultDataSourceFactory)
-
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build().apply {
-                playWhenReady = true
-                repeatMode = Player.REPEAT_MODE_OFF
-            }
-    }
-
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                isPlayerBuffering = playbackState == Player.STATE_BUFFERING
-                if (playbackState == Player.STATE_READY) {
-                    playerHasError = false
-                }
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                playerHasError = true
+    DisposableEffect(playerManager) {
+        playerManager.onBuffering = { buffering, _ ->
+            isPlayerBuffering = buffering
+        }
+        playerManager.onPlayingChanged = { playing ->
+            if (playing) {
                 isPlayerBuffering = false
+                playerHasError = false
             }
         }
-        exoPlayer.addListener(listener)
+        playerManager.onError = {
+            playerHasError = true
+            isPlayerBuffering = false
+        }
 
         onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.stop()
-            exoPlayer.release()
+            playerManager.release()
         }
     }
 
@@ -193,10 +165,7 @@ private fun TvLiveFullscreenScreen(
                 playerHasError = false
                 isPlayerBuffering = true
                 showOsdBanner = true
-                val mediaItem = MediaItem.fromUri(url)
-                exoPlayer.setMediaItem(mediaItem)
-                exoPlayer.prepare()
-                exoPlayer.play()
+                playerManager.play(url, 0L)
             } catch (e: Exception) {
                 playerHasError = true
                 isPlayerBuffering = false
@@ -403,19 +372,9 @@ private fun TvLiveFullscreenScreen(
             }
             .testTag("tv_live_fullscreen_container")
     ) {
-        // --- 1. FULLSCREEN EXOPLAYER VIDEO BACKGROUND (100% Pantalla Completa) ---
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    this.player = exoPlayer
-                    useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-            },
+        // --- 1. FULLSCREEN VLC VIDEO BACKGROUND (100% Pantalla Completa) ---
+        VlcPlayerView(
+            playerManager = playerManager,
             modifier = Modifier
                 .fillMaxSize()
                 .clickable {
@@ -1039,7 +998,6 @@ private fun TvChannelFloatingItem(
 /**
  * MOBILE / PHONE LIVE SCREEN (UNTOUCHED)
  */
-@OptIn(UnstableApi::class)
 @Composable
 private fun PhoneLiveScreen(
     viewModel: MainViewModel,
@@ -1058,44 +1016,26 @@ private fun PhoneLiveScreen(
     var isPlayerBuffering by remember { mutableStateOf(false) }
     var playerHasError by remember { mutableStateOf(false) }
 
-    // Embedded ExoPlayer Instance
-    val exoPlayer = remember {
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(10000)
-            .setReadTimeoutMs(15000)
+    // Embedded VLC Instance
+    val playerManager = remember { PlayerManager(context) }
 
-        val defaultDataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
-        val mediaSourceFactory = DefaultMediaSourceFactory(defaultDataSourceFactory)
-
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build().apply {
-                playWhenReady = true
-                repeatMode = Player.REPEAT_MODE_OFF
-            }
-    }
-
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                isPlayerBuffering = playbackState == Player.STATE_BUFFERING
-                if (playbackState == Player.STATE_READY) {
-                    playerHasError = false
-                }
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                playerHasError = true
+    DisposableEffect(playerManager) {
+        playerManager.onBuffering = { buffering, _ ->
+            isPlayerBuffering = buffering
+        }
+        playerManager.onPlayingChanged = { playing ->
+            if (playing) {
                 isPlayerBuffering = false
+                playerHasError = false
             }
         }
-        exoPlayer.addListener(listener)
+        playerManager.onError = {
+            playerHasError = true
+            isPlayerBuffering = false
+        }
 
         onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.stop()
-            exoPlayer.release()
+            playerManager.release()
         }
     }
 
@@ -1108,10 +1048,7 @@ private fun PhoneLiveScreen(
             try {
                 playerHasError = false
                 isPlayerBuffering = true
-                val mediaItem = MediaItem.fromUri(url)
-                exoPlayer.setMediaItem(mediaItem)
-                exoPlayer.prepare()
-                exoPlayer.play()
+                playerManager.play(url, 0L)
             } catch (e: Exception) {
                 playerHasError = true
                 isPlayerBuffering = false
@@ -1226,17 +1163,8 @@ private fun PhoneLiveScreen(
                 contentAlignment = Alignment.Center
             ) {
                 // Video Surface
-                AndroidView(
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            this.player = exoPlayer
-                            useController = false
-                            layoutParams = FrameLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                        }
-                    },
+                VlcPlayerView(
+                    playerManager = playerManager,
                     modifier = Modifier.fillMaxSize()
                 )
 
