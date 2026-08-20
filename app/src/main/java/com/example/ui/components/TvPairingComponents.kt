@@ -37,6 +37,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.R
 import com.example.data.link.TvLinkManager
+import com.example.data.link.TvLinkPayload
 import com.example.data.storage.AppStorage
 import com.example.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +51,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun TvQrLoginDialog(
     onDismiss: () -> Unit,
-    onLoginSuccess: (serverUrl: String, user: String, pass: String) -> Unit
+    onLoginSuccess: (payload: TvLinkPayload) -> Unit
 ) {
     var pinCode by remember { mutableStateOf("") }
     var isSuccess by remember { mutableStateOf(false) }
@@ -58,11 +59,11 @@ fun TvQrLoginDialog(
     val coroutineScope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
-        val (pin, _) = TvLinkManager.startTvPairingServer { serverUrl, user, pass ->
+        val (pin, _) = TvLinkManager.startTvPairingServer { payload ->
             isSuccess = true
             coroutineScope.launch {
-                delay(1200)
-                onLoginSuccess(serverUrl, user, pass)
+                delay(300)
+                onLoginSuccess(payload)
             }
         }
         pinCode = pin
@@ -356,6 +357,8 @@ fun PhoneLinkTvDialog(
     val currentUsername = AppStorage.getUsername()
     val currentPassword = AppStorage.getPassword()
 
+    val isM3uActive = AppStorage.isM3uMode()
+
     // Auto-discover TV on same Wi-Fi
     LaunchedEffect(Unit) {
         isScanning = true
@@ -379,7 +382,7 @@ fun PhoneLinkTvDialog(
             isSuccess = false
             return
         }
-        if (currentUsername.isBlank() || currentPassword.isBlank()) {
+        if (!isM3uActive && (currentUsername.isBlank() || currentPassword.isBlank())) {
             statusMessage = "No tienes una sesión iniciada en este teléfono para transferir"
             isSuccess = false
             return
@@ -390,12 +393,9 @@ fun PhoneLinkTvDialog(
         focusManager.clearFocus()
 
         coroutineScope.launch {
-            val result = TvLinkManager.sendCredentialsToTv(
+            val result = TvLinkManager.sendCurrentSessionToTv(
                 tvIpOrUrl = targetIp.ifBlank { "192.168.1.1" },
-                pin = pin,
-                serverUrl = currentServerUrl,
-                username = currentUsername,
-                password = currentPassword
+                pin = pin
             )
 
             isSending = false
@@ -406,7 +406,7 @@ fun PhoneLinkTvDialog(
                 onDismiss()
             }.onFailure { err ->
                 isSuccess = false
-                statusMessage = err.message ?: "Error al transferir credenciales"
+                statusMessage = err.message ?: "Error al transferir datos al televisor"
             }
         }
     }
@@ -475,7 +475,11 @@ fun PhoneLinkTvDialog(
                     Spacer(modifier = Modifier.height(18.dp))
 
                     Text(
-                        text = "Transfiere tu cuenta activa de este teléfono a tu Smart TV o Android TV al instante sin escribir contraseñas.",
+                        text = if (isM3uActive) {
+                            "Transfiere tu lista M3U activa a tu Smart TV para que inicie inmediatamente sin tener que escribir la URL."
+                        } else {
+                            "Transfiere tu cuenta activa de este teléfono a tu Smart TV o Android TV al instante sin escribir contraseñas."
+                        },
                         style = MaterialTheme.typography.bodySmall.copy(color = NexusTextSecondary),
                         textAlign = TextAlign.Start,
                         modifier = Modifier.fillMaxWidth()
@@ -483,7 +487,7 @@ fun PhoneLinkTvDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Account summary to transfer
+                    // Account / M3U summary to transfer
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = NexusSurfaceVariant,
@@ -494,15 +498,20 @@ fun PhoneLinkTvDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(Icons.Default.AccountCircle, contentDescription = null, tint = NexusPrimary, modifier = Modifier.size(28.dp))
+                            Icon(
+                                if (isM3uActive) Icons.Default.PlaylistPlay else Icons.Default.AccountCircle,
+                                contentDescription = null,
+                                tint = NexusPrimary,
+                                modifier = Modifier.size(28.dp)
+                            )
                             Column {
                                 Text(
-                                    text = "Cuenta a transferir:",
+                                    text = if (isM3uActive) "Lista M3U a transferir:" else "Cuenta a transferir:",
                                     fontSize = 11.sp,
                                     color = NexusTextSecondary
                                 )
                                 Text(
-                                    text = currentUsername.ifBlank { "Sin sesión activa" },
+                                    text = currentUsername.ifBlank { if (isM3uActive) "Lista M3U" else "Sin sesión activa" },
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White

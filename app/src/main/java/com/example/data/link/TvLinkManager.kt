@@ -2,6 +2,7 @@ package com.example.data.link
 
 import android.graphics.Bitmap
 import android.util.Log
+import com.example.data.storage.AppStorage
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.zxing.BarcodeFormat
@@ -19,6 +20,16 @@ import java.io.OutputStream
 import java.net.*
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
+
+data class TvLinkPayload(
+    val isM3u: Boolean = false,
+    val m3uUrl: String = "",
+    val m3uName: String = "Lista M3U",
+    val m3uContent: String? = null,
+    val serverUrl: String = "",
+    val username: String = "",
+    val password: String = ""
+)
 
 object TvLinkManager {
     private const val TAG = "TvLinkManager"
@@ -38,13 +49,13 @@ object TvLinkManager {
     var currentTvUrl: String = ""
         private set
 
-    private var onLoginReceivedCallback: ((serverUrl: String, user: String, pass: String) -> Unit)? = null
+    private var onLoginReceivedCallback: ((payload: TvLinkPayload) -> Unit)? = null
 
     /**
      * Start the local pairing server on the TV.
      */
     fun startTvPairingServer(
-        onCredentialsReceived: (serverUrl: String, user: String, pass: String) -> Unit
+        onCredentialsReceived: (payload: TvLinkPayload) -> Unit
     ): Pair<String, String> {
         stopTvPairingServer()
 
@@ -147,12 +158,35 @@ object TvLinkManager {
                 try {
                     val jsonObj = gson.fromJson(body, JsonObject::class.java)
                     val pin = jsonObj.get("pin")?.asString?.replace(" ", "") ?: ""
-                    val serverUrl = jsonObj.get("serverUrl")?.asString ?: ""
-                    val username = jsonObj.get("username")?.asString ?: ""
-                    val password = jsonObj.get("password")?.asString ?: ""
+                    val serverUrl = jsonObj.get("serverUrl")?.asString?.trim() ?: ""
+                    val username = jsonObj.get("username")?.asString?.trim() ?: ""
+                    val password = jsonObj.get("password")?.asString?.trim() ?: ""
+                    val m3uUrl = jsonObj.get("m3uUrl")?.asString?.trim() ?: ""
+                    val m3uName = jsonObj.get("m3uName")?.asString?.trim() ?: ""
+                    val m3uContent = jsonObj.get("m3uContent")?.asString
 
-                    if (pin == currentPin && username.isNotBlank() && password.isNotBlank()) {
-                        val respJson = """{"success":true,"message":"Vinculación exitosa"}"""
+                    val isExplicitM3u = jsonObj.get("isM3u")?.asBoolean == true
+                    val isM3uDetected = isExplicitM3u ||
+                            m3uUrl.isNotBlank() ||
+                            !m3uContent.isNullOrBlank() ||
+                            password == "m3u_direct" ||
+                            password == "m3u_local_file" ||
+                            serverUrl.contains(".m3u", ignoreCase = true) ||
+                            serverUrl.contains(".m3u8", ignoreCase = true) ||
+                            serverUrl.startsWith("local://", ignoreCase = true)
+
+                    val cleanM3uUrl = when {
+                        m3uUrl.isNotBlank() -> m3uUrl
+                        serverUrl.startsWith("http://", ignoreCase = true) || serverUrl.startsWith("https://", ignoreCase = true) -> serverUrl
+                        else -> ""
+                    }
+                    val playlistName = m3uName.ifBlank { username.ifBlank { "Lista M3U" } }
+
+                    val isValidM3u = isM3uDetected && (cleanM3uUrl.isNotBlank() || !m3uContent.isNullOrBlank())
+                    val isValidXtream = username.isNotBlank() && password.isNotBlank()
+
+                    if (pin == currentPin && (isValidM3u || isValidXtream)) {
+                        val respJson = """{"success":true,"message":"Vinculación exitosa. Iniciando en la TV..."}"""
                         val response = "HTTP/1.1 200 OK\r\n" +
                                 "Content-Type: application/json\r\n" +
                                 "Content-Length: ${respJson.length}\r\n" +
@@ -161,12 +195,22 @@ object TvLinkManager {
                         output.write(response.toByteArray(Charsets.UTF_8))
                         output.flush()
 
-                        // Notify TV to login
+                        val payload = TvLinkPayload(
+                            isM3u = isM3uDetected,
+                            m3uUrl = cleanM3uUrl,
+                            m3uName = playlistName,
+                            m3uContent = m3uContent,
+                            serverUrl = serverUrl,
+                            username = username,
+                            password = password
+                        )
+
+                        // Notify TV to login immediately
                         CoroutineScope(Dispatchers.Main).launch {
-                            onLoginReceivedCallback?.invoke(serverUrl, username, password)
+                            onLoginReceivedCallback?.invoke(payload)
                         }
                     } else {
-                        val respJson = """{"success":false,"message":"Código PIN inválido"}"""
+                        val respJson = """{"success":false,"message":"Código PIN inválido o datos incompletos"}"""
                         val response = "HTTP/1.1 400 Bad Request\r\n" +
                                 "Content-Type: application/json\r\n" +
                                 "Content-Length: ${respJson.length}\r\n" +
@@ -199,24 +243,47 @@ object TvLinkManager {
     }
 
     /**
-     * Mobile App Client: Sends active session credentials to a TV using IP / PIN.
+     * Mobile App Client: Sends active session credentials or M3U list to a TV using IP / PIN.
      */
-    suspend fun sendCredentialsToTv(
+    suspend fun sendCurrentSessionToTv(
         tvIpOrUrl: String,
-        pin: String,
-        serverUrl: String,
-        username: String,
-        password: String
+        pin: String
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             val cleanIp = tvIpOrUrl.replace("http://", "").replace("https://", "").substringBefore(":").substringBefore("/")
             val targetUrl = "http://$cleanIp:$DEFAULT_PORT/api/link"
 
+            val isM3u = AppStorage.isM3uMode()
+            val isLocalFile = AppStorage.isLocalM3uFile()
+            val m3uUrl = AppStorage.getM3uUrl()
+            val username = AppStorage.getUsername()
+            val password = AppStorage.getPassword()
+            val serverUrl = AppStorage.getServerUrl()
+
             val json = JsonObject().apply {
                 addProperty("pin", pin.replace(" ", ""))
-                addProperty("serverUrl", serverUrl)
-                addProperty("username", username)
-                addProperty("password", password)
+                if (isM3u) {
+                    addProperty("isM3u", true)
+                    addProperty("m3uName", username.ifBlank { "Lista M3U" })
+                    if (isLocalFile) {
+                        addProperty("m3uContent", AppStorage.getLocalM3uFileContent().orEmpty())
+                        addProperty("m3uUrl", "")
+                        addProperty("serverUrl", "local://custom_playlist.m3u")
+                        addProperty("username", username)
+                        addProperty("password", "m3u_local_file")
+                    } else {
+                        val finalUrl = m3uUrl.ifBlank { serverUrl }
+                        addProperty("m3uUrl", finalUrl)
+                        addProperty("serverUrl", finalUrl)
+                        addProperty("username", username)
+                        addProperty("password", "m3u_direct")
+                    }
+                } else {
+                    addProperty("isM3u", false)
+                    addProperty("serverUrl", serverUrl)
+                    addProperty("username", username)
+                    addProperty("password", password)
+                }
             }
 
             val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
@@ -228,10 +295,10 @@ object TvLinkManager {
             httpClient.newCall(request).execute().use { response ->
                 val respStr = response.body?.string().orEmpty()
                 if (response.isSuccessful) {
-                    Result.success("¡Sesión transferida con éxito al televisor!")
+                    Result.success("¡Sesión transferida con éxito! Tu televisor está iniciando...")
                 } else {
                     val message = try {
-                        gson.fromJson(respStr, JsonObject::class.java).get("message")?.asString ?: "PIN incorrecto"
+                        gson.fromJson(respStr, JsonObject::class.java).get("message")?.asString ?: "Código PIN incorrecto"
                     } catch (e: Exception) {
                         "Error al conectar con la TV (Código ${response.code})"
                     }
@@ -241,6 +308,19 @@ object TvLinkManager {
         } catch (e: Exception) {
             Result.failure(Exception("No se pudo contactar al televisor. Asegúrate de estar en la misma red Wi-Fi."))
         }
+    }
+
+    /**
+     * Mobile App Client: Sends active session credentials to a TV using IP / PIN.
+     */
+    suspend fun sendCredentialsToTv(
+        tvIpOrUrl: String,
+        pin: String,
+        serverUrl: String,
+        username: String,
+        password: String
+    ): Result<String> {
+        return sendCurrentSessionToTv(tvIpOrUrl, pin)
     }
 
     /**
@@ -338,19 +418,22 @@ object TvLinkManager {
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
                     body { background: #0a0a0f; color: #ffffff; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-                    .card { background: #14141e; border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; max-width: 420px; width: 100%; padding: 32px 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
-                    .logo { text-align: center; margin-bottom: 24px; }
-                    .logo-badge { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; background: radial-gradient(circle, #ab1225, #780c19); border-radius: 50%; box-shadow: 0 4px 15px rgba(229,9,20,0.4); font-size: 32px; font-weight: 900; color: white; margin-bottom: 12px; }
-                    h1 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 6px; }
-                    p.sub { font-size: 13px; color: #a0a0b0; text-align: center; margin-bottom: 24px; }
-                    .pin-box { background: rgba(229,9,20,0.12); border: 1px dashed #e50914; border-radius: 12px; padding: 12px; text-align: center; font-size: 24px; font-weight: 900; letter-spacing: 6px; color: #ffffff; margin-bottom: 24px; }
-                    .field { margin-bottom: 16px; }
+                    .card { background: #14141e; border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; max-width: 440px; width: 100%; padding: 28px 22px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+                    .logo { text-align: center; margin-bottom: 20px; }
+                    .logo-badge { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; background: radial-gradient(circle, #ab1225, #780c19); border-radius: 50%; box-shadow: 0 4px 15px rgba(229,9,20,0.4); font-size: 28px; font-weight: 900; color: white; margin-bottom: 10px; }
+                    h1 { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; }
+                    p.sub { font-size: 13px; color: #a0a0b0; text-align: center; margin-bottom: 18px; }
+                    .pin-box { background: rgba(229,9,20,0.12); border: 1px dashed #e50914; border-radius: 12px; padding: 10px; text-align: center; font-size: 22px; font-weight: 900; letter-spacing: 6px; color: #ffffff; margin-bottom: 18px; }
+                    .tabs { display: flex; background: #1c1c28; border-radius: 10px; padding: 4px; margin-bottom: 18px; gap: 4px; }
+                    .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; color: #a0a0b0; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+                    .tab-btn.active { background: #e50914; color: white; }
+                    .field { margin-bottom: 14px; }
                     label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #a0a0b0; margin-bottom: 6px; }
-                    input { width: 100%; background: #1c1c28; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 14px; font-size: 15px; color: white; outline: none; }
+                    input { width: 100%; background: #1c1c28; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 13px; font-size: 14px; color: white; outline: none; }
                     input:focus { border-color: #e50914; }
-                    button { width: 100%; background: #e50914; color: white; border: none; border-radius: 10px; padding: 16px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
-                    button:active { transform: scale(0.98); opacity: 0.9; }
-                    .alert { padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 16px; text-align: center; display: none; }
+                    button.submit-btn { width: 100%; background: #e50914; color: white; border: none; border-radius: 10px; padding: 15px; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
+                    button.submit-btn:active { transform: scale(0.98); opacity: 0.9; }
+                    .alert { padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 14px; text-align: center; display: none; }
                     .alert.success { background: rgba(16,185,129,0.2); border: 1px solid #10b981; color: #10b981; }
                     .alert.error { background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #ef4444; }
                 </style>
@@ -360,46 +443,100 @@ object TvLinkManager {
                     <div class="logo">
                         <div class="logo-badge">N</div>
                         <h1>Iniciar Sesión en TV</h1>
-                        <p class="sub">Transfiere tus credenciales al televisor</p>
+                        <p class="sub">Transfiere tu lista M3U o cuenta al televisor</p>
                     </div>
 
                     <div class="pin-box">$pin</div>
 
+                    <div class="tabs">
+                        <button type="button" class="tab-btn active" id="tabM3uBtn" onclick="switchTab('m3u')">Lista M3U (URL)</button>
+                        <button type="button" class="tab-btn" id="tabXtreamBtn" onclick="switchTab('xtream')">Usuario / Contraseña</button>
+                    </div>
+
                     <div id="alert" class="alert"></div>
 
-                    <form id="linkForm" onsubmit="submitForm(event)">
-                        <input type="hidden" id="pin" value="$pin" />
+                    <!-- M3U Form -->
+                    <form id="m3uForm" onsubmit="submitM3uForm(event)">
                         <div class="field">
-                            <label>Servidor / URL</label>
-                            <input type="text" id="serverUrl" placeholder="http://servidor.com:8080" required />
+                            <label>Enlace / URL de la Lista M3U</label>
+                            <input type="url" id="m3uUrlInput" placeholder="http://servidor.com/playlist.m3u" required />
+                        </div>
+                        <div class="field">
+                            <label>Nombre de la Lista (Opcional)</label>
+                            <input type="text" id="m3uNameInput" placeholder="Mi Lista M3U" />
+                        </div>
+                        <button type="submit" class="submit-btn" id="submitM3uBtn">Iniciar Lista en Televisor</button>
+                    </form>
+
+                    <!-- Xtream Form -->
+                    <form id="xtreamForm" style="display: none;" onsubmit="submitXtreamForm(event)">
+                        <div class="field">
+                            <label>Servidor / URL (Opcional)</label>
+                            <input type="text" id="serverUrlInput" placeholder="http://servidor.com:8080" />
                         </div>
                         <div class="field">
                             <label>Usuario</label>
-                            <input type="text" id="username" placeholder="Tu usuario" required />
+                            <input type="text" id="usernameInput" placeholder="Tu usuario" required />
                         </div>
                         <div class="field">
                             <label>Contraseña</label>
-                            <input type="password" id="password" placeholder="Tu contraseña" required />
+                            <input type="password" id="passwordInput" placeholder="Tu contraseña" required />
                         </div>
-                        <button type="submit" id="submitBtn">Vincular Televisor Ahora</button>
+                        <button type="submit" class="submit-btn" id="submitXtreamBtn">Iniciar Sesión en Televisor</button>
                     </form>
                 </div>
 
                 <script>
-                    async function submitForm(e) {
+                    let activeTab = 'm3u';
+
+                    function switchTab(tab) {
+                        activeTab = tab;
+                        document.getElementById('tabM3uBtn').className = tab === 'm3u' ? 'tab-btn active' : 'tab-btn';
+                        document.getElementById('tabXtreamBtn').className = tab === 'xtream' ? 'tab-btn active' : 'tab-btn';
+                        document.getElementById('m3uForm').style.display = tab === 'm3u' ? 'block' : 'none';
+                        document.getElementById('xtreamForm').style.display = tab === 'xtream' ? 'block' : 'none';
+                        document.getElementById('alert').style.display = 'none';
+                    }
+
+                    async function submitM3uForm(e) {
                         e.preventDefault();
-                        const btn = document.getElementById('submitBtn');
+                        const btn = document.getElementById('submitM3uBtn');
+                        const url = document.getElementById('m3uUrlInput').value.trim();
+                        const name = document.getElementById('m3uNameInput').value.trim() || 'Lista M3U';
+
+                        await sendPayload({
+                            pin: '$pin',
+                            isM3u: true,
+                            m3uUrl: url,
+                            m3uName: name,
+                            serverUrl: url,
+                            username: name,
+                            password: 'm3u_direct'
+                        }, btn);
+                    }
+
+                    async function submitXtreamForm(e) {
+                        e.preventDefault();
+                        const btn = document.getElementById('submitXtreamBtn');
+                        const serverUrl = document.getElementById('serverUrlInput').value.trim();
+                        const username = document.getElementById('usernameInput').value.trim();
+                        const password = document.getElementById('passwordInput').value.trim();
+
+                        await sendPayload({
+                            pin: '$pin',
+                            isM3u: false,
+                            serverUrl: serverUrl,
+                            username: username,
+                            password: password
+                        }, btn);
+                    }
+
+                    async function sendPayload(payload, btn) {
                         const alertBox = document.getElementById('alert');
                         btn.disabled = true;
-                        btn.innerText = 'Vinculando con la TV...';
+                        const originalText = btn.innerText;
+                        btn.innerText = 'Enviando a la TV...';
                         alertBox.style.display = 'none';
-
-                        const payload = {
-                            pin: document.getElementById('pin').value,
-                            serverUrl: document.getElementById('serverUrl').value,
-                            username: document.getElementById('username').value,
-                            password: document.getElementById('password').value
-                        };
 
                         try {
                             const res = await fetch('/api/link', {
@@ -411,20 +548,20 @@ object TvLinkManager {
                             alertBox.style.display = 'block';
                             if (data.success) {
                                 alertBox.className = 'alert success';
-                                alertBox.innerText = '¡Listo! Tu sesión se ha iniciado en la televisión.';
+                                alertBox.innerText = '¡Listo! Tu lista se está iniciando en la televisión.';
                                 btn.innerText = '✓ Vinculado con Éxito';
                             } else {
                                 alertBox.className = 'alert error';
-                                alertBox.innerText = data.message || 'Error al vincular';
+                                alertBox.innerText = data.message || 'Error al vincular con la TV';
                                 btn.disabled = false;
-                                btn.innerText = 'Reintentar';
+                                btn.innerText = originalText;
                             }
                         } catch (err) {
                             alertBox.style.display = 'block';
                             alertBox.className = 'alert error';
-                            alertBox.innerText = 'Error de conexión con la TV.';
+                            alertBox.innerText = 'Error de conexión con el televisor.';
                             btn.disabled = false;
-                            btn.innerText = 'Reintentar';
+                            btn.innerText = originalText;
                         }
                     }
                 </script>

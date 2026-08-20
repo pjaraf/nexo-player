@@ -561,11 +561,20 @@ fun LoginScreen(
         if (showTvQrDialog) {
             TvQrLoginDialog(
                 onDismiss = { showTvQrDialog = false },
-                onLoginSuccess = { serverUrl, user, pass ->
+                onLoginSuccess = { payload ->
                     showTvQrDialog = false
-                    username = user
-                    password = pass
-                    viewModel.login(user, pass, serverUrl, onLoginSuccess)
+                    if (payload.isM3u) {
+                        if (!payload.m3uContent.isNullOrBlank()) {
+                            viewModel.loadM3uFileContent(payload.m3uName, payload.m3uContent, onLoginSuccess)
+                        } else {
+                            val targetUrl = payload.m3uUrl.ifBlank { payload.serverUrl }
+                            viewModel.loadM3uPlaylist(targetUrl, payload.m3uName, onLoginSuccess)
+                        }
+                    } else {
+                        username = payload.username
+                        password = payload.password
+                        viewModel.login(payload.username, payload.password, payload.serverUrl, onLoginSuccess)
+                    }
                 }
             )
         }
