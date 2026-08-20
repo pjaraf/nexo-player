@@ -701,7 +701,7 @@ fun PlayerScreen(
                             true
                         }
                         Key.DirectionLeft -> {
-                            if (!isLive) {
+                            if (!showControls && !isLive) {
                                 val target = (exoPlayer.currentPosition - 10000L).coerceAtLeast(0L)
                                 exoPlayer.seekTo(target)
                                 showControls = true
@@ -709,7 +709,7 @@ fun PlayerScreen(
                             } else false
                         }
                         Key.DirectionRight -> {
-                            if (!isLive) {
+                            if (!showControls && !isLive) {
                                 val target = (exoPlayer.currentPosition + 10000L).coerceAtMost(duration)
                                 exoPlayer.seekTo(target)
                                 showControls = true
@@ -735,22 +735,16 @@ fun PlayerScreen(
                             } else false
                         }
                         Key.DirectionUp -> {
-                            if (isLive) {
+                            if (isLive && !showControls) {
                                 jumpChannel(1, "up")
                                 true
-                            } else {
-                                showControls = true
-                                false
-                            }
+                            } else false
                         }
                         Key.DirectionDown -> {
-                            if (isLive) {
+                            if (isLive && !showControls) {
                                 jumpChannel(-1, "down")
                                 true
-                            } else {
-                                showControls = true
-                                false
-                            }
+                            } else false
                         }
                         Key.Back, Key.Escape -> {
                             if (showControls) {
