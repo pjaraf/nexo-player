@@ -52,6 +52,8 @@ import kotlinx.coroutines.launch
 
 private val JetOrange = Color(0xFFDE5B17)
 private val JetOrangeBright = Color(0xFFFF7A00)
+private val PhoneRed = Color(0xFFE50914)
+private val PhoneRedBright = Color(0xFFFF3333)
 private val JetSidebarBg = Color(0xFF141414)
 private val JetBackground = Color(0xFF0D0D0D)
 private val JetCardBg = Color(0xFF1A1A1A)
@@ -865,7 +867,7 @@ private fun PhoneLiveScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = JetOrange,
+                    focusedBorderColor = PhoneRed,
                     unfocusedBorderColor = Color(0xFF2A2A2A),
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
@@ -902,7 +904,7 @@ private fun PhoneLiveScreen(
                 )
 
                 if (isPlayerBuffering) {
-                    CircularProgressIndicator(color = JetOrange, strokeWidth = 3.dp, modifier = Modifier.size(36.dp).align(Alignment.Center))
+                    CircularProgressIndicator(color = PhoneRed, strokeWidth = 3.dp, modifier = Modifier.size(36.dp).align(Alignment.Center))
                 }
 
                 if (playerHasError && !isPlayerBuffering) {
@@ -957,7 +959,7 @@ private fun PhoneLiveScreen(
                     onClick = { activeTab = LiveSubTab.CATEGORIA },
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (activeTab == LiveSubTab.CATEGORIA) JetOrange else Color(0xFF202020),
+                        containerColor = if (activeTab == LiveSubTab.CATEGORIA) PhoneRed else Color(0xFF202020),
                         contentColor = Color.White
                     ),
                     modifier = Modifier.weight(1f).height(38.dp)
@@ -969,7 +971,7 @@ private fun PhoneLiveScreen(
                     onClick = { activeTab = LiveSubTab.FAVORITOS },
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (activeTab == LiveSubTab.FAVORITOS) JetOrange else Color(0xFF202020),
+                        containerColor = if (activeTab == LiveSubTab.FAVORITOS) PhoneRed else Color(0xFF202020),
                         contentColor = Color.White
                     ),
                     modifier = Modifier.weight(1f).height(38.dp)
@@ -1002,7 +1004,7 @@ private fun PhoneLiveScreen(
                             item {
                                 val isSelected = selectedCat == "ALL"
                                 Surface(
-                                    color = if (isSelected) JetOrange else Color.Transparent,
+                                    color = if (isSelected) PhoneRed else Color.Transparent,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable { viewModel.selectLiveCategory("ALL") }
@@ -1020,7 +1022,7 @@ private fun PhoneLiveScreen(
                             itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
                                 val isSelected = selectedCat == cat.categoryId
                                 Surface(
-                                    color = if (isSelected) JetOrange else Color.Transparent,
+                                    color = if (isSelected) PhoneRed else Color.Transparent,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable { viewModel.selectLiveCategory(cat.categoryId) }
@@ -1047,7 +1049,7 @@ private fun PhoneLiveScreen(
                             .background(JetBackground)
                     ) {
                         if (loading && channels.isEmpty()) {
-                            CircularProgressIndicator(color = JetOrange, modifier = Modifier.size(32.dp).align(Alignment.Center))
+                            CircularProgressIndicator(color = PhoneRed, modifier = Modifier.size(32.dp).align(Alignment.Center))
                         } else if (filteredChannels.isEmpty()) {
                             Text(
                                 text = if (search.isNotBlank()) "Sin canales para \"$search\"" else "No hay canales",
@@ -1150,10 +1152,13 @@ private fun ChannelListItemJetGo(
     val formattedIndex = String.format("%03d", index)
     var isFocused by remember { mutableStateOf(false) }
 
+    val activePrimaryColor = if (isTv) JetOrange else PhoneRed
+    val activeNumberColor = if (isTv) JetOrangeBright else PhoneRedBright
+
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(8.dp),
-        color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2C2C3C) else JetCardBg,
+        color = if (isSelected) activePrimaryColor else if (isFocused) Color(0xFF2C2C3C) else JetCardBg,
         border = if (isFocused) BorderStroke(2.dp, Color.White) else null,
         modifier = Modifier
             .fillMaxWidth()
@@ -1171,7 +1176,7 @@ private fun ChannelListItemJetGo(
         ) {
             Text(
                 text = formattedIndex,
-                color = if (isSelected || isFocused) Color.White else JetOrangeBright,
+                color = if (isSelected || isFocused) Color.White else activeNumberColor,
                 fontSize = if (isTv) 13.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.width(32.dp)

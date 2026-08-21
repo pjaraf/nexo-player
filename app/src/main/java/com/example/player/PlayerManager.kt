@@ -94,6 +94,10 @@ class PlayerManager(val context: Context) {
                         try { onError?.invoke("Error de reproducción en VLC") } catch (_: Throwable) {}
                     }
                     MediaPlayer.Event.Vout -> {
+                        try {
+                            targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
+                            targetScale?.let { mediaPlayer.scale = it }
+                        } catch (_: Throwable) {}
                         try { onTracksChanged?.invoke() } catch (_: Throwable) {}
                     }
                 }
@@ -108,7 +112,11 @@ class PlayerManager(val context: Context) {
             if (attachedLayout != layout) {
                 detachViews()
                 attachedLayout = layout
-                mediaPlayer.attachViews(layout, null, enableSubtitles, false)
+                mediaPlayer.attachViews(layout, null, enableSubtitles, true)
+                try {
+                    targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
+                    targetScale?.let { mediaPlayer.scale = it }
+                } catch (_: Throwable) {}
             }
         } catch (e: Exception) {
             Log.e("PlayerManager", "Error attaching VLC views", e)
