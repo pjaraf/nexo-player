@@ -37,8 +37,10 @@ import com.example.BuildConfig
 import com.example.R
 import com.example.data.storage.AppStorage
 import com.example.ui.components.PhoneLinkTvDialog
+import com.example.ui.components.ScreenCastDialog
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
+import com.example.utils.DeviceUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,12 +51,15 @@ fun ProfileScreen(
     onNavigateManageProfiles: () -> Unit,
     onLogout: () -> Unit
 ) {
+    val context = LocalContext.current
+    val isTv = remember { DeviceUtils.isTelevision(context) }
     val activeProfile by viewModel.activeProfile.collectAsState()
     val userInfo by viewModel.userInfo.collectAsState()
     val isCheckingUpdates by viewModel.isCheckingUpdates.collectAsState()
     val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
 
     var showPhoneLinkDialog by remember { mutableStateOf(false) }
+    var showScreenCastDialog by remember { mutableStateOf(false) }
 
     val avatarColor = try {
         Color(android.graphics.Color.parseColor(activeProfile?.color ?: "#E50914"))
@@ -188,14 +193,24 @@ fun ProfileScreen(
                     testTag = "profile_favorites_btn"
                 )
 
-                // Link to TV / Transfer Session
-                MenuOptionCard(
-                    title = "Vincular Televisor (TV)",
-                    subtitle = "Iniciar sesión en tu Smart TV con PIN o QR",
-                    icon = Icons.Default.Tv,
-                    onClick = { showPhoneLinkDialog = true },
-                    testTag = "profile_link_tv_btn"
-                )
+                // Link to TV / Transfer Session (Only shown on mobile devices, not on TV)
+                if (!isTv) {
+                    MenuOptionCard(
+                        title = "Transmitir Pantalla a TV",
+                        subtitle = "Proyectar en Smart TV (Samsung, LG, Android TV, Chromecast)",
+                        icon = Icons.Default.Cast,
+                        onClick = { showScreenCastDialog = true },
+                        testTag = "profile_cast_screen_btn"
+                    )
+
+                    MenuOptionCard(
+                        title = "Vincular Televisor (TV)",
+                        subtitle = "Iniciar sesión en tu Smart TV con PIN o QR",
+                        icon = Icons.Default.Tv,
+                        onClick = { showPhoneLinkDialog = true },
+                        testTag = "profile_link_tv_btn"
+                    )
+                }
 
             }
 
@@ -294,28 +309,6 @@ fun ProfileScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-                        var isSimulateFocused by remember { mutableStateOf(false) }
-                        Button(
-                            onClick = { viewModel.simulateUpdate() },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSimulateFocused) TvFocusBlue else NexusSurfaceVariant
-                            ),
-                            border = androidx.compose.foundation.BorderStroke(
-                                if (isSimulateFocused) 2.dp else 1.dp,
-                                if (isSimulateFocused) Color(0xFFFFC107) else NexusBorder
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
-                                .onFocusChanged { isSimulateFocused = it.isFocused }
-                                .focusable()
-                                .testTag("profile_simulate_update_btn")
-                        ) {
-                            Text("Probar aviso de actualización", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Medium)
-                        }
-
                         if (updateStatusMessage != null) {
                             Text(
                                 text = updateStatusMessage ?: "",
@@ -348,8 +341,6 @@ fun ProfileScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        DetailRow("Servidor", AppStorage.getServerUrl())
-                        HorizontalDivider(color = NexusBorder)
                         DetailRow("Usuario", AppStorage.getUsername().ifBlank { "demo_user" })
                         HorizontalDivider(color = NexusBorder)
                         DetailRow("Vencimiento", userInfo?.expDate ?: "Ilimitado")
@@ -391,6 +382,12 @@ fun ProfileScreen(
         if (showPhoneLinkDialog) {
             PhoneLinkTvDialog(
                 onDismiss = { showPhoneLinkDialog = false }
+            )
+        }
+
+        if (showScreenCastDialog) {
+            ScreenCastDialog(
+                onDismiss = { showScreenCastDialog = false }
             )
         }
     }

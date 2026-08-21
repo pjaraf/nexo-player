@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
@@ -43,6 +44,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.example.data.api.XtreamApi
 import com.example.data.models.Episode
+import com.example.ui.components.ScreenCastDialog
 import com.example.data.models.SeriesDetailInfo
 import com.example.player.PlayerManager
 import com.example.player.VlcPlayerView
@@ -635,6 +637,7 @@ fun SeriesDetailPhoneScreen(
     var episodesMap by remember { mutableStateOf<Map<String, List<Episode>>>(emptyMap()) }
     var selectedSeason by remember { mutableStateOf("1") }
     var selectedEpisode by remember { mutableStateOf<Episode?>(null) }
+    var showScreenCastDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(seriesId) {
         loading = true
@@ -695,6 +698,13 @@ fun SeriesDetailPhoneScreen(
                             modifier = Modifier.padding(top = 40.dp, start = 16.dp).align(Alignment.TopStart)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                        }
+
+                        IconButton(
+                            onClick = { showScreenCastDialog = true },
+                            modifier = Modifier.padding(top = 40.dp, end = 16.dp).align(Alignment.TopEnd)
+                        ) {
+                            Icon(Icons.Default.Cast, contentDescription = "Transmitir a TV", tint = Color.White)
                         }
                         
                         Box(
@@ -825,6 +835,16 @@ fun SeriesDetailPhoneScreen(
                     }
                 }
             }
+        }
+
+        if (showScreenCastDialog) {
+            val ep = selectedEpisode
+            val url = ep?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
+            ScreenCastDialog(
+                streamUrl = url,
+                title = "$seriesTitle - T${selectedSeason}E${ep?.epNumber ?: 1}: ${ep?.displayTitle ?: ""}",
+                onDismiss = { showScreenCastDialog = false }
+            )
         }
     }
 }

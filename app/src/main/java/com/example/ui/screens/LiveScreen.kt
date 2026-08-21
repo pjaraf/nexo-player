@@ -52,6 +52,7 @@ import com.example.player.PlayerManager
 import com.example.player.VlcPlayerView
 import com.example.ui.components.BreakingNewsTvBanner
 import com.example.ui.components.CHANNEL_FALLBACK
+import com.example.ui.components.ScreenCastDialog
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 import com.example.utils.DeviceUtils
@@ -1033,6 +1034,7 @@ private fun PhoneLiveScreen(
     var selectedChannel by remember { mutableStateOf<LiveChannel?>(null) }
     var isPlayerBuffering by remember { mutableStateOf(false) }
     var playerHasError by remember { mutableStateOf(false) }
+    var showScreenCastDialog by remember { mutableStateOf(false) }
 
     // Embedded VLC Instance
     val playerManager = remember { PlayerManager(context) }
@@ -1229,28 +1231,56 @@ private fun PhoneLiveScreen(
                     )
                 }
 
-                // Expand Fullscreen button
-                Surface(
-                    color = Color.Black.copy(alpha = 0.6f),
-                    shape = CircleShape,
+                // Control Buttons (Fullscreen and Cast to TV)
+                Row(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(10.dp)
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = {
-                            selectedChannel?.let { ch ->
-                                onPlayChannel(ch.id, selectedCat, ch.name)
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
+                    // Cast Screen to TV Button
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = CircleShape,
                     ) {
-                        Icon(
-                            Icons.Default.Fullscreen,
-                            contentDescription = "Pantalla completa",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        IconButton(
+                            onClick = { showScreenCastDialog = true },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("live_cast_screen_btn")
+                        ) {
+                            Icon(
+                                Icons.Default.Cast,
+                                contentDescription = "Transmitir a TV",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Expand Fullscreen button
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = CircleShape,
+                    ) {
+                        IconButton(
+                            onClick = {
+                                selectedChannel?.let { ch ->
+                                    onPlayChannel(ch.id, selectedCat, ch.name)
+                                }
+                            },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("live_fullscreen_btn")
+                        ) {
+                            Icon(
+                                Icons.Default.Fullscreen,
+                                contentDescription = "Pantalla completa",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -1478,6 +1508,15 @@ private fun PhoneLiveScreen(
                     }
                 }
             }
+        }
+
+        if (showScreenCastDialog) {
+            val castUrl = selectedChannel?.let { XtreamApi.getLiveStreamCandidates(it.id).firstOrNull() }
+            ScreenCastDialog(
+                streamUrl = castUrl,
+                title = selectedChannel?.name ?: "Canal en Vivo",
+                onDismiss = { showScreenCastDialog = false }
+            )
         }
     }
 }
