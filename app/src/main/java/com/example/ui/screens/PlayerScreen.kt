@@ -231,8 +231,8 @@ fun PlayerScreen(
     var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
     var isSubtitlesDisabled by remember { mutableStateOf(false) }
     var showAudioSubtitlesDialog by remember { mutableStateOf(false) }
-    var currentResizeMode by remember(isLive) {
-        mutableStateOf(if (isLive) ScreenResizeMode.FILL else ScreenResizeMode.FIT)
+    var currentResizeMode by remember(isLive, isTv) {
+        mutableStateOf(if (isLive && !isTv) ScreenResizeMode.FILL else ScreenResizeMode.FIT)
     }
     var resizeToastText by remember { mutableStateOf<String?>(null) }
 

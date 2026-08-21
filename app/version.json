@@ -1,8 +1,8 @@
 {
-  "versionCode": 97,
-  "versionName": "1.1.86",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.86/app-debug.apk",
-  "changelog": "Versión 1.1.86: Notificación de actualización instantánea automática y compatibilidad total en pantallas de TV (estabilidad VLC y carga continua de canales).",
+  "versionCode": 98,
+  "versionName": "1.1.87",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.87/app-debug.apk",
+  "changelog": "Versión 1.1.87: Ajuste de aspecto automático (16:9) en el mini-reproductor y pantalla completa exclusivamente para dispositivos móviles.",
   "isMandatory": true
 }
 

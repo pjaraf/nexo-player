@@ -35,6 +35,9 @@ class PlayerManager(val context: Context) {
     private var currentUrl: String? = null
     private var currentMedia: Media? = null
 
+    private var targetAspectRatio: String? = null
+    private var targetScale: Float? = null
+
     val isPlaying: Boolean
         get() = try {
             mediaPlayer.isPlaying
@@ -65,6 +68,10 @@ class PlayerManager(val context: Context) {
                         try { onBuffering?.invoke(percent < 100.0f, percent) } catch (_: Throwable) {}
                     }
                     MediaPlayer.Event.Playing -> {
+                        try {
+                            targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
+                            targetScale?.let { mediaPlayer.scale = it }
+                        } catch (_: Throwable) {}
                         try { onBuffering?.invoke(false, 100f) } catch (_: Throwable) {}
                         try { onPlayingChanged?.invoke(true) } catch (_: Throwable) {}
                         try { onTracksChanged?.invoke() } catch (_: Throwable) {}
@@ -152,6 +159,8 @@ class PlayerManager(val context: Context) {
             val newMedia = VlcHelper.createMedia(libVLC, url)
             currentMedia = newMedia
             mediaPlayer.media = newMedia
+            targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
+            targetScale?.let { mediaPlayer.scale = it }
             mediaPlayer.play()
             if (startPositionMs > 0L) {
                 mediaPlayer.time = startPositionMs
@@ -204,6 +213,7 @@ class PlayerManager(val context: Context) {
 
     fun setAspectRatio(ratio: String?) {
         try {
+            targetAspectRatio = ratio
             mediaPlayer.aspectRatio = ratio
         } catch (e: Exception) {
             Log.e("PlayerManager", "Error setting aspect ratio: $ratio", e)
@@ -212,6 +222,7 @@ class PlayerManager(val context: Context) {
 
     fun setScale(scale: Float) {
         try {
+            targetScale = scale
             mediaPlayer.scale = scale
         } catch (e: Exception) {
             Log.e("PlayerManager", "Error setting scale: $scale", e)
