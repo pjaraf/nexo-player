@@ -96,24 +96,31 @@ class PlayerManager(val context: Context) {
 
     @Synchronized
     fun play(url: String, startPositionMs: Long = 0L) {
+        if (url.isBlank()) {
+            onError?.invoke("URL de transmisión inválida")
+            return
+        }
         try {
             currentUrl = url
             Log.d("PlayerManager", "VLC Reproduciendo: $url (startPos=$startPositionMs)")
 
             // Cleanly stop prior playback before loading new media
             try {
-                if (mediaPlayer.isPlaying) {
-                    mediaPlayer.stop()
-                }
-            } catch (e: Exception) {
+                mediaPlayer.stop()
+            } catch (e: Throwable) {
                 Log.w("PlayerManager", "Warning stopping prior playback: ${e.message}")
             }
+
+            // Safely detach old media reference from player
+            try {
+                mediaPlayer.media = null
+            } catch (_: Throwable) {}
 
             // Release previous media reference
             try {
                 currentMedia?.release()
                 currentMedia = null
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.w("PlayerManager", "Warning releasing old media: ${e.message}")
             }
 
@@ -124,7 +131,7 @@ class PlayerManager(val context: Context) {
             if (startPositionMs > 0L) {
                 mediaPlayer.time = startPositionMs
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("PlayerManager", "Error al reproducir con VLC: $url", e)
             onError?.invoke(e.localizedMessage ?: "Error al reproducir")
         }

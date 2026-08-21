@@ -25,6 +25,15 @@ class NexusApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Log.e("NexusApp", "Uncaught exception on thread: ${thread.name}", throwable)
+            try {
+                // Log and delegate gracefully
+                defaultHandler?.uncaughtException(thread, throwable)
+            } catch (_: Throwable) {}
+        }
     }
 
     override fun newImageLoader(): ImageLoader {

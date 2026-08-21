@@ -1,8 +1,8 @@
 {
-  "versionCode": 93,
-  "versionName": "1.1.82",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.82/app-debug.apk",
-  "changelog": "Versión 1.1.82: Optimización de memoria y fluidez para dispositivos antiguos y TV boxes de bajos recursos (Large Heap, RGB_565, LibVLC optimizado y prevención de cierres forzados).",
+  "versionCode": 94,
+  "versionName": "1.1.83",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.83/app-debug.apk",
+  "changelog": "Versión 1.1.83: Corrección definitiva de cierres inesperados al cambiar o seleccionar canales en Smart TV (fallback automático de códec por software, prevención de fallos de MediaCodec NDK, protección de listas y sincronización de hilos en VLC).",
   "isMandatory": true
 }
 

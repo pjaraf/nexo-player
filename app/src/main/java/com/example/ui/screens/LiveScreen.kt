@@ -618,7 +618,7 @@ private fun TvLiveFullscreenScreen(
                                 }
 
                                 // Categories from Server
-                                items(categories, key = { it.categoryId }) { cat ->
+                                itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
                                     val isSelected = selectedCat == cat.categoryId && !isFavoritesCategorySelected
                                     TvCategoryFloatingItem(
                                         title = cat.categoryName.uppercase(),
@@ -779,7 +779,7 @@ private fun TvLiveFullscreenScreen(
                                     .focusRequester(channelsFocusRequester),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                itemsIndexed(displayedChannels, key = { _, ch -> ch.id }) { index, channel ->
+                                itemsIndexed(displayedChannels, key = { index, ch -> "${ch.id}_$index" }) { index, channel ->
                                     val isCurrentPlaying = selectedChannel?.id == channel.id
                                     val isFav = viewModel.isFavorite("live", channel.id)
 
@@ -1382,7 +1382,7 @@ private fun PhoneLiveScreen(
                             }
 
                             // Dynamic categories from server
-                            items(categories, key = { it.categoryId }) { cat ->
+                            itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
                                 val isSelected = selectedCat == cat.categoryId
                                 Surface(
                                     color = if (isSelected) JetOrange else Color.Transparent,
@@ -1435,7 +1435,7 @@ private fun PhoneLiveScreen(
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                itemsIndexed(filteredChannels, key = { _, ch -> ch.id }) { index, channel ->
+                                itemsIndexed(filteredChannels, key = { index, ch -> "${ch.id}_$index" }) { index, channel ->
                                     val isSelected = selectedChannel?.id == channel.id
                                     val isFav = viewModel.isFavorite("live", channel.id)
 
@@ -1486,7 +1486,7 @@ private fun PhoneLiveScreen(
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            itemsIndexed(favoriteChannels, key = { _, ch -> ch.id }) { index, channel ->
+                            itemsIndexed(favoriteChannels, key = { index, ch -> "${ch.id}_$index" }) { index, channel ->
                                 val isSelected = selectedChannel?.id == channel.id
                                 ChannelListItemJetGo(
                                     index = index + 1,
