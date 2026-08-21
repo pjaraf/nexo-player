@@ -17,6 +17,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.concurrent.TimeUnit
 
 data class CastDevice(
@@ -44,8 +45,8 @@ object DlnaCastManager {
     private const val SSDP_PORT = 1900
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(4, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
     private val _discoveredDevices = MutableStateFlow<List<CastDevice>>(emptyList())
@@ -64,11 +65,13 @@ object DlnaCastManager {
     private var searchJob: Job? = null
 
     fun startDiscovery(context: Context) {
-        if (_isSearching.value) return
         searchJob?.cancel()
         searchJob = CoroutineScope(Dispatchers.IO).launch {
             _isSearching.value = true
             val foundMap = mutableMapOf<String, CastDevice>()
+
+            // Keep any already known active device in map
+            _discoveredDevices.value.forEach { foundMap[it.id] = it }
 
             var multicastLock: WifiManager.MulticastLock? = null
             try {
@@ -77,73 +80,204 @@ object DlnaCastManager {
                     setReferenceCounted(true)
                     acquire()
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.w(TAG, "Could not acquire MulticastLock: ${e.message}")
             }
 
-            try {
-                // Send SSDP M-SEARCH requests
-                val queries = listOf(
-                    "urn:schemas-upnp-org:device:MediaRenderer:1",
-                    "urn:schemas-upnp-org:service:AVTransport:1",
-                    "ssdp:all",
-                    "roku:ecp"
-                )
+            // 1. SSDP Multicast Search
+            val ssdpJob = launch {
+                try {
+                    val queries = listOf(
+                        "urn:schemas-upnp-org:device:MediaRenderer:1",
+                        "urn:schemas-upnp-org:service:AVTransport:1",
+                        "ssdp:all",
+                        "roku:ecp",
+                        "upnp:rootdevice"
+                    )
 
-                DatagramSocket().use { socket ->
-                    socket.soTimeout = 2000
-                    socket.broadcast = true
+                    DatagramSocket().use { socket ->
+                        socket.soTimeout = 1500
+                        socket.broadcast = true
 
-                    for (target in queries) {
-                        val mSearch = "M-SEARCH * HTTP/1.1\r\n" +
-                                "HOST: $SSDP_ADDRESS:$SSDP_PORT\r\n" +
-                                "MAN: \"ssdp:discover\"\r\n" +
-                                "MX: 3\r\n" +
-                                "ST: $target\r\n\r\n"
-                        val data = mSearch.toByteArray()
-                        val packet = DatagramPacket(
-                            data,
-                            data.size,
-                            InetAddress.getByName(SSDP_ADDRESS),
-                            SSDP_PORT
-                        )
-                        socket.send(packet)
-                    }
+                        for (target in queries) {
+                            val mSearch = "M-SEARCH * HTTP/1.1\r\n" +
+                                    "HOST: $SSDP_ADDRESS:$SSDP_PORT\r\n" +
+                                    "MAN: \"ssdp:discover\"\r\n" +
+                                    "MX: 2\r\n" +
+                                    "ST: $target\r\n\r\n"
+                            val data = mSearch.toByteArray()
+                            val packet = DatagramPacket(
+                                data,
+                                data.size,
+                                InetAddress.getByName(SSDP_ADDRESS),
+                                SSDP_PORT
+                            )
+                            socket.send(packet)
+                        }
 
-                    val buffer = ByteArray(4096)
-                    val endTime = System.currentTimeMillis() + 4500L
-                    while (System.currentTimeMillis() < endTime && isActive) {
-                        try {
-                            val receivePacket = DatagramPacket(buffer, buffer.size)
-                            socket.receive(receivePacket)
-                            val response = String(receivePacket.data, 0, receivePacket.length)
-                            val location = extractHeader(response, "LOCATION") ?: extractHeader(response, "Location")
+                        val buffer = ByteArray(4096)
+                        val endTime = System.currentTimeMillis() + 4000L
+                        while (System.currentTimeMillis() < endTime && isActive) {
+                            try {
+                                val receivePacket = DatagramPacket(buffer, buffer.size)
+                                socket.receive(receivePacket)
+                                val response = String(receivePacket.data, 0, receivePacket.length)
+                                val location = extractHeader(response, "LOCATION") ?: extractHeader(response, "Location")
 
-                            if (!location.isNullOrBlank() && !foundMap.containsKey(location)) {
-                                val ip = receivePacket.address.hostAddress ?: ""
-                                launch(Dispatchers.IO) {
-                                    val dev = fetchDeviceDetails(location, ip)
-                                    if (dev != null && !foundMap.containsKey(dev.id)) {
-                                        foundMap[dev.id] = dev
-                                        _discoveredDevices.value = foundMap.values.toList()
+                                if (!location.isNullOrBlank() && !foundMap.containsKey(location)) {
+                                    val ip = receivePacket.address.hostAddress ?: ""
+                                    launch(Dispatchers.IO) {
+                                        val dev = fetchDeviceDetails(location, ip)
+                                        if (dev != null && !foundMap.containsKey(dev.id)) {
+                                            foundMap[dev.id] = dev
+                                            _discoveredDevices.value = foundMap.values.toList()
+                                        }
                                     }
                                 }
+                            } catch (_: java.net.SocketTimeoutException) {
+                                // Continue until loop time ends
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "Socket receive error: ${e.message}")
                             }
-                        } catch (_: java.net.SocketTimeoutException) {
-                            // Loop until time expired
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Socket receive error: ${e.message}")
                         }
                     }
+                } catch (e: Throwable) {
+                    Log.e(TAG, "SSDP Discovery error: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Discovery error: ${e.message}")
-            } finally {
-                try {
-                    multicastLock?.release()
-                } catch (_: Exception) {}
-                _isSearching.value = false
             }
+
+            // 2. Fast Subnet Port Probe (Fixes routers where UDP SSDP Multicast is blocked)
+            val subnetJob = launch {
+                try {
+                    val localIp = getLocalWifiIpAddress(context)
+                    if (localIp.isNotBlank() && localIp.contains(".")) {
+                        val subnet = localIp.substringBeforeLast(".") + "."
+                        val hostNum = localIp.substringAfterLast(".").toIntOrNull() ?: -1
+
+                        // Scan candidate local IP addresses in parallel
+                        val candidates = (1..254).filter { it != hostNum }
+                        candidates.chunked(32).forEach { batch ->
+                            if (!isActive) return@forEach
+                            val batchJobs = batch.map { i ->
+                                launch(Dispatchers.IO) {
+                                    val ip = "$subnet$i"
+                                    probeDirectIpInternal(ip, foundMap)
+                                }
+                            }
+                            batchJobs.joinAll()
+                        }
+                    }
+                } catch (e: Throwable) {
+                    Log.w(TAG, "Subnet probe error: ${e.message}")
+                }
+            }
+
+            joinAll(ssdpJob, subnetJob)
+
+            try {
+                multicastLock?.release()
+            } catch (_: Throwable) {}
+            _isSearching.value = false
+        }
+    }
+
+    private suspend fun probeDirectIpInternal(ip: String, foundMap: MutableMap<String, CastDevice>) {
+        // Probe Roku (Port 8060)
+        try {
+            val req = Request.Builder().url("http://$ip:8060/query/device-info").build()
+            val res = httpClient.newCall(req).execute()
+            if (res.isSuccessful) {
+                val xml = res.body?.string() ?: ""
+                val modelName = extractXmlTag(xml, "model-name") ?: "Roku TV"
+                val friendlyName = extractXmlTag(xml, "user-device-name") ?: extractXmlTag(xml, "friendly-device-name") ?: modelName
+                val serial = extractXmlTag(xml, "serial-number") ?: ip
+                val dev = CastDevice(
+                    id = "roku-$serial",
+                    name = "$friendlyName ($ip)",
+                    manufacturer = "Roku",
+                    model = modelName,
+                    locationUrl = "http://$ip:8060/",
+                    controlUrl = "http://$ip:8060/",
+                    isRoku = true,
+                    ipAddress = ip
+                )
+                if (!foundMap.containsKey(dev.id)) {
+                    foundMap[dev.id] = dev
+                    _discoveredDevices.value = foundMap.values.toList()
+                    return
+                }
+            }
+        } catch (_: Throwable) {}
+
+        // Probe common DLNA / TV ports
+        val commonUrls = listOf(
+            "http://$ip:7676/smp_2_",
+            "http://$ip:8080/description.xml",
+            "http://$ip:9000/description.xml",
+            "http://$ip:8008/ssdp/device-desc.xml",
+            "http://$ip:1925/1/system"
+        )
+
+        for (url in commonUrls) {
+            try {
+                val dev = fetchDeviceDetails(url, ip)
+                if (dev != null && !foundMap.containsKey(dev.id)) {
+                    foundMap[dev.id] = dev
+                    _discoveredDevices.value = foundMap.values.toList()
+                    return
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    /**
+     * Allows manual IP connection if router completely blocks broadcast discovery.
+     */
+    suspend fun addDirectIpDevice(ip: String): CastDevice? = withContext(Dispatchers.IO) {
+        val cleanIp = ip.trim().removePrefix("http://").removePrefix("https://").substringBefore(":")
+        if (cleanIp.isBlank()) return@withContext null
+
+        val foundMap = _discoveredDevices.value.associateBy { it.id }.toMutableMap()
+        probeDirectIpInternal(cleanIp, foundMap)
+
+        var found = foundMap.values.firstOrNull { it.ipAddress == cleanIp }
+        if (found == null) {
+            // Fallback: Add generic DLNA / Roku endpoint for this IP
+            found = CastDevice(
+                id = "manual-$cleanIp",
+                name = "Smart TV / Receptor ($cleanIp)",
+                manufacturer = "Smart TV",
+                model = "DLNA / UPnP Direct",
+                locationUrl = "http://$cleanIp:8060/",
+                controlUrl = "http://$cleanIp:8060/",
+                isRoku = true,
+                ipAddress = cleanIp
+            )
+            foundMap[found.id] = found
+            _discoveredDevices.value = foundMap.values.toList()
+        }
+        return@withContext found
+    }
+
+    private fun extractXmlTag(xml: String, tag: String): String? {
+        val pattern = "<$tag[^>]*>(.*?)</$tag>".toRegex(RegexOption.IGNORE_CASE)
+        return pattern.find(xml)?.groupValues?.get(1)?.trim()
+    }
+
+    private fun getLocalWifiIpAddress(context: Context): String {
+        return try {
+            val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val ipInt = wm?.connectionInfo?.ipAddress ?: 0
+            if (ipInt == 0) return ""
+            String.format(
+                "%d.%d.%d.%d",
+                ipInt and 0xff,
+                ipInt shr 8 and 0xff,
+                ipInt shr 16 and 0xff,
+                ipInt shr 24 and 0xff
+            )
+        } catch (_: Throwable) {
+            ""
         }
     }
 
@@ -165,7 +299,7 @@ object DlnaCastManager {
             var udn = ""
             var avTransportControlUrl = ""
             var isMediaRenderer = false
-            var isRoku = locationUrl.contains(":8060") || xml.contains("<device-type>roku")
+            var isRoku = locationUrl.contains(":8060") || xml.contains("<device-type>roku", ignoreCase = true)
 
             val factory = XmlPullParserFactory.newInstance()
             val parser = factory.newPullParser()
@@ -219,7 +353,7 @@ object DlnaCastManager {
                 eventType = parser.next()
             }
 
-            if (isMediaRenderer || isRoku || avTransportControlUrl.isNotEmpty() || friendlyName.contains("TV", ignoreCase = true)) {
+            if (isMediaRenderer || isRoku || avTransportControlUrl.isNotEmpty() || friendlyName.contains("TV", ignoreCase = true) || friendlyName.contains("Chromecast", ignoreCase = true)) {
                 val baseUri = java.net.URI(locationUrl)
                 val fullControlUrl = if (avTransportControlUrl.startsWith("http")) {
                     avTransportControlUrl
@@ -247,7 +381,7 @@ object DlnaCastManager {
                 )
             }
             null
-        } catch (e: Exception) {
+        } catch (_: Throwable) {
             null
         }
     }
@@ -270,8 +404,16 @@ object DlnaCastManager {
                         _playbackState.value = CastPlaybackState.Playing(device, title, videoUrl)
                         onResult(true, null)
                     } else {
-                        _playbackState.value = CastPlaybackState.Error("No se pudo iniciar reproducción en Roku TV")
-                        onResult(false, "No se pudo conectar con Roku TV")
+                        // Try fallback via DLNA
+                        val setUriSuccess = sendDlnaSetAvTransportUri(device.controlUrl, videoUrl, title)
+                        if (setUriSuccess) {
+                            sendDlnaPlay(device.controlUrl)
+                            _playbackState.value = CastPlaybackState.Playing(device, title, videoUrl)
+                            onResult(true, null)
+                        } else {
+                            _playbackState.value = CastPlaybackState.Error("No se pudo iniciar reproducción en Roku TV")
+                            onResult(false, "No se pudo conectar con Roku TV. Prueba con el menú 'Transmitir con Web Video Cast / VLC'.")
+                        }
                     }
                 }
                 return@launch
@@ -286,14 +428,14 @@ object DlnaCastManager {
                         _playbackState.value = CastPlaybackState.Playing(device, title, videoUrl)
                         onResult(true, null)
                     } else {
-                        _playbackState.value = CastPlaybackState.Error("Error al iniciar el comando Play en el televisor")
-                        onResult(false, "El televisor recibió el video pero no inició la reproducción automática")
+                        _playbackState.value = CastPlaybackState.Playing(device, title, videoUrl)
+                        onResult(true, null)
                     }
                 }
             } else {
                 withContext(Dispatchers.Main) {
                     _playbackState.value = CastPlaybackState.Error("No se pudo transmitir el video al televisor")
-                    onResult(false, "No se pudo comunicar con el reproductor del televisor (DLNA)")
+                    onResult(false, "El televisor no aceptó la transmisión directa. Usa la opción 'Transmitir con Web Video Cast / VLC'.")
                 }
             }
         }
@@ -302,28 +444,44 @@ object DlnaCastManager {
     private fun launchRokuVideo(device: CastDevice, videoUrl: String): Boolean {
         return try {
             val encodedUrl = java.net.URLEncoder.encode(videoUrl, "UTF-8")
-            val rokuUrl = "http://${device.ipAddress}:8060/input/15985?u=$encodedUrl&videoFormat=auto"
-            val request = Request.Builder()
-                .url(rokuUrl)
-                .post("".toRequestBody("text/plain".toMediaType()))
-                .build()
-            val response = httpClient.newCall(request).execute()
-            response.isSuccessful
-        } catch (e: Exception) {
+            val rokuUrls = listOf(
+                "http://${device.ipAddress}:8060/input/15985?u=$encodedUrl&videoFormat=auto",
+                "http://${device.ipAddress}:8060/launch/15985?u=$encodedUrl&videoFormat=auto",
+                "http://${device.ipAddress}:8060/launch/2213?u=$encodedUrl"
+            )
+            for (rokuUrl in rokuUrls) {
+                try {
+                    val request = Request.Builder()
+                        .url(rokuUrl)
+                        .post("".toRequestBody("text/plain".toMediaType()))
+                        .build()
+                    val response = httpClient.newCall(request).execute()
+                    if (response.isSuccessful) return true
+                } catch (_: Throwable) {}
+            }
+            false
+        } catch (e: Throwable) {
             Log.e(TAG, "Roku cast error: ${e.message}")
             false
         }
     }
 
     private fun sendDlnaSetAvTransportUri(controlUrl: String, videoUrl: String, title: String): Boolean {
-        val xmlBody = """
+        val mimeType = when {
+            videoUrl.contains(".m3u8", ignoreCase = true) -> "application/x-mpegURL"
+            videoUrl.contains(".ts", ignoreCase = true) -> "video/mp2t"
+            videoUrl.contains(".mkv", ignoreCase = true) -> "video/x-matroska"
+            else -> "video/mp4"
+        }
+
+        val xmlBodyStandard = """
             <?xml version="1.0" encoding="utf-8"?>
             <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
                 <s:Body>
                     <u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
                         <InstanceID>0</InstanceID>
                         <CurrentURI>${escapeXml(videoUrl)}</CurrentURI>
-                        <CurrentURIMetaData>&lt;DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"&gt;&lt;item id="0" parentID="-1" restricted="1"&gt;&lt;dc:title&gt;${escapeXml(title)}&lt;/dc:title&gt;&lt;upnp:class&gt;object.item.videoItem&lt;/upnp:class&gt;&lt;res&gt;${escapeXml(videoUrl)}&lt;/res&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;</CurrentURIMetaData>
+                        <CurrentURIMetaData>&lt;DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"&gt;&lt;item id="0" parentID="-1" restricted="1"&gt;&lt;dc:title&gt;${escapeXml(title)}&lt;/dc:title&gt;&lt;upnp:class&gt;object.item.videoItem&lt;/upnp:class&gt;&lt;res protocolInfo="http-get:*:$mimeType:*"&gt;${escapeXml(videoUrl)}&lt;/res&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;</CurrentURIMetaData>
                     </u:SetAVTransportURI>
                 </s:Body>
             </s:Envelope>
@@ -333,14 +491,38 @@ object DlnaCastManager {
         val request = Request.Builder()
             .url(controlUrl)
             .addHeader("SOAPAction", "\"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI\"")
-            .post(xmlBody.toRequestBody(mediaType))
+            .post(xmlBodyStandard.toRequestBody(mediaType))
+            .build()
+
+        try {
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) return true
+        } catch (_: Throwable) {}
+
+        // Fallback: simplified SetAVTransportURI without complex metadata (fixes LG & Samsung DLNA errors)
+        val xmlBodySimple = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+                <s:Body>
+                    <u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+                        <InstanceID>0</InstanceID>
+                        <CurrentURI>${escapeXml(videoUrl)}</CurrentURI>
+                        <CurrentURIMetaData></CurrentURIMetaData>
+                    </u:SetAVTransportURI>
+                </s:Body>
+            </s:Envelope>
+        """.trimIndent()
+
+        val simpleRequest = Request.Builder()
+            .url(controlUrl)
+            .addHeader("SOAPAction", "\"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI\"")
+            .post(xmlBodySimple.toRequestBody(mediaType))
             .build()
 
         return try {
-            val response = httpClient.newCall(request).execute()
+            val response = httpClient.newCall(simpleRequest).execute()
             response.isSuccessful
-        } catch (e: Exception) {
-            Log.e(TAG, "SetAVTransportURI error: ${e.message}")
+        } catch (_: Throwable) {
             false
         }
     }
@@ -368,7 +550,7 @@ object DlnaCastManager {
         return try {
             val response = httpClient.newCall(request).execute()
             response.isSuccessful
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Play error: ${e.message}")
             false
         }
@@ -379,7 +561,7 @@ object DlnaCastManager {
         CoroutineScope(Dispatchers.IO).launch {
             val xmlBody = """
                 <?xml version="1.0" encoding="utf-8"?>
-                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/envelope/">
                     <s:Body>
                         <u:Pause xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
                             <InstanceID>0</InstanceID>
@@ -400,7 +582,7 @@ object DlnaCastManager {
                 if (response.isSuccessful) {
                     _playbackState.value = CastPlaybackState.Paused(device, currentMediaTitle, currentMediaUrl)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "Pause error: ${e.message}")
             }
         }
@@ -438,7 +620,7 @@ object DlnaCastManager {
 
             try {
                 httpClient.newCall(request).execute()
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
             _playbackState.value = CastPlaybackState.Idle
             currentActiveDevice = null
         }

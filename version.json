@@ -1,7 +1,7 @@
 {
-    "versionCode": 94,
-    "versionName": "1.1.83",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.83/app-debug.apk",
-    "changelog": "Versión 1.1.83: Corrección definitiva de cierres inesperados al cambiar o seleccionar canales en Smart TV (fallback automático de códec por software, prevención de fallos de MediaCodec NDK, protección de listas y sincronización de hilos en VLC).",
+    "versionCode": 95,
+    "versionName": "1.1.84",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.84/app-debug.apk",
+    "changelog": "Versión 1.1.84: Mejora integral de transmisión a Smart TV (escaneo de subred para routers con bloqueo multicast, conexión por IP directa, transmisión directa a Web Video Caster / VLC, compatibilidad DLNA Samsung/LG/Roku y soporte MIME dinámico).",
     "isMandatory": true
 }
