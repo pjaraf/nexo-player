@@ -538,15 +538,20 @@ fun PhoneLinkTvDialog(
                         discoveredTvs.forEach { tv ->
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = NexusSurfaceVariant,
-                                border = BorderStroke(1.dp, NexusPrimary.copy(alpha = 0.4f)),
+                                color = if (tvIpInput == tv.ip) NexusPrimary.copy(alpha = 0.15f) else NexusSurfaceVariant,
+                                border = BorderStroke(1.dp, if (tvIpInput == tv.ip) NexusPrimary else NexusBorder),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 8.dp)
                                     .clickable {
                                         tvIpInput = tv.ip
-                                        pinInput = tv.pin
-                                        submitPairing(tv.ip, tv.pin)
+                                        if (tv.pin.isNotBlank() && pinInput.isBlank()) {
+                                            pinInput = tv.pin
+                                        }
+                                        val effPin = if (pinInput.length == 6) pinInput else tv.pin
+                                        if (effPin.length == 6) {
+                                            submitPairing(tv.ip, effPin)
+                                        }
                                     }
                             ) {
                                 Row(
@@ -568,8 +573,15 @@ fun PhoneLinkTvDialog(
                                     Button(
                                         onClick = {
                                             tvIpInput = tv.ip
-                                            pinInput = tv.pin
-                                            submitPairing(tv.ip, tv.pin)
+                                            if (tv.pin.isNotBlank() && pinInput.isBlank()) {
+                                                pinInput = tv.pin
+                                            }
+                                            val effPin = if (pinInput.length == 6) pinInput else tv.pin
+                                            if (effPin.length == 6) {
+                                                submitPairing(tv.ip, effPin)
+                                            } else {
+                                                statusMessage = "Por favor ingresa los 6 dígitos del código PIN de tu televisor"
+                                            }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary),
                                         shape = RoundedCornerShape(8.dp),

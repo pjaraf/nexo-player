@@ -1,7 +1,7 @@
 {
-    "versionCode": 80,
-    "versionName": "1.1.69",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.69/app-debug.apk",
-    "changelog": "Versión 1.1.69: Inicio instantáneo en Smart TV al vincular listas M3U y cuentas desde el teléfono mediante código PIN.",
+    "versionCode": 81,
+    "versionName": "1.1.70",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.70/app-debug.apk",
+    "changelog": "Versión 1.1.70: Corrección y optimización del socket de enlace local HTTP, lectura de flujo binario y conexión instantánea TV-Móvil.",
     "isMandatory": true
 }

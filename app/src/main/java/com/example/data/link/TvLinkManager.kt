@@ -14,8 +14,8 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.io.OutputStream
 import java.net.*
 import java.util.concurrent.TimeUnit
@@ -39,8 +39,10 @@ object TvLinkManager {
     private var serverJob: Job? = null
     private val gson = Gson()
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(4, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     var currentPin: String = ""
@@ -68,7 +70,10 @@ object TvLinkManager {
 
         serverJob = CoroutineScope(Dispatchers.IO).launch {
             try {
-                serverSocket = ServerSocket(DEFAULT_PORT)
+                serverSocket = ServerSocket().apply {
+                    reuseAddress = true
+                    bind(InetSocketAddress(DEFAULT_PORT))
+                }
                 Log.d(TAG, "TV Pairing Server listening on port $DEFAULT_PORT, IP: $localIp, PIN: $currentPin")
 
                 while (isActive && serverSocket?.isClosed == false) {
@@ -106,54 +111,98 @@ object TvLinkManager {
 
     private fun handleClient(socket: Socket) {
         try {
-            socket.soTimeout = 8000
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+            socket.soTimeout = 10000
+            val input: InputStream = socket.getInputStream()
             val output: OutputStream = socket.getOutputStream()
 
-            val requestLine = reader.readLine() ?: return
-            val parts = requestLine.split(" ")
-            if (parts.size < 2) return
+            // Read request line and headers byte by byte until \r\n\r\n
+            val headerBytes = ByteArrayOutputStream()
+            var b: Int
+            var doubleNewlineFound = false
+            while (input.read().also { b = it } != -1) {
+                headerBytes.write(b)
+                val size = headerBytes.size()
+                val bytes = headerBytes.toByteArray()
+                if (size >= 4 &&
+                    bytes[size - 4] == '\r'.code.toByte() &&
+                    bytes[size - 3] == '\n'.code.toByte() &&
+                    bytes[size - 2] == '\r'.code.toByte() &&
+                    bytes[size - 1] == '\n'.code.toByte()
+                ) {
+                    doubleNewlineFound = true
+                    break
+                }
+                if (size > 16384) break
+            }
 
-            val method = parts[0]
+            if (!doubleNewlineFound) {
+                socket.close()
+                return
+            }
+
+            val headerText = String(headerBytes.toByteArray(), Charsets.UTF_8)
+            val headerLines = headerText.lines()
+            if (headerLines.isEmpty()) {
+                socket.close()
+                return
+            }
+
+            val requestLine = headerLines[0]
+            val parts = requestLine.split(" ")
+            if (parts.size < 2) {
+                socket.close()
+                return
+            }
+
+            val method = parts[0].uppercase()
             val path = parts[1]
 
             var contentLength = 0
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                if (line.isNullOrBlank()) break
-                if (line!!.startsWith("Content-Length:", ignoreCase = true)) {
-                    contentLength = line!!.substringAfter(":").trim().toIntOrNull() ?: 0
+            for (line in headerLines) {
+                if (line.startsWith("Content-Length:", ignoreCase = true)) {
+                    contentLength = line.substringAfter(":").trim().toIntOrNull() ?: 0
                 }
             }
 
-            if (method == "GET" && (path.startsWith("/link") || path == "/" || path.startsWith("/?"))) {
-                // Return Mobile Web Pairing Page
+            if (method == "OPTIONS") {
+                val response = "HTTP/1.1 204 No Content\r\n" +
+                        "Access-Control-Allow-Origin: *\r\n" +
+                        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
+                        "Access-Control-Allow-Headers: Content-Type, Authorization\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "\r\n"
+                output.write(response.toByteArray(Charsets.UTF_8))
+                output.flush()
+            } else if (method == "GET" && (path.startsWith("/link") || path == "/" || path.startsWith("/?"))) {
                 val html = generateWebPairingPage(currentPin)
+                val htmlBytes = html.toByteArray(Charsets.UTF_8)
                 val response = "HTTP/1.1 200 OK\r\n" +
                         "Content-Type: text/html; charset=UTF-8\r\n" +
-                        "Content-Length: ${html.toByteArray(Charsets.UTF_8).size}\r\n" +
+                        "Content-Length: ${htmlBytes.size}\r\n" +
                         "Access-Control-Allow-Origin: *\r\n" +
-                        "\r\n" + html
+                        "\r\n"
                 output.write(response.toByteArray(Charsets.UTF_8))
+                output.write(htmlBytes)
                 output.flush()
             } else if (method == "GET" && path.startsWith("/api/status")) {
                 val json = """{"status":"ready","pin":"$currentPin"}"""
+                val jsonBytes = json.toByteArray(Charsets.UTF_8)
                 val response = "HTTP/1.1 200 OK\r\n" +
                         "Content-Type: application/json\r\n" +
-                        "Content-Length: ${json.length}\r\n" +
+                        "Content-Length: ${jsonBytes.size}\r\n" +
                         "Access-Control-Allow-Origin: *\r\n" +
                         "\r\n" + json
                 output.write(response.toByteArray(Charsets.UTF_8))
                 output.flush()
             } else if (method == "POST" && path.startsWith("/api/link")) {
-                val bodyChars = CharArray(contentLength)
-                var read = 0
-                while (read < contentLength) {
-                    val count = reader.read(bodyChars, read, contentLength - read)
-                    if (count <= 0) break
-                    read += count
+                val bodyBytes = ByteArray(contentLength)
+                var totalRead = 0
+                while (totalRead < contentLength) {
+                    val bytesRead = input.read(bodyBytes, totalRead, contentLength - totalRead)
+                    if (bytesRead <= 0) break
+                    totalRead += bytesRead
                 }
-                val body = String(bodyChars)
+                val body = String(bodyBytes, 0, totalRead, Charsets.UTF_8)
 
                 try {
                     val jsonObj = gson.fromJson(body, JsonObject::class.java)
@@ -187,9 +236,10 @@ object TvLinkManager {
 
                     if (pin == currentPin && (isValidM3u || isValidXtream)) {
                         val respJson = """{"success":true,"message":"Vinculación exitosa. Iniciando en la TV..."}"""
+                        val respBytes = respJson.toByteArray(Charsets.UTF_8)
                         val response = "HTTP/1.1 200 OK\r\n" +
                                 "Content-Type: application/json\r\n" +
-                                "Content-Length: ${respJson.length}\r\n" +
+                                "Content-Length: ${respBytes.size}\r\n" +
                                 "Access-Control-Allow-Origin: *\r\n" +
                                 "\r\n" + respJson
                         output.write(response.toByteArray(Charsets.UTF_8))
@@ -211,9 +261,10 @@ object TvLinkManager {
                         }
                     } else {
                         val respJson = """{"success":false,"message":"Código PIN inválido o datos incompletos"}"""
+                        val respBytes = respJson.toByteArray(Charsets.UTF_8)
                         val response = "HTTP/1.1 400 Bad Request\r\n" +
                                 "Content-Type: application/json\r\n" +
-                                "Content-Length: ${respJson.length}\r\n" +
+                                "Content-Length: ${respBytes.size}\r\n" +
                                 "Access-Control-Allow-Origin: *\r\n" +
                                 "\r\n" + respJson
                         output.write(response.toByteArray(Charsets.UTF_8))
@@ -221,9 +272,11 @@ object TvLinkManager {
                     }
                 } catch (e: Exception) {
                     val respJson = """{"success":false,"message":"Error de formato JSON"}"""
+                    val respBytes = respJson.toByteArray(Charsets.UTF_8)
                     val response = "HTTP/1.1 400 Bad Request\r\n" +
                             "Content-Type: application/json\r\n" +
-                            "Content-Length: ${respJson.length}\r\n" +
+                            "Content-Length: ${respBytes.size}\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n" +
                             "\r\n" + respJson
                     output.write(response.toByteArray(Charsets.UTF_8))
                     output.flush()
@@ -306,6 +359,7 @@ object TvLinkManager {
                 }
             }
         } catch (e: Exception) {
+            Log.e(TAG, "sendCurrentSessionToTv failure", e)
             Result.failure(Exception("No se pudo contactar al televisor. Asegúrate de estar en la misma red Wi-Fi."))
         }
     }
