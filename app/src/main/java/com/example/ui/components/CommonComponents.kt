@@ -48,8 +48,8 @@ import com.example.data.models.ProgressItem
 import com.example.data.models.VodStream
 import com.example.ui.theme.*
 
-const val POSTER_FALLBACK = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&q=80"
-const val CHANNEL_FALLBACK = "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&q=80"
+const val POSTER_FALLBACK = ""
+const val CHANNEL_FALLBACK = ""
 
 @Composable
 fun AppLogo(

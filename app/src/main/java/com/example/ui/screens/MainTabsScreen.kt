@@ -158,6 +158,17 @@ fun MainTabsScreen(
         }
 
         if (currentTab == MainTab.HOME) {
+            val homeTabFocusRequester = remember { FocusRequester() }
+
+            LaunchedEffect(Unit) {
+                if (isTv) {
+                    kotlinx.coroutines.delay(250)
+                    try {
+                        homeTabFocusRequester.requestFocus()
+                    } catch (_: Exception) {}
+                }
+            }
+
             // --- TELEVISION HOME SCREEN WITH FIXED ICON-ONLY NAVIGATION RAIL ON THE LEFT ---
             Row(
                 modifier = Modifier
@@ -187,12 +198,19 @@ fun MainTabsScreen(
                             Surface(
                                 shape = CircleShape,
                                 color = when {
+                                    isFocused && isSelected -> NexusPrimary
+                                    isFocused -> Color.White.copy(alpha = 0.25f)
                                     isSelected -> NexusPrimary
-                                    isFocused -> Color.White.copy(alpha = 0.2f)
                                     else -> Color.Transparent
                                 },
+                                border = if (isFocused) {
+                                    androidx.compose.foundation.BorderStroke(2.5.dp, Color.White)
+                                } else if (isSelected) {
+                                    androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
+                                } else null,
                                 modifier = Modifier
                                     .size(48.dp)
+                                    .then(if (tab == MainTab.HOME) Modifier.focusRequester(homeTabFocusRequester) else Modifier)
                                     .onFocusChanged { isFocused = it.isFocused }
                                     .focusable()
                                     .clickable { currentTab = tab }

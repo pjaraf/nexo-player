@@ -151,12 +151,10 @@ fun HomeScreen(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-                // --- 1. Dynamic Fullscreen Backdrop Layer (Uncropped 16:9 Hero for TV & WideScreen) ---
-                // Active for whichever card the user is currently focused on in Home, always visible behind floating menu
-                val currentBackdrop = selectedMedia?.backdropUrl ?: (moviesRow.firstOrNull()?.streamIcon ?: POSTER_FALLBACK)
-                val showHero = true
+                // --- 1. Background Layer: Use CinematicBackground (same as Login screen) if no item selected or when empty ---
+                val currentBackdrop = selectedMedia?.backdropUrl?.takeIf { it.isNotBlank() }
 
-                if (showHero) {
+                if (currentBackdrop != null) {
                     Crossfade(
                         targetState = currentBackdrop,
                         animationSpec = tween(durationMillis = 400),
@@ -238,6 +236,9 @@ fun HomeScreen(
                             )
                         }
                     }
+                } else {
+                    // Exact same cinematic poster wall background as Login screen
+                    CinematicBackground()
                 }
 
                 // --- 2. Main Scrollable Content ---
@@ -254,7 +255,7 @@ fun HomeScreen(
                         modifier = Modifier.statusBarsPadding()
                     )
 
-                    // --- Dynamic Hero Details for TV & Mobile (Shows current selected title for any focused card) ---
+                    // --- Dynamic Hero Details for TV & Mobile (Shows current selected title or default greeting) ---
                     val media = selectedMedia
                     if (media != null) {
                             Column(
@@ -336,7 +337,57 @@ fun HomeScreen(
                                     )
                                 }
                             }
+                    } else {
+                        // Empty/Welcome Hero when there is no content loaded
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .padding(top = if (isWideScreen) 32.dp else 16.dp, bottom = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "N",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFFE50914),
+                                        fontFamily = FontFamily.SansSerif,
+                                        fontSize = 24.sp
+                                    )
+                                )
+                                Text(
+                                    text = "NEXO PLAYER",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 3.sp,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        fontSize = 13.sp
+                                    )
+                                )
+                            }
+                            Text(
+                                text = "Entretenimiento Ilimitado",
+                                style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = if (isWideScreen) 36.sp else 24.sp,
+                                    color = Color.White
+                                )
+                            )
+                            Text(
+                                text = "Utiliza el menú lateral para acceder a la guía de Canales de TV en Vivo, Películas, Series o la configuración de tu Perfil.",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = if (isWideScreen) 15.sp else 13.sp,
+                                    lineHeight = 20.sp
+                                ),
+                                modifier = Modifier.widthIn(max = 640.dp)
+                            )
                         }
+                    }
 
                     // --- Tendencias ahora (Películas) ---
                     if (moviesRow.isNotEmpty()) {
