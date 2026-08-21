@@ -1038,6 +1038,8 @@ private fun PhoneLiveScreen(
     val playerManager = remember { PlayerManager(context) }
 
     DisposableEffect(playerManager) {
+        playerManager.setAspectRatio("16:9")
+        playerManager.setScale(0f)
         playerManager.onBuffering = { buffering, _ ->
             isPlayerBuffering = buffering
         }
@@ -1174,8 +1176,8 @@ private fun PhoneLiveScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
-                    .height(52.dp)
+                    .padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 4.dp)
+                    .height(48.dp)
                     .testTag("live_search_input")
             )
 
@@ -1183,8 +1185,8 @@ private fun PhoneLiveScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 4.dp)
-                    .height(200.dp)
+                    .padding(horizontal = 14.dp, vertical = 2.dp)
+                    .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color.Black)
                     .border(1.dp, Color(0xFF262626), RoundedCornerShape(14.dp))
@@ -1201,46 +1203,6 @@ private fun PhoneLiveScreen(
                     playerManager = playerManager,
                     modifier = Modifier.fillMaxSize()
                 )
-
-                // Central Channel Logo / Circular Badge
-                if (selectedChannel != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(76.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.55f))
-                            .border(2.dp, Color.White.copy(alpha = 0.75f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(58.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.15f))
-                                .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val iconUrl = selectedChannel?.streamIcon?.takeIf { it.isNotBlank() }
-                            if (iconUrl != null) {
-                                AsyncImage(
-                                    model = iconUrl,
-                                    contentDescription = selectedChannel?.name,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.Tv,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                    }
-                }
 
                 // Buffering indicator
                 if (isPlayerBuffering) {
