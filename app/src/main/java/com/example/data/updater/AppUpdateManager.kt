@@ -185,23 +185,23 @@ object AppUpdateManager {
     private fun fetchFromVersionJson(customUrl: String?): UpdateInfo? {
         val configuredUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
         val candidateUrls = mutableListOf<String>()
-        candidateUrls.add(configuredUrl)
-        candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
+        candidateUrls.add(configuredUrl)
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/master/version.json")
-        candidateUrls.add("https://fastly.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
+        candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
 
         for (url in candidateUrls.distinct()) {
             try {
                 val normalized = normalizeUrl(url)
-                val cacheBuster = if (normalized.contains("?")) "&_cb=${System.currentTimeMillis()}" else "?_cb=${System.currentTimeMillis()}"
+                val cacheBuster = if (normalized.contains("?")) "&_t=${System.currentTimeMillis()}" else "?_t=${System.currentTimeMillis()}"
                 val targetUrl = "$normalized$cacheBuster"
 
                 val request = Request.Builder()
                     .url(targetUrl)
                     .header("User-Agent", "Nexo-Updater/${currentVersionName}")
-                    .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                    .header("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
                     .header("Pragma", "no-cache")
+                    .header("Expires", "0")
                     .build()
 
                 val response = httpClient.newCall(request).execute()
