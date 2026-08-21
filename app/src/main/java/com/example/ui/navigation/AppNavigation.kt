@@ -81,10 +81,22 @@ fun AppNavigation(
 
     LaunchedEffect(Unit) {
         AppStorage.setDismissedUpdateVersion(null)
-        mainViewModel.checkForUpdates(manual = true)
-        kotlinx.coroutines.delay(2000)
-        if (mainViewModel.updateInfo.value == null) {
-            mainViewModel.checkForUpdates(manual = false)
+        // Immediate check and active retry sequence on startup (0.5s, 2s, 5s, 10s, 20s, 40s)
+        val retryDelays = listOf(500L, 2000L, 5000L, 10000L, 20000L, 40000L)
+        for (delayMs in retryDelays) {
+            if (mainViewModel.updateInfo.value == null) {
+                mainViewModel.checkForUpdates(manual = true)
+                kotlinx.coroutines.delay(delayMs)
+            } else {
+                break
+            }
+        }
+        // Continuous background check every 60 seconds so users get prompted automatically
+        while (true) {
+            kotlinx.coroutines.delay(60000L)
+            if (mainViewModel.updateInfo.value == null) {
+                mainViewModel.checkForUpdates(manual = true)
+            }
         }
     }
 
