@@ -419,6 +419,10 @@ fun PlayerScreen(
     LaunchedEffect(streamUrl) {
         isLoading = true
         errorMsg = null
+        if (isLive) {
+            // Give smooth debounce on live channel zap
+            delay(200)
+        }
         try {
             val startPos = if (candidateIndex == 0) resumeMs else 0L
             playerManager.play(streamUrl, startPos)

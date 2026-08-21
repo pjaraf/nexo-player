@@ -33,6 +33,7 @@ class PlayerManager(val context: Context) {
     var onTracksChanged: (() -> Unit)? = null
 
     private var currentUrl: String? = null
+    private var currentMedia: Media? = null
 
     init {
         mediaPlayer.setEventListener { event ->
@@ -93,13 +94,32 @@ class PlayerManager(val context: Context) {
         }
     }
 
+    @Synchronized
     fun play(url: String, startPositionMs: Long = 0L) {
         try {
             currentUrl = url
             Log.d("PlayerManager", "VLC Reproduciendo: $url (startPos=$startPositionMs)")
-            val media = VlcHelper.createMedia(libVLC, url)
-            mediaPlayer.media = media
-            media.release()
+
+            // Cleanly stop prior playback before loading new media
+            try {
+                if (mediaPlayer.isPlaying) {
+                    mediaPlayer.stop()
+                }
+            } catch (e: Exception) {
+                Log.w("PlayerManager", "Warning stopping prior playback: ${e.message}")
+            }
+
+            // Release previous media reference
+            try {
+                currentMedia?.release()
+                currentMedia = null
+            } catch (e: Exception) {
+                Log.w("PlayerManager", "Warning releasing old media: ${e.message}")
+            }
+
+            val newMedia = VlcHelper.createMedia(libVLC, url)
+            currentMedia = newMedia
+            mediaPlayer.media = newMedia
             mediaPlayer.play()
             if (startPositionMs > 0L) {
                 mediaPlayer.time = startPositionMs
@@ -110,6 +130,7 @@ class PlayerManager(val context: Context) {
         }
     }
 
+    @Synchronized
     fun pause() {
         try {
             if (mediaPlayer.isPlaying) {
@@ -120,6 +141,7 @@ class PlayerManager(val context: Context) {
         }
     }
 
+    @Synchronized
     fun resume() {
         try {
             if (!mediaPlayer.isPlaying) {
@@ -130,6 +152,7 @@ class PlayerManager(val context: Context) {
         }
     }
 
+    @Synchronized
     fun stop() {
         try {
             mediaPlayer.stop()
@@ -138,6 +161,7 @@ class PlayerManager(val context: Context) {
         }
     }
 
+    @Synchronized
     fun seekTo(timeMs: Long) {
         try {
             mediaPlayer.time = timeMs.coerceAtLeast(0L)
@@ -202,10 +226,17 @@ class PlayerManager(val context: Context) {
         }
     }
 
+    @Synchronized
     fun release() {
         try {
             detachViews()
-            mediaPlayer.stop()
+            try {
+                mediaPlayer.stop()
+            } catch (_: Exception) {}
+            try {
+                currentMedia?.release()
+                currentMedia = null
+            } catch (_: Exception) {}
             mediaPlayer.release()
         } catch (e: Exception) {
             Log.e("PlayerManager", "Error al liberar VLC MediaPlayer", e)

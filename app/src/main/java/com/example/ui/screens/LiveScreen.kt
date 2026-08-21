@@ -155,16 +155,20 @@ private fun TvLiveFullscreenScreen(
         }
     }
 
-    // Play selected channel inside full screen player
+    // Play selected channel inside full screen player with debounce for smooth fast remote zapping
     LaunchedEffect(selectedChannel) {
         val ch = selectedChannel
         if (ch != null) {
+            showOsdBanner = true
+            isPlayerBuffering = true
+            playerHasError = false
+            // Short debounce to permit fast remote channel browsing without flooding native LibVLC decoder
+            delay(220)
             val url = ch.directStreamUrl?.takeIf { it.isNotBlank() }
                 ?: XtreamApi.getLiveStreamUrl(ch.id)
             try {
                 playerHasError = false
                 isPlayerBuffering = true
-                showOsdBanner = true
                 playerManager.play(url, 0L)
             } catch (e: Exception) {
                 playerHasError = true
@@ -1039,10 +1043,13 @@ private fun PhoneLiveScreen(
         }
     }
 
-    // Play selected channel inside the embedded preview
+    // Play selected channel inside the embedded preview with debounce
     LaunchedEffect(selectedChannel) {
         val ch = selectedChannel
         if (ch != null) {
+            isPlayerBuffering = true
+            playerHasError = false
+            delay(200)
             val url = ch.directStreamUrl?.takeIf { it.isNotBlank() }
                 ?: XtreamApi.getLiveStreamUrl(ch.id)
             try {
