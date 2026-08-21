@@ -34,6 +34,7 @@ object AppUpdateManager {
         .readTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
         .build()
 
     private val _downloadState = MutableStateFlow<UpdateDownloadState>(UpdateDownloadState.Idle)
@@ -69,7 +70,7 @@ object AppUpdateManager {
     }
 
     /**
-     * Returns true ONLY if the remote version is strictly newer than the current version.
+     * Returns true if the remote version is newer by build code or semantic version name.
      */
     fun isUpdateNewer(
         remoteVersionName: String,
@@ -77,13 +78,19 @@ object AppUpdateManager {
         currentVersionName: String,
         currentVersionCode: Int
     ): Boolean {
-        if (remoteVersionName.isBlank()) return false
-        val comparison = compareVersions(remoteVersionName, currentVersionName)
-        return when {
-            comparison > 0 -> true // Newer semantic version (e.g. 1.1.17 > 1.1.16)
-            comparison == 0 -> remoteVersionCode > currentVersionCode // Same version name, newer build code
-            else -> false // Older version (e.g. 1.1.14 < 1.1.16) -> DO NOT UPDATE
+        if (remoteVersionName.isBlank() && remoteVersionCode <= 0) return false
+        // If remote versionCode is strictly higher, it's definitely a newer build
+        if (remoteVersionCode > 0 && currentVersionCode > 0 && remoteVersionCode > currentVersionCode) {
+            return true
         }
+        val comparison = compareVersions(remoteVersionName, currentVersionName)
+        if (comparison > 0) {
+            return true
+        }
+        if (comparison == 0) {
+            return remoteVersionCode > currentVersionCode
+        }
+        return false
     }
 
     fun isVersionHigher(remoteVersion: String, currentVersion: String): Boolean {
@@ -179,8 +186,10 @@ object AppUpdateManager {
         val configuredUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
         val candidateUrls = mutableListOf<String>()
         candidateUrls.add(configuredUrl)
+        candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/master/version.json")
+        candidateUrls.add("https://fastly.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
 
         for (url in candidateUrls.distinct()) {
             try {

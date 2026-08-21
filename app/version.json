@@ -1,8 +1,8 @@
 {
-  "versionCode": 82,
-  "versionName": "1.1.71",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.71/app-debug.apk",
-  "changelog": "Versión 1.1.71: Solución al cierre de la app al cambiar canales en Smart TV, sincronización de decodificador por hardware con respaldo por software y cambio fluido con control remoto.",
+  "versionCode": 83,
+  "versionName": "1.1.72",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.72/app-debug.apk",
+  "changelog": "Versión 1.1.72: Optimización del sistema de actualización automática con soporte multi-servidor CDN, detección inmediata en Smart TV y solución a cierres inesperados.",
   "isMandatory": true
 }
 

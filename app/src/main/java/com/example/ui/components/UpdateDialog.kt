@@ -22,6 +22,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +53,14 @@ fun UpdateDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val primaryFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(300)
+        try {
+            primaryFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
 
     Dialog(
         onDismissRequest = {
@@ -238,13 +255,20 @@ fun UpdateDialog(
                 ) {
                     when (downloadState) {
                         is UpdateDownloadState.ReadyToInstall -> {
+                            var isFocused by remember { mutableStateOf(false) }
                             Button(
                                 onClick = { onInstall(downloadState.apkFilePath) },
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isFocused) Color(0xFF059669) else Color(0xFF10B981)),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp)
+                                    .focusRequester(primaryFocusRequester)
+                                    .onFocusChanged { isFocused = it.isFocused }
+                                    .then(
+                                        if (isFocused) Modifier.border(2.dp, Color.White, RoundedCornerShape(12.dp))
+                                        else Modifier
+                                    )
                                     .testTag("install_update_btn")
                             ) {
                                 Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Color.White)
@@ -277,13 +301,20 @@ fun UpdateDialog(
                             }
                         }
                         else -> {
+                            var isFocused by remember { mutableStateOf(false) }
                             Button(
                                 onClick = onStartDownload,
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isFocused) NexusAccent else NexusPrimary),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp)
+                                    .focusRequester(primaryFocusRequester)
+                                    .onFocusChanged { isFocused = it.isFocused }
+                                    .then(
+                                        if (isFocused) Modifier.border(2.dp, Color.White, RoundedCornerShape(12.dp))
+                                        else Modifier
+                                    )
                                     .testTag("start_download_update_btn")
                             ) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color.White)
