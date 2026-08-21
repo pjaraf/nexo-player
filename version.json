@@ -1,7 +1,7 @@
 {
-    "versionCode": 101,
-    "versionName": "1.1.90",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.90/app-debug.apk",
-    "changelog": "Versión 1.1.90: Mini-reproductor con imagen completa en teléfonos y temática roja en botones y números para dispositivos móviles.",
+    "versionCode": 102,
+    "versionName": "1.1.91",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.91/app-debug.apk",
+    "changelog": "Versión 1.1.91: Corrección definitiva de cierres en televisores al cargar canales (gestión nativa de memoria en LibVLC, eliminación de doble liberación y SurfaceView directo).",
     "isMandatory": true
 }

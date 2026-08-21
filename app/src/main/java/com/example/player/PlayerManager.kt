@@ -107,12 +107,12 @@ class PlayerManager(val context: Context) {
         }
     }
 
-    fun attachViews(layout: VLCVideoLayout, enableSubtitles: Boolean = true) {
+    fun attachViews(layout: VLCVideoLayout, enableSubtitles: Boolean = true, useTextureView: Boolean = false) {
         try {
             if (attachedLayout != layout) {
                 detachViews()
                 attachedLayout = layout
-                mediaPlayer.attachViews(layout, null, enableSubtitles, true)
+                mediaPlayer.attachViews(layout, null, enableSubtitles, useTextureView)
                 try {
                     targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
                     targetScale?.let { mediaPlayer.scale = it }
@@ -146,29 +146,25 @@ class PlayerManager(val context: Context) {
 
             // Cleanly stop prior playback before loading new media
             try {
-                mediaPlayer.stop()
+                if (mediaPlayer.isPlaying) {
+                    mediaPlayer.stop()
+                }
             } catch (e: Throwable) {
                 Log.w("PlayerManager", "Warning stopping prior playback: ${e.message}")
             }
 
-            // Safely detach old media reference from player
+            val newMedia = VlcHelper.createMedia(libVLC, url)
+            mediaPlayer.media = newMedia
+            // LibVLC takes native ownership; release local Java reference to avoid double-free
             try {
-                mediaPlayer.media = null
+                newMedia.release()
             } catch (_: Throwable) {}
 
-            // Release previous media reference
             try {
-                currentMedia?.release()
-                currentMedia = null
-            } catch (e: Throwable) {
-                Log.w("PlayerManager", "Warning releasing old media: ${e.message}")
-            }
+                targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
+                targetScale?.let { mediaPlayer.scale = it }
+            } catch (_: Throwable) {}
 
-            val newMedia = VlcHelper.createMedia(libVLC, url)
-            currentMedia = newMedia
-            mediaPlayer.media = newMedia
-            targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
-            targetScale?.let { mediaPlayer.scale = it }
             mediaPlayer.play()
             if (startPositionMs > 0L) {
                 mediaPlayer.time = startPositionMs
@@ -282,11 +278,13 @@ class PlayerManager(val context: Context) {
         try {
             detachViews()
             try {
+                mediaPlayer.setEventListener(null)
+            } catch (_: Exception) {}
+            try {
                 mediaPlayer.stop()
             } catch (_: Exception) {}
             try {
-                currentMedia?.release()
-                currentMedia = null
+                mediaPlayer.media = null
             } catch (_: Exception) {}
             mediaPlayer.release()
         } catch (e: Exception) {

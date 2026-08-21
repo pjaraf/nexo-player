@@ -28,6 +28,8 @@ object VlcHelper {
                     add("--no-sub-autodetect-file")
                     add("--no-video-title-show")
                     add("--no-stats")
+                    add("--no-osd")
+                    add("--avcodec-skiploopfilter=1")
                     add("--http-user-agent=Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 VLC/3.0.18 LibVLC/3.0.18")
                 }
                 LibVLC(context.applicationContext, options).also {
