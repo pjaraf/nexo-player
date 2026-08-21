@@ -4,6 +4,7 @@ import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,7 +18,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
@@ -44,13 +45,11 @@ import com.example.player.PlayerManager
 import com.example.player.VlcPlayerView
 import com.example.ui.components.CHANNEL_FALLBACK
 import com.example.ui.components.ScreenCastDialog
-import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 import com.example.utils.DeviceUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Color palette matching the JetGo layout
 private val JetOrange = Color(0xFFDE5B17)
 private val JetOrangeBright = Color(0xFFFF7A00)
 private val JetSidebarBg = Color(0xFF141414)
@@ -64,10 +63,10 @@ enum class LiveSubTab {
 }
 
 /**
- * PANTALLA UNIFICADA DE TV EN VIVO (Móvil y Smart TV / TV Box)
- * - Mismo diseño robusto, estable y sin cierres inesperados
- * - Soporte 100% interactivo para control remoto D-Pad (resaltado de foco, OK, Flechas)
- * - Mini-reproductor VLC en 16:9 con preview en tiempo real y transición fluida a pantalla completa
+ * PANTALLA PRINCIPAL DE TV EN VIVO:
+ * - Detección automática de dispositivo:
+ *   * SMART TV / TV BOX (isTv = true): Interfaz nativa de TV a pantalla completa, zapping D-Pad, banner OSD y menú lateral sin cierres.
+ *   * TELÉFONOS (isTv = false): Interfaz JetGo con mini-reproductor ajustado a 16:9 y categorías/canales.
  */
 @Composable
 fun LiveScreen(
@@ -77,8 +76,630 @@ fun LiveScreen(
 ) {
     val context = LocalContext.current
     val isTv = remember { DeviceUtils.isTelevision(context) }
-    val coroutineScope = rememberCoroutineScope()
 
+    if (isTv) {
+        TvLiveFullscreenScreen(
+            viewModel = viewModel,
+            onPlayChannel = onPlayChannel,
+            onExitToMenu = onExitToMenu
+        )
+    } else {
+        PhoneLiveScreen(
+            viewModel = viewModel,
+            onPlayChannel = onPlayChannel,
+            onExitToMenu = onExitToMenu
+        )
+    }
+}
+
+// =========================================================================
+// INTERFAZ PARA TELEVISORES (SMART TV / ANDROID TV / TV BOX - D-PAD NATIVO)
+// =========================================================================
+@Composable
+private fun TvLiveFullscreenScreen(
+    viewModel: MainViewModel,
+    onPlayChannel: (channelId: String, categoryId: String, title: String) -> Unit,
+    onExitToMenu: (() -> Unit)? = null
+) {
+    val context = LocalContext.current
+    val categories by viewModel.liveCategories.collectAsState()
+    val selectedCat by viewModel.selectedLiveCat.collectAsState()
+    val channels by viewModel.liveChannels.collectAsState()
+    val loading by viewModel.liveLoading.collectAsState()
+    val favorites by viewModel.favoritesList.collectAsState()
+
+    var showMenu by remember { mutableStateOf(false) }
+    var showChannelBanner by remember { mutableStateOf(true) }
+    var selectedChannel by remember { mutableStateOf<LiveChannel?>(null) }
+    var isBuffering by remember { mutableStateOf(false) }
+    var hasError by remember { mutableStateOf(false) }
+    var candidateIndex by remember { mutableIntStateOf(0) }
+    var candidates by remember { mutableStateOf<List<String>>(emptyList()) }
+    var activeTvTab by remember { mutableStateOf(LiveSubTab.CATEGORIA) }
+
+    val playerManager = remember { PlayerManager(context) }
+
+    // Safe VLC instance
+    DisposableEffect(playerManager) {
+        playerManager.setAspectRatio("16:9")
+        playerManager.setScale(0f)
+        playerManager.onBuffering = { buffering, _ ->
+            isBuffering = buffering
+        }
+        playerManager.onPlayingChanged = { playing ->
+            if (playing) {
+                isBuffering = false
+                hasError = false
+            }
+        }
+        playerManager.onError = { error ->
+            Log.w("TvLiveScreen", "Error VLC candidato $candidateIndex: $error")
+            if (candidateIndex + 1 < candidates.size) {
+                candidateIndex++
+                val nextCandidate = candidates[candidateIndex]
+                try {
+                    isBuffering = true
+                    playerManager.play(nextCandidate, 0L)
+                } catch (_: Throwable) {
+                    hasError = true
+                    isBuffering = false
+                }
+            } else {
+                hasError = true
+                isBuffering = false
+            }
+        }
+        onDispose {
+            playerManager.release()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadLiveCategories()
+    }
+
+    // Auto select first channel if none selected
+    LaunchedEffect(channels) {
+        if (selectedChannel == null && channels.isNotEmpty()) {
+            selectedChannel = channels.first()
+        }
+    }
+
+    // Play channel stream with fallback candidates
+    LaunchedEffect(selectedChannel) {
+        val ch = selectedChannel
+        if (ch != null) {
+            isBuffering = true
+            hasError = false
+            candidateIndex = 0
+            showChannelBanner = true
+
+            val raw = XtreamApi.getLiveStreamCandidates(ch.id)
+            val list = mutableListOf<String>()
+            ch.directStreamUrl?.takeIf { it.isNotBlank() }?.let { list.add(it) }
+            for (c in raw) {
+                if (!list.contains(c)) list.add(c)
+            }
+            if (list.isEmpty()) {
+                val single = XtreamApi.getLiveStreamUrl(ch.id)
+                if (single.isNotBlank()) list.add(single)
+            }
+            candidates = list
+
+            delay(150)
+
+            if (list.isNotEmpty()) {
+                try {
+                    playerManager.play(list[0], 0L)
+                } catch (e: Throwable) {
+                    if (list.size > 1) {
+                        candidateIndex = 1
+                        try {
+                            playerManager.play(list[1], 0L)
+                        } catch (_: Throwable) {
+                            hasError = true
+                            isBuffering = false
+                        }
+                    } else {
+                        hasError = true
+                        isBuffering = false
+                    }
+                }
+            } else {
+                hasError = true
+                isBuffering = false
+            }
+        }
+    }
+
+    // Auto-hide channel banner after 4 seconds
+    LaunchedEffect(showChannelBanner, selectedChannel) {
+        if (showChannelBanner) {
+            delay(4000)
+            showChannelBanner = false
+        }
+    }
+
+    // Favorite channels list
+    val favoriteChannels = remember(favorites, channels) {
+        val favIds = favorites.filter { it.kind == "live" }.map { it.id }.toSet()
+        channels.filter { favIds.contains(it.id) }
+    }
+
+    val displayChannels = if (activeTvTab == LiveSubTab.FAVORITOS) favoriteChannels else channels
+
+    // Zapping function
+    fun zapChannel(delta: Int) {
+        if (displayChannels.isEmpty()) return
+        val currentIdx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }
+        val newIdx = if (currentIdx == -1) {
+            0
+        } else {
+            (currentIdx + delta).mod(displayChannels.size)
+        }
+        selectedChannel = displayChannels[newIdx]
+        showChannelBanner = true
+    }
+
+    val channelListState = rememberLazyListState()
+
+    // Manejador del botón ATRÁS
+    BackHandler(enabled = true) {
+        if (showMenu) {
+            showMenu = false
+        } else {
+            onExitToMenu?.invoke()
+        }
+    }
+
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        try {
+            focusRequester.requestFocus()
+        } catch (_: Throwable) {}
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .focusRequester(focusRequester)
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    when (event.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER, AndroidKeyEvent.KEYCODE_ENTER -> {
+                            if (!showMenu) {
+                                showMenu = true
+                                true
+                            } else false
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_UP -> {
+                            if (!showMenu) {
+                                zapChannel(-1)
+                                true
+                            } else false
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                            if (!showMenu) {
+                                zapChannel(1)
+                                true
+                            } else false
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
+                            if (!showMenu) {
+                                showMenu = true
+                                true
+                            } else false
+                        }
+                        AndroidKeyEvent.KEYCODE_MENU -> {
+                            showMenu = !showMenu
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+            .testTag("tv_live_fullscreen_root")
+    ) {
+        // 1. Fullscreen Video Player (VLC Surface)
+        VlcPlayerView(
+            playerManager = playerManager,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // 2. Buffering Indicator
+        if (isBuffering) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = JetOrange,
+                    strokeWidth = 4.dp,
+                    modifier = Modifier.size(54.dp)
+                )
+            }
+        }
+
+        // 3. Error Banner
+        if (hasError && !isBuffering) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 24.dp, vertical = 14.dp)
+            ) {
+                Text(
+                    text = "Canal no disponible temporalmente",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // 4. Channel Info Banner (Bottom OSD)
+        AnimatedVisibility(
+            visible = showChannelBanner && !showMenu,
+            enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 2 }),
+            exit = fadeOut(tween(300)) + slideOutVertically(targetOffsetY = { it / 2 }),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(32.dp)
+        ) {
+            val currentIdx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }
+            val chNumber = if (currentIdx >= 0) String.format("%03d", currentIdx + 1) else "---"
+
+            Surface(
+                color = Color(0xE6141414),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, Color(0xFF333333)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // Channel Number Badge
+                    Surface(
+                        color = JetOrange,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = chNumber,
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        )
+                    }
+
+                    // Channel Logo
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.Black.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = selectedChannel?.streamIcon?.takeIf { it.isNotBlank() } ?: CHANNEL_FALLBACK,
+                            contentDescription = selectedChannel?.name,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
+
+                    // Channel Info
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = selectedChannel?.name ?: "Cargando canal...",
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (activeTvTab == LiveSubTab.FAVORITOS) "FAVORITOS" else (categories.find { it.categoryId == selectedCat }?.categoryName?.uppercase() ?: "TODOS"),
+                            color = JetTextMuted,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // Live Badge
+                    Surface(
+                        color = Color(0xFFCC0000),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                            )
+                            Text(
+                                text = "EN VIVO",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. TV Overlay Menu (Categorías & Canales con navegación D-Pad)
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn(tween(200)) + slideInHorizontally(initialOffsetX = { -it }),
+            exit = fadeOut(tween(200)) + slideOutHorizontally(targetOffsetX = { -it }),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.95f),
+                                Color.Black.copy(alpha = 0.85f),
+                                Color.Transparent
+                            ),
+                            startX = 0f,
+                            endX = 1400f
+                        )
+                    )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(620.dp)
+                        .padding(start = 28.dp, top = 24.dp, bottom = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // 5A. Categories Drawer
+                    Surface(
+                        color = Color(0xFF141414),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, Color(0xFF2A2A2A)),
+                        modifier = Modifier
+                            .width(220.dp)
+                            .fillMaxHeight()
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            // Header
+                            item {
+                                Text(
+                                    text = "CATEGORÍAS",
+                                    color = JetOrangeBright,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                                )
+                            }
+
+                            // FAVORITOS Tab
+                            item {
+                                var isFavFocused by remember { mutableStateOf(false) }
+                                val isSelected = activeTvTab == LiveSubTab.FAVORITOS
+                                Surface(
+                                    onClick = {
+                                        activeTvTab = LiveSubTab.FAVORITOS
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) JetOrange else if (isFavFocused) Color(0xFF333344) else Color.Transparent,
+                                    border = if (isFavFocused) BorderStroke(2.dp, Color.White) else null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onFocusChanged { isFavFocused = it.isFocused }
+                                        .focusable()
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(18.dp))
+                                        Text(
+                                            text = "FAVORITOS (${favoriteChannels.size})",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isSelected || isFavFocused) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            // TODOS Item
+                            item {
+                                var isAllFocused by remember { mutableStateOf(false) }
+                                val isSelected = activeTvTab == LiveSubTab.CATEGORIA && selectedCat == "ALL"
+                                Surface(
+                                    onClick = {
+                                        activeTvTab = LiveSubTab.CATEGORIA
+                                        viewModel.selectLiveCategory("ALL")
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) JetOrange else if (isAllFocused) Color(0xFF333344) else Color.Transparent,
+                                    border = if (isAllFocused) BorderStroke(2.dp, Color.White) else null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onFocusChanged { isAllFocused = it.isFocused }
+                                        .focusable()
+                                ) {
+                                    Text(
+                                        text = "TODOS LOS CANALES",
+                                        color = if (isSelected || isAllFocused) Color.White else JetTextMuted,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected || isAllFocused) FontWeight.Bold else FontWeight.Medium,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                                    )
+                                }
+                            }
+
+                            // Categories from Server
+                            itemsIndexed(categories, key = { idx, cat -> "tv_${cat.categoryId}_$idx" }) { _, cat ->
+                                var isCatFocused by remember { mutableStateOf(false) }
+                                val isSelected = activeTvTab == LiveSubTab.CATEGORIA && selectedCat == cat.categoryId
+                                Surface(
+                                    onClick = {
+                                        activeTvTab = LiveSubTab.CATEGORIA
+                                        viewModel.selectLiveCategory(cat.categoryId)
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) JetOrange else if (isCatFocused) Color(0xFF333344) else Color.Transparent,
+                                    border = if (isCatFocused) BorderStroke(2.dp, Color.White) else null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onFocusChanged { isCatFocused = it.isFocused }
+                                        .focusable()
+                                ) {
+                                    Text(
+                                        text = cat.categoryName.uppercase(),
+                                        color = if (isSelected || isCatFocused) Color.White else JetTextMuted,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected || isCatFocused) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 5B. Channels List Drawer
+                    Surface(
+                        color = Color(0xFF141414),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, Color(0xFF2A2A2A)),
+                        modifier = Modifier
+                            .width(360.dp)
+                            .fillMaxHeight()
+                    ) {
+                        if (loading && displayChannels.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = JetOrange, modifier = Modifier.size(32.dp))
+                            }
+                        } else if (displayChannels.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("No hay canales en esta sección", color = JetTextMuted, fontSize = 14.sp)
+                            }
+                        } else {
+                            LazyColumn(
+                                state = channelListState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                itemsIndexed(displayChannels, key = { idx, ch -> "tv_ch_${ch.id}_$idx" }) { index, channel ->
+                                    val isCurrent = selectedChannel?.id == channel.id
+                                    val isFav = viewModel.isFavorite("live", channel.id)
+                                    var isItemFocused by remember { mutableStateOf(false) }
+
+                                    Surface(
+                                        onClick = {
+                                            selectedChannel = channel
+                                            showMenu = false
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (isCurrent) JetOrange else if (isItemFocused) Color(0xFF2C2C3C) else JetCardBg,
+                                        border = if (isItemFocused) BorderStroke(2.dp, Color.White) else null,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(56.dp)
+                                            .onFocusChanged { isItemFocused = it.isFocused }
+                                            .focusable()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(horizontal = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Text(
+                                                text = String.format("%03d", index + 1),
+                                                color = if (isCurrent || isItemFocused) Color.White else JetOrangeBright,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.width(34.dp)
+                                            )
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(38.dp)
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Color.Black.copy(alpha = 0.3f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                AsyncImage(
+                                                    model = channel.streamIcon?.takeIf { it.isNotBlank() } ?: CHANNEL_FALLBACK,
+                                                    contentDescription = channel.name,
+                                                    contentScale = ContentScale.Fit,
+                                                    modifier = Modifier.size(30.dp)
+                                                )
+                                            }
+
+                                            Text(
+                                                text = channel.name,
+                                                color = Color.White,
+                                                fontSize = 14.sp,
+                                                fontWeight = if (isCurrent || isItemFocused) FontWeight.Bold else FontWeight.Normal,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+
+                                            if (isFav) {
+                                                Icon(
+                                                    Icons.Default.Star,
+                                                    contentDescription = "Favorito",
+                                                    tint = Color(0xFFFFC107),
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
+// INTERFAZ PARA TELÉFONOS (MÓVIL / MINI REPRODUCTOR 16:9 AJUSTADO)
+// =========================================================================
+@Composable
+private fun PhoneLiveScreen(
+    viewModel: MainViewModel,
+    onPlayChannel: (channelId: String, categoryId: String, title: String) -> Unit,
+    onExitToMenu: (() -> Unit)? = null
+) {
+    val context = LocalContext.current
     val categories by viewModel.liveCategories.collectAsState()
     val selectedCat by viewModel.selectedLiveCat.collectAsState()
     val channels by viewModel.liveChannels.collectAsState()
@@ -95,7 +716,7 @@ fun LiveScreen(
     var channelCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
     var retryTrigger by remember { mutableIntStateOf(0) }
 
-    // Embedded VLC Instance
+    // Embedded VLC Instance for phone preview
     val playerManager = remember { PlayerManager(context) }
 
     DisposableEffect(playerManager) {
@@ -111,7 +732,7 @@ fun LiveScreen(
             }
         }
         playerManager.onError = { error ->
-            Log.w("LiveScreen", "VLC Error en candidato $candidateIndex: $error")
+            Log.w("PhoneLiveScreen", "VLC Error candidato $candidateIndex: $error")
             if (candidateIndex + 1 < channelCandidates.size) {
                 candidateIndex++
                 val nextCandidate = channelCandidates[candidateIndex]
@@ -133,7 +754,6 @@ fun LiveScreen(
         }
     }
 
-    // Play selected channel inside preview with debounce
     LaunchedEffect(selectedChannel, retryTrigger) {
         val ch = selectedChannel
         if (ch != null) {
@@ -185,7 +805,6 @@ fun LiveScreen(
         viewModel.loadLiveCategories()
     }
 
-    // Filter channels according to search
     val filteredChannels = remember(channels, search) {
         if (search.isBlank()) {
             channels
@@ -195,13 +814,11 @@ fun LiveScreen(
         }
     }
 
-    // Favorite channels list
     val favoriteChannels = remember(favorites, channels) {
         val favIds = favorites.filter { it.kind == "live" }.map { it.id }.toSet()
         channels.filter { favIds.contains(it.id) }
     }
 
-    // Select first channel automatically when data loads
     LaunchedEffect(filteredChannels) {
         if (selectedChannel == null && filteredChannels.isNotEmpty()) {
             selectedChannel = filteredChannels.first()
@@ -210,7 +827,6 @@ fun LiveScreen(
 
     val channelListState = rememberLazyListState()
 
-    // Manejador del botón Atrás
     BackHandler(enabled = true) {
         if (search.isNotBlank()) {
             viewModel.setLiveSearch("")
@@ -225,7 +841,7 @@ fun LiveScreen(
         containerColor = JetBackground,
         modifier = Modifier
             .fillMaxSize()
-            .testTag("live_screen")
+            .testTag("phone_live_screen")
     ) { padding ->
         Column(
             modifier = Modifier
@@ -233,35 +849,16 @@ fun LiveScreen(
                 .padding(padding)
                 .statusBarsPadding()
         ) {
-            // --- 1. Top Search Bar (Búsqueda por canal) ---
-            var isSearchFocused by remember { mutableStateOf(false) }
+            // 1. Top Search Bar
             OutlinedTextField(
                 value = search,
                 onValueChange = { viewModel.setLiveSearch(it) },
-                placeholder = {
-                    Text(
-                        text = "Búsqueda por canal",
-                        color = JetTextMuted,
-                        fontSize = if (isTv) 15.sp else 14.sp
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = "Buscar",
-                        tint = if (isSearchFocused) JetOrangeBright else JetTextMuted,
-                        modifier = Modifier.size(if (isTv) 22.dp else 20.dp)
-                    )
-                },
+                placeholder = { Text(text = "Búsqueda por canal", color = JetTextMuted, fontSize = 14.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar", tint = JetTextMuted, modifier = Modifier.size(20.dp)) },
                 trailingIcon = {
                     if (search.isNotBlank()) {
                         IconButton(onClick = { viewModel.setLiveSearch("") }) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Limpiar",
-                                tint = JetTextMuted,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Default.Close, contentDescription = "Limpiar", tint = JetTextMuted, modifier = Modifier.size(18.dp))
                         }
                     }
                 },
@@ -269,7 +866,7 @@ fun LiveScreen(
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = JetOrange,
-                    unfocusedBorderColor = if (isSearchFocused) Color.White else Color(0xFF2A2A2A),
+                    unfocusedBorderColor = Color(0xFF2A2A2A),
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
                     focusedContainerColor = JetCardBg,
@@ -277,54 +874,37 @@ fun LiveScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = if (isTv) 20.dp else 14.dp, end = if (isTv) 20.dp else 14.dp, top = 4.dp, bottom = 4.dp)
-                    .height(if (isTv) 52.dp else 48.dp)
-                    .onFocusChanged { isSearchFocused = it.isFocused }
-                    .testTag("live_search_input")
+                    .padding(horizontal = 14.dp, vertical = 4.dp)
+                    .height(48.dp)
+                    .testTag("phone_live_search")
             )
 
-            // --- 2. Live Video Player Preview Box (Formato 16:9 ajustado) ---
-            var isPlayerBoxFocused by remember { mutableStateOf(false) }
+            // 2. Mini Player Box 16:9
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = if (isTv) 20.dp else 14.dp, vertical = 2.dp)
+                    .padding(horizontal = 14.dp, vertical = 2.dp)
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color.Black)
-                    .border(
-                        if (isPlayerBoxFocused) 2.dp else 1.dp,
-                        if (isPlayerBoxFocused) Color.White else Color(0xFF262626),
-                        RoundedCornerShape(14.dp)
-                    )
-                    .onFocusChanged { isPlayerBoxFocused = it.isFocused }
-                    .focusable()
+                    .border(1.dp, Color(0xFF262626), RoundedCornerShape(14.dp))
                     .clickable {
                         selectedChannel?.let { ch ->
                             onPlayChannel(ch.id, selectedCat, ch.name)
                         }
                     }
-                    .testTag("live_player_preview_box"),
+                    .testTag("phone_live_player_preview_box"),
                 contentAlignment = Alignment.Center
             ) {
-                // Video Surface VLC
                 VlcPlayerView(
                     playerManager = playerManager,
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Buffering indicator
                 if (isPlayerBuffering) {
-                    CircularProgressIndicator(
-                        color = JetOrange,
-                        strokeWidth = 3.dp,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .align(Alignment.Center)
-                    )
+                    CircularProgressIndicator(color = JetOrange, strokeWidth = 3.dp, modifier = Modifier.size(36.dp).align(Alignment.Center))
                 }
 
-                // Error text
                 if (playerHasError && !isPlayerBuffering) {
                     Text(
                         text = "Canal no disponible",
@@ -338,7 +918,6 @@ fun LiveScreen(
                     )
                 }
 
-                // Control Buttons (Pantalla completa y Transmitir)
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -346,61 +925,34 @@ fun LiveScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Transmitir a TV
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        shape = CircleShape,
-                    ) {
-                        IconButton(
-                            onClick = { showScreenCastDialog = true },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .testTag("live_cast_screen_btn")
-                        ) {
-                            Icon(
-                                Icons.Default.Cast,
-                                contentDescription = "Transmitir a TV",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
+                    Surface(color = Color.Black.copy(alpha = 0.6f), shape = CircleShape) {
+                        IconButton(onClick = { showScreenCastDialog = true }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Cast, contentDescription = "Transmitir a TV", tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
 
-                    // Botón Expandir a Pantalla Completa
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        shape = CircleShape,
-                    ) {
+                    Surface(color = Color.Black.copy(alpha = 0.6f), shape = CircleShape) {
                         IconButton(
                             onClick = {
                                 selectedChannel?.let { ch ->
                                     onPlayChannel(ch.id, selectedCat, ch.name)
                                 }
                             },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .testTag("live_fullscreen_btn")
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(
-                                Icons.Default.Fullscreen,
-                                contentDescription = "Pantalla completa",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            Icon(Icons.Default.Fullscreen, contentDescription = "Pantalla completa", tint = Color.White, modifier = Modifier.size(22.dp))
                         }
                     }
                 }
             }
 
-            // --- 3. Sub Tabs: CATEGORÍA & FAVORITOS ---
+            // 3. Sub Tabs: CATEGORÍA & FAVORITOS
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = if (isTv) 20.dp else 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // CATEGORÍA Button
-                var isCatTabFocused by remember { mutableStateOf(false) }
                 Button(
                     onClick = { activeTab = LiveSubTab.CATEGORIA },
                     shape = RoundedCornerShape(8.dp),
@@ -408,23 +960,11 @@ fun LiveScreen(
                         containerColor = if (activeTab == LiveSubTab.CATEGORIA) JetOrange else Color(0xFF202020),
                         contentColor = Color.White
                     ),
-                    border = if (isCatTabFocused) BorderStroke(2.dp, Color.White) else null,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(if (isTv) 44.dp else 38.dp)
-                        .onFocusChanged { isCatTabFocused = it.isFocused }
-                        .testTag("tab_categoria")
+                    modifier = Modifier.weight(1f).height(38.dp)
                 ) {
-                    Text(
-                        text = "CATEGORÍA",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = if (isTv) 13.sp else 12.sp
-                    )
+                    Text(text = "CATEGORÍA", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
 
-                // FAVORITOS Button
-                var isFavTabFocused by remember { mutableStateOf(false) }
                 Button(
                     onClick = { activeTab = LiveSubTab.FAVORITOS },
                     shape = RoundedCornerShape(8.dp),
@@ -432,101 +972,74 @@ fun LiveScreen(
                         containerColor = if (activeTab == LiveSubTab.FAVORITOS) JetOrange else Color(0xFF202020),
                         contentColor = Color.White
                     ),
-                    border = if (isFavTabFocused) BorderStroke(2.dp, Color.White) else null,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(if (isTv) 44.dp else 38.dp)
-                        .onFocusChanged { isFavTabFocused = it.isFocused }
-                        .testTag("tab_favoritos")
+                    modifier = Modifier.weight(1f).height(38.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(16.dp))
-                        Text(
-                            text = "FAVORITOS (${favoriteChannels.size})",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = if (isTv) 13.sp else 12.sp
-                        )
+                        Text(text = "FAVORITOS (${favoriteChannels.size})", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             }
 
-            // --- 4. Main Content Area (Sidebar + Channels or Favorites) ---
+            // 4. Content Area
             if (activeTab == LiveSubTab.CATEGORIA) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                 ) {
-                    // --- 4A. Left Sidebar: Categories list ---
+                    // Categories
                     Surface(
                         color = JetSidebarBg,
                         modifier = Modifier
-                            .width(if (isTv) 160.dp else 130.dp)
+                            .width(130.dp)
                             .fillMaxHeight()
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(vertical = 4.dp)
                         ) {
-                            // "TODOS LOS CANALES" Category item
                             item {
                                 val isSelected = selectedCat == "ALL"
-                                var isItemFocused by remember { mutableStateOf(false) }
                                 Surface(
-                                    color = if (isSelected) JetOrange else if (isItemFocused) Color(0xFF333344) else Color.Transparent,
-                                    border = if (isItemFocused) BorderStroke(2.dp, Color.White) else null,
+                                    color = if (isSelected) JetOrange else Color.Transparent,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .onFocusChanged { isItemFocused = it.isFocused }
-                                        .focusable()
                                         .clickable { viewModel.selectLiveCategory("ALL") }
-                                        .testTag("live_cat_all")
                                 ) {
                                     Text(
                                         text = "TODOS",
-                                        color = if (isSelected || isItemFocused) Color.White else JetTextMuted,
-                                        fontSize = if (isTv) 12.5.sp else 11.5.sp,
-                                        fontWeight = if (isSelected || isItemFocused) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = if (isTv) 12.dp else 10.dp)
+                                        color = if (isSelected) Color.White else JetTextMuted,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
                                     )
                                 }
                             }
 
-                            // Dynamic categories from server
                             itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
                                 val isSelected = selectedCat == cat.categoryId
-                                var isItemFocused by remember { mutableStateOf(false) }
                                 Surface(
-                                    color = if (isSelected) JetOrange else if (isItemFocused) Color(0xFF333344) else Color.Transparent,
-                                    border = if (isItemFocused) BorderStroke(2.dp, Color.White) else null,
+                                    color = if (isSelected) JetOrange else Color.Transparent,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .onFocusChanged { isItemFocused = it.isFocused }
-                                        .focusable()
                                         .clickable { viewModel.selectLiveCategory(cat.categoryId) }
-                                        .testTag("live_cat_${cat.categoryId}")
                                 ) {
                                     Text(
                                         text = cat.categoryName.uppercase(),
-                                        color = if (isSelected || isItemFocused) Color.White else JetTextMuted,
-                                        fontSize = if (isTv) 12.5.sp else 11.5.sp,
-                                        fontWeight = if (isSelected || isItemFocused) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else JetTextMuted,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = if (isTv) 12.dp else 10.dp)
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
                                     )
                                 }
                             }
                         }
                     }
 
-                    // --- 4B. Right List: Channels ---
+                    // Channels
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -534,20 +1047,13 @@ fun LiveScreen(
                             .background(JetBackground)
                     ) {
                         if (loading && channels.isEmpty()) {
-                            CircularProgressIndicator(
-                                color = JetOrange,
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .align(Alignment.Center)
-                            )
+                            CircularProgressIndicator(color = JetOrange, modifier = Modifier.size(32.dp).align(Alignment.Center))
                         } else if (filteredChannels.isEmpty()) {
                             Text(
                                 text = if (search.isNotBlank()) "Sin canales para \"$search\"" else "No hay canales",
                                 color = JetTextMuted,
                                 fontSize = 13.sp,
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .padding(16.dp)
+                                modifier = Modifier.align(Alignment.Center).padding(16.dp)
                             )
                         } else {
                             LazyColumn(
@@ -565,16 +1071,10 @@ fun LiveScreen(
                                         channel = channel,
                                         isSelected = isSelected,
                                         isFav = isFav,
-                                        isTv = isTv,
-                                        onFavToggle = {
-                                            viewModel.toggleFavorite("live", channel.id, channel.name, channel.streamIcon)
-                                        },
-                                        onClick = {
-                                            selectedChannel = channel
-                                        },
-                                        onDoubleClick = {
-                                            onPlayChannel(channel.id, selectedCat, channel.name)
-                                        }
+                                        isTv = false,
+                                        onFavToggle = { viewModel.toggleFavorite("live", channel.id, channel.name, channel.streamIcon) },
+                                        onClick = { selectedChannel = channel },
+                                        onDoubleClick = { onPlayChannel(channel.id, selectedCat, channel.name) }
                                     )
                                 }
                             }
@@ -582,7 +1082,7 @@ fun LiveScreen(
                     }
                 }
             } else {
-                // --- 4C. FAVORITOS TAB (Full Width Channels list) ---
+                // Favorites
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -591,9 +1091,7 @@ fun LiveScreen(
                 ) {
                     if (favoriteChannels.isEmpty()) {
                         Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
+                            modifier = Modifier.fillMaxSize().padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -615,16 +1113,10 @@ fun LiveScreen(
                                     channel = channel,
                                     isSelected = isSelected,
                                     isFav = true,
-                                    isTv = isTv,
-                                    onFavToggle = {
-                                        viewModel.toggleFavorite("live", channel.id, channel.name, channel.streamIcon)
-                                    },
-                                    onClick = {
-                                        selectedChannel = channel
-                                    },
-                                    onDoubleClick = {
-                                        onPlayChannel(channel.id, selectedCat, channel.name)
-                                    }
+                                    isTv = false,
+                                    onFavToggle = { viewModel.toggleFavorite("live", channel.id, channel.name, channel.streamIcon) },
+                                    onClick = { selectedChannel = channel },
+                                    onDoubleClick = { onPlayChannel(channel.id, selectedCat, channel.name) }
                                 )
                             }
                         }
@@ -644,9 +1136,6 @@ fun LiveScreen(
     }
 }
 
-/**
- * Channel Item Component (Móvil y TV D-Pad focus)
- */
 @Composable
 private fun ChannelListItemJetGo(
     index: Int,
@@ -680,7 +1169,6 @@ private fun ChannelListItemJetGo(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Channel Number
             Text(
                 text = formattedIndex,
                 color = if (isSelected || isFocused) Color.White else JetOrangeBright,
@@ -689,7 +1177,6 @@ private fun ChannelListItemJetGo(
                 modifier = Modifier.width(32.dp)
             )
 
-            // Channel Icon
             Box(
                 modifier = Modifier
                     .size(if (isTv) 34.dp else 30.dp)
@@ -705,7 +1192,6 @@ private fun ChannelListItemJetGo(
                 )
             }
 
-            // Channel Name
             Text(
                 text = channel.name,
                 color = Color.White,
@@ -716,7 +1202,6 @@ private fun ChannelListItemJetGo(
                 modifier = Modifier.weight(1f)
             )
 
-            // Favorite Star
             IconButton(
                 onClick = onFavToggle,
                 modifier = Modifier.size(if (isTv) 32.dp else 28.dp)
