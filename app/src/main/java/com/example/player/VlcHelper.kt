@@ -15,14 +15,18 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: run {
                 val options = ArrayList<String>().apply {
-                    add("--network-caching=1500")
-                    add("--live-caching=1000")
-                    add("--file-caching=2000")
+                    // High stability options for Android TV and mobile devices
+                    add("--network-caching=3000")
+                    add("--live-caching=2000")
+                    add("--file-caching=3000")
                     add("--http-reconnect")
                     add("--drop-late-frames")
                     add("--skip-frames")
                     add("--avcodec-fast")
                     add("--audio-time-stretch")
+                    add("--aout=android_audiotrack")
+                    add("--vout=android_display,none")
+                    add("--no-sub-autodetect-file")
                     add("--http-user-agent=Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 VLC/3.0.18 LibVLC/3.0.18")
                 }
                 LibVLC(context.applicationContext, options).also {
@@ -35,11 +39,11 @@ object VlcHelper {
     fun createMedia(libVLC: LibVLC, url: String): Media {
         return Media(libVLC, Uri.parse(url)).apply {
             setHWDecoderEnabled(true, true) // Enable HW decoding WITH software fallback to prevent crashes on TV
-            addOption(":network-caching=1500")
-            addOption(":live-caching=1000")
+            addOption(":network-caching=3000")
+            addOption(":live-caching=2000")
             addOption(":http-reconnect")
-            addOption(":clock-jitter=0")
-            addOption(":clock-synchro=0")
+            addOption(":sout-mux-caching=2000")
+            addOption(":codec=mediacodec_ndk,mediacodec_jni,all")
         }
     }
 }

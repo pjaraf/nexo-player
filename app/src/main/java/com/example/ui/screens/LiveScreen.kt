@@ -163,16 +163,30 @@ private fun TvLiveFullscreenScreen(
             isPlayerBuffering = true
             playerHasError = false
             // Short debounce to permit fast remote channel browsing without flooding native LibVLC decoder
-            delay(220)
-            val url = ch.directStreamUrl?.takeIf { it.isNotBlank() }
+            delay(180)
+            val candidates = XtreamApi.getLiveStreamCandidates(ch.id)
+            val primaryUrl = ch.directStreamUrl?.takeIf { it.isNotBlank() }
+                ?: candidates.firstOrNull()
                 ?: XtreamApi.getLiveStreamUrl(ch.id)
+
             try {
                 playerHasError = false
                 isPlayerBuffering = true
-                playerManager.play(url, 0L)
+                playerManager.play(primaryUrl, 0L)
             } catch (e: Exception) {
-                playerHasError = true
-                isPlayerBuffering = false
+                // Fallback attempt with alternate stream candidate if available
+                val altUrl = candidates.getOrNull(1)
+                if (altUrl != null && altUrl != primaryUrl) {
+                    try {
+                        playerManager.play(altUrl, 0L)
+                    } catch (_: Exception) {
+                        playerHasError = true
+                        isPlayerBuffering = false
+                    }
+                } else {
+                    playerHasError = true
+                    isPlayerBuffering = false
+                }
             }
         }
     }
@@ -1049,16 +1063,29 @@ private fun PhoneLiveScreen(
         if (ch != null) {
             isPlayerBuffering = true
             playerHasError = false
-            delay(200)
-            val url = ch.directStreamUrl?.takeIf { it.isNotBlank() }
+            delay(180)
+            val candidates = XtreamApi.getLiveStreamCandidates(ch.id)
+            val primaryUrl = ch.directStreamUrl?.takeIf { it.isNotBlank() }
+                ?: candidates.firstOrNull()
                 ?: XtreamApi.getLiveStreamUrl(ch.id)
+
             try {
                 playerHasError = false
                 isPlayerBuffering = true
-                playerManager.play(url, 0L)
+                playerManager.play(primaryUrl, 0L)
             } catch (e: Exception) {
-                playerHasError = true
-                isPlayerBuffering = false
+                val altUrl = candidates.getOrNull(1)
+                if (altUrl != null && altUrl != primaryUrl) {
+                    try {
+                        playerManager.play(altUrl, 0L)
+                    } catch (_: Exception) {
+                        playerHasError = true
+                        isPlayerBuffering = false
+                    }
+                } else {
+                    playerHasError = true
+                    isPlayerBuffering = false
+                }
             }
         }
     }
