@@ -1,7 +1,7 @@
 {
-    "versionCode": 90,
-    "versionName": "1.1.79",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.79/app-debug.apk",
-    "changelog": "Versión 1.1.79: Optimización de perfil en TV y móvil, interfaz limpia sin datos innecesarios de servidor.",
+    "versionCode": 92,
+    "versionName": "1.1.81",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.81/app-debug.apk",
+    "changelog": "Versión 1.1.81: Transmisión directa y exclusiva del contenido multimedia a Smart TVs (DLNA/UPnP y Roku ECP).",
     "isMandatory": true
 }
