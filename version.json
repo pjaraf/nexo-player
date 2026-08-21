@@ -1,7 +1,7 @@
 {
-    "versionCode": 98,
-    "versionName": "1.1.87",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.87/app-debug.apk",
-    "changelog": "Versión 1.1.87: Ajuste de aspecto automático (16:9) en el mini-reproductor y pantalla completa exclusivamente para dispositivos móviles.",
+    "versionCode": 99,
+    "versionName": "1.1.88",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.88/app-debug.apk",
+    "changelog": "Versión 1.1.88: Corrección de estabilidad total en TV en vivo para Smart TV y dispositivos móviles sin cierres inesperados.",
     "isMandatory": true
 }

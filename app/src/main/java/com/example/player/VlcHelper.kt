@@ -16,7 +16,7 @@ object VlcHelper {
             libVLCInstance ?: run {
                 val numCores = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
                 val options = ArrayList<String>().apply {
-                    // Maximum stability and compatibility options for Android TV and low-end chipsets
+                    // Maximum stability and compatibility options for Android TV and mobile devices
                     add("--network-caching=3000")
                     add("--live-caching=2000")
                     add("--file-caching=3000")
@@ -25,9 +25,6 @@ object VlcHelper {
                     add("--skip-frames")
                     add("--avcodec-threads=$numCores")
                     add("--audio-time-stretch")
-                    add("--aout=android_audiotrack")
-                    add("--vout=android_display,none")
-                    add("--codec=mediacodec_jni,all")
                     add("--no-sub-autodetect-file")
                     add("--no-video-title-show")
                     add("--no-stats")
@@ -53,7 +50,6 @@ object VlcHelper {
             addOption(":live-caching=2000")
             addOption(":http-reconnect")
             addOption(":sout-mux-caching=2000")
-            addOption(":codec=mediacodec_jni,all")
             addOption(":no-sub-autodetect-file")
         }
     }

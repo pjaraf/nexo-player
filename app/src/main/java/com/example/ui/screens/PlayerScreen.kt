@@ -114,11 +114,17 @@ fun PlayerScreen(
         val window = activity?.window
         val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
 
-        // Set fullscreen landscape orientation by default
-        activity?.requestedOrientation = if (isLandscape) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        // Set fullscreen landscape orientation by default (only on mobile devices; skip on TVs to prevent crash)
+        if (!isTv) {
+            try {
+                activity?.requestedOrientation = if (isLandscape) {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                }
+            } catch (e: Throwable) {
+                Log.w("PlayerScreen", "Ignoring orientation request error: ${e.message}")
+            }
         }
 
         // Hide Android System Bars for fully immersive fullscreen playback
@@ -135,7 +141,11 @@ fun PlayerScreen(
                 insetsController.show(WindowInsetsCompat.Type.systemBars())
                 win.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
-            activity?.requestedOrientation = originalOrientation
+            if (!isTv) {
+                try {
+                    activity?.requestedOrientation = originalOrientation
+                } catch (_: Throwable) {}
+            }
         }
     }
 
@@ -231,8 +241,8 @@ fun PlayerScreen(
     var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
     var isSubtitlesDisabled by remember { mutableStateOf(false) }
     var showAudioSubtitlesDialog by remember { mutableStateOf(false) }
-    var currentResizeMode by remember(isLive, isTv) {
-        mutableStateOf(if (isLive && !isTv) ScreenResizeMode.FILL else ScreenResizeMode.FIT)
+    var currentResizeMode by remember(isLive) {
+        mutableStateOf(if (isLive) ScreenResizeMode.FILL else ScreenResizeMode.FIT)
     }
     var resizeToastText by remember { mutableStateOf<String?>(null) }
 
