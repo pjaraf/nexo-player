@@ -29,6 +29,7 @@ object VlcHelper {
                     add("--vout=android_display,none")
                     add("--codec=mediacodec_jni,all")
                     add("--no-sub-autodetect-file")
+                    add("--no-video-title-show")
                     add("--no-stats")
                     add("--http-user-agent=Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 VLC/3.0.18 LibVLC/3.0.18")
                 }

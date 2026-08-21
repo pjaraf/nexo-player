@@ -593,13 +593,13 @@ fun PlayerScreen(
                             } else false
                         }
                         Key.DirectionUp -> {
-                            if (isLive && !showControls) {
+                            if (isLive) {
                                 jumpChannel(1, "up")
                                 true
                             } else false
                         }
                         Key.DirectionDown -> {
-                            if (isLive && !showControls) {
+                            if (isLive) {
                                 jumpChannel(-1, "down")
                                 true
                             } else false
@@ -748,13 +748,57 @@ fun PlayerScreen(
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Button(
-                        onClick = onClose,
-                        colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary)
-                    ) {
-                        Text("Regresar")
+
+                    if (isLive) {
+                        Text(
+                            text = "Presiona ▲ o ▼ en el control remoto para cambiar de canal",
+                            color = Color(0xFFA0A0AB),
+                            fontSize = 13.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = { jumpChannel(1, "next") },
+                                colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary)
+                            ) {
+                                Text("Siguiente Canal")
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    errorMsg = null
+                                    isLoading = true
+                                    candidateIndex = 0
+                                    try {
+                                        playerManager.play(streamUrl, 0L)
+                                    } catch (_: Throwable) {}
+                                },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                            ) {
+                                Text("Reintentar")
+                            }
+
+                            TextButton(
+                                onClick = onClose,
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFA0A3BD))
+                            ) {
+                                Text("Volver")
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = onClose,
+                            colors = ButtonDefaults.buttonColors(containerColor = NexusPrimary)
+                        ) {
+                            Text("Regresar")
+                        }
                     }
                 }
             }

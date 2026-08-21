@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -117,7 +118,6 @@ private fun TvLiveFullscreenScreen(
     val loading by viewModel.liveLoading.collectAsState()
     val favorites by viewModel.favoritesList.collectAsState()
 
-    // Guide visibility mode: HIDDEN (0 presses), CHANNELS_ONLY (1 press), BOTH_CATEGORIES_AND_CHANNELS (2 presses)
     var guideMode by remember { mutableStateOf(0) } // 0 = oculto, 1 = solo canales, 2 = categorías y canales
     var selectedChannel by remember { mutableStateOf<LiveChannel?>(null) }
     var isPlayerBuffering by remember { mutableStateOf(false) }
@@ -125,6 +125,9 @@ private fun TvLiveFullscreenScreen(
     var isFavoritesCategorySelected by remember { mutableStateOf(false) }
     var showOsdBanner by remember { mutableStateOf(false) }
     var showRemoteHint by remember { mutableStateOf(true) }
+    var candidateIndex by remember { mutableIntStateOf(0) }
+    var channelCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
+    var retryTrigger by remember { mutableIntStateOf(0) }
 
     val rootFocusRequester = remember { FocusRequester() }
     val categoriesFocusRequester = remember { FocusRequester() }
@@ -146,9 +149,22 @@ private fun TvLiveFullscreenScreen(
                 playerHasError = false
             }
         }
-        playerManager.onError = {
-            playerHasError = true
-            isPlayerBuffering = false
+        playerManager.onError = { error ->
+            Log.w("LiveScreen", "VLC Error en candidato $candidateIndex: $error")
+            if (candidateIndex + 1 < channelCandidates.size) {
+                candidateIndex++
+                val nextCandidate = channelCandidates[candidateIndex]
+                try {
+                    isPlayerBuffering = true
+                    playerManager.play(nextCandidate, 0L)
+                } catch (_: Throwable) {
+                    playerHasError = true
+                    isPlayerBuffering = false
+                }
+            } else {
+                playerHasError = true
+                isPlayerBuffering = false
+            }
         }
 
         onDispose {
@@ -157,37 +173,51 @@ private fun TvLiveFullscreenScreen(
     }
 
     // Play selected channel inside full screen player with debounce for smooth fast remote zapping
-    LaunchedEffect(selectedChannel) {
+    LaunchedEffect(selectedChannel, retryTrigger) {
         val ch = selectedChannel
         if (ch != null) {
             showOsdBanner = true
             isPlayerBuffering = true
             playerHasError = false
+            candidateIndex = 0
+
+            val rawCandidates = XtreamApi.getLiveStreamCandidates(ch.id)
+            val list = mutableListOf<String>()
+            ch.directStreamUrl?.takeIf { it.isNotBlank() }?.let { list.add(it) }
+            for (c in rawCandidates) {
+                if (!list.contains(c)) list.add(c)
+            }
+            if (list.isEmpty()) {
+                val single = XtreamApi.getLiveStreamUrl(ch.id)
+                if (single.isNotBlank()) list.add(single)
+            }
+            channelCandidates = list
+
             // Short debounce to permit fast remote channel browsing without flooding native LibVLC decoder
             delay(180)
-            val candidates = XtreamApi.getLiveStreamCandidates(ch.id)
-            val primaryUrl = ch.directStreamUrl?.takeIf { it.isNotBlank() }
-                ?: candidates.firstOrNull()
-                ?: XtreamApi.getLiveStreamUrl(ch.id)
 
-            try {
-                playerHasError = false
-                isPlayerBuffering = true
-                playerManager.play(primaryUrl, 0L)
-            } catch (e: Exception) {
-                // Fallback attempt with alternate stream candidate if available
-                val altUrl = candidates.getOrNull(1)
-                if (altUrl != null && altUrl != primaryUrl) {
-                    try {
-                        playerManager.play(altUrl, 0L)
-                    } catch (_: Exception) {
+            if (list.isNotEmpty()) {
+                try {
+                    playerHasError = false
+                    isPlayerBuffering = true
+                    playerManager.play(list[0], 0L)
+                } catch (e: Throwable) {
+                    if (list.size > 1) {
+                        candidateIndex = 1
+                        try {
+                            playerManager.play(list[1], 0L)
+                        } catch (_: Throwable) {
+                            playerHasError = true
+                            isPlayerBuffering = false
+                        }
+                    } else {
                         playerHasError = true
                         isPlayerBuffering = false
                     }
-                } else {
-                    playerHasError = true
-                    isPlayerBuffering = false
                 }
+            } else {
+                playerHasError = true
+                isPlayerBuffering = false
             }
         }
     }
@@ -1035,6 +1065,9 @@ private fun PhoneLiveScreen(
     var isPlayerBuffering by remember { mutableStateOf(false) }
     var playerHasError by remember { mutableStateOf(false) }
     var showScreenCastDialog by remember { mutableStateOf(false) }
+    var candidateIndex by remember { mutableIntStateOf(0) }
+    var channelCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
+    var retryTrigger by remember { mutableIntStateOf(0) }
 
     // Embedded VLC Instance
     val playerManager = remember { PlayerManager(context) }
@@ -1051,9 +1084,22 @@ private fun PhoneLiveScreen(
                 playerHasError = false
             }
         }
-        playerManager.onError = {
-            playerHasError = true
-            isPlayerBuffering = false
+        playerManager.onError = { error ->
+            Log.w("PhoneLiveScreen", "VLC Error en candidato $candidateIndex: $error")
+            if (candidateIndex + 1 < channelCandidates.size) {
+                candidateIndex++
+                val nextCandidate = channelCandidates[candidateIndex]
+                try {
+                    isPlayerBuffering = true
+                    playerManager.play(nextCandidate, 0L)
+                } catch (_: Throwable) {
+                    playerHasError = true
+                    isPlayerBuffering = false
+                }
+            } else {
+                playerHasError = true
+                isPlayerBuffering = false
+            }
         }
 
         onDispose {
@@ -1062,34 +1108,49 @@ private fun PhoneLiveScreen(
     }
 
     // Play selected channel inside the embedded preview with debounce
-    LaunchedEffect(selectedChannel) {
+    LaunchedEffect(selectedChannel, retryTrigger) {
         val ch = selectedChannel
         if (ch != null) {
             isPlayerBuffering = true
             playerHasError = false
-            delay(180)
-            val candidates = XtreamApi.getLiveStreamCandidates(ch.id)
-            val primaryUrl = ch.directStreamUrl?.takeIf { it.isNotBlank() }
-                ?: candidates.firstOrNull()
-                ?: XtreamApi.getLiveStreamUrl(ch.id)
+            candidateIndex = 0
 
-            try {
-                playerHasError = false
-                isPlayerBuffering = true
-                playerManager.play(primaryUrl, 0L)
-            } catch (e: Exception) {
-                val altUrl = candidates.getOrNull(1)
-                if (altUrl != null && altUrl != primaryUrl) {
-                    try {
-                        playerManager.play(altUrl, 0L)
-                    } catch (_: Exception) {
+            val rawCandidates = XtreamApi.getLiveStreamCandidates(ch.id)
+            val list = mutableListOf<String>()
+            ch.directStreamUrl?.takeIf { it.isNotBlank() }?.let { list.add(it) }
+            for (c in rawCandidates) {
+                if (!list.contains(c)) list.add(c)
+            }
+            if (list.isEmpty()) {
+                val single = XtreamApi.getLiveStreamUrl(ch.id)
+                if (single.isNotBlank()) list.add(single)
+            }
+            channelCandidates = list
+
+            delay(180)
+
+            if (list.isNotEmpty()) {
+                try {
+                    playerHasError = false
+                    isPlayerBuffering = true
+                    playerManager.play(list[0], 0L)
+                } catch (e: Throwable) {
+                    if (list.size > 1) {
+                        candidateIndex = 1
+                        try {
+                            playerManager.play(list[1], 0L)
+                        } catch (_: Throwable) {
+                            playerHasError = true
+                            isPlayerBuffering = false
+                        }
+                    } else {
                         playerHasError = true
                         isPlayerBuffering = false
                     }
-                } else {
-                    playerHasError = true
-                    isPlayerBuffering = false
                 }
+            } else {
+                playerHasError = true
+                isPlayerBuffering = false
             }
         }
     }

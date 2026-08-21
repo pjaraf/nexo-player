@@ -35,38 +35,63 @@ class PlayerManager(val context: Context) {
     private var currentUrl: String? = null
     private var currentMedia: Media? = null
 
+    val isPlaying: Boolean
+        get() = try {
+            mediaPlayer.isPlaying
+        } catch (_: Throwable) {
+            false
+        }
+
+    val time: Long
+        get() = try {
+            mediaPlayer.time.coerceAtLeast(0L)
+        } catch (_: Throwable) {
+            0L
+        }
+
+    val length: Long
+        get() = try {
+            mediaPlayer.length.coerceAtLeast(0L)
+        } catch (_: Throwable) {
+            0L
+        }
+
     init {
         mediaPlayer.setEventListener { event ->
-            when (event.type) {
-                MediaPlayer.Event.Buffering -> {
-                    val percent = event.buffering
-                    onBuffering?.invoke(percent < 100.0f, percent)
+            try {
+                when (event.type) {
+                    MediaPlayer.Event.Buffering -> {
+                        val percent = event.buffering
+                        try { onBuffering?.invoke(percent < 100.0f, percent) } catch (_: Throwable) {}
+                    }
+                    MediaPlayer.Event.Playing -> {
+                        try { onBuffering?.invoke(false, 100f) } catch (_: Throwable) {}
+                        try { onPlayingChanged?.invoke(true) } catch (_: Throwable) {}
+                        try { onTracksChanged?.invoke() } catch (_: Throwable) {}
+                    }
+                    MediaPlayer.Event.Paused, MediaPlayer.Event.Stopped -> {
+                        try { onPlayingChanged?.invoke(false) } catch (_: Throwable) {}
+                    }
+                    MediaPlayer.Event.TimeChanged -> {
+                        try { onTimeChanged?.invoke(event.timeChanged) } catch (_: Throwable) {}
+                    }
+                    MediaPlayer.Event.LengthChanged -> {
+                        try { onLengthChanged?.invoke(event.lengthChanged) } catch (_: Throwable) {}
+                    }
+                    MediaPlayer.Event.EndReached -> {
+                        try { onEndReached?.invoke() } catch (_: Throwable) {}
+                    }
+                    MediaPlayer.Event.EncounteredError -> {
+                        Log.e("PlayerManager", "VLC Error de reproducción en: $currentUrl")
+                        try { onBuffering?.invoke(false, 0f) } catch (_: Throwable) {}
+                        try { onError?.invoke("Error de reproducción en VLC") } catch (_: Throwable) {}
+                    }
+                    MediaPlayer.Event.Vout -> {
+                        try { onTracksChanged?.invoke() } catch (_: Throwable) {}
+                    }
                 }
-                MediaPlayer.Event.Playing -> {
-                    onBuffering?.invoke(false, 100f)
-                    onPlayingChanged?.invoke(true)
-                    onTracksChanged?.invoke()
-                }
-                MediaPlayer.Event.Paused, MediaPlayer.Event.Stopped -> {
-                    onPlayingChanged?.invoke(false)
-                }
-                MediaPlayer.Event.TimeChanged -> {
-                    onTimeChanged?.invoke(event.timeChanged)
-                }
-                MediaPlayer.Event.LengthChanged -> {
-                    onLengthChanged?.invoke(event.lengthChanged)
-                }
-                MediaPlayer.Event.EndReached -> {
-                    onEndReached?.invoke()
-                }
-                MediaPlayer.Event.EncounteredError -> {
-                    Log.e("PlayerManager", "VLC Error de reproducción en: $currentUrl")
-                    onBuffering?.invoke(false, 0f)
-                    onError?.invoke("Error de reproducción en VLC")
-                }
-                MediaPlayer.Event.Vout -> {
-                    onTracksChanged?.invoke()
-                }
+            } catch (t: Throwable) {
+                Log.w("PlayerManager", "Safe handling of VLC event exception: ${t.message}")
             }
         }
     }
