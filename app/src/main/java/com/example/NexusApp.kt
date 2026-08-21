@@ -1,6 +1,11 @@
 package com.example
 
+import android.app.ActivityManager
 import android.app.Application
+import android.content.Context
+import android.graphics.Bitmap
+import android.os.Build
+import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
@@ -15,12 +20,17 @@ import javax.net.ssl.X509TrustManager
 
 class NexusApp : Application(), ImageLoaderFactory {
 
+    private var activeImageLoader: ImageLoader? = null
+
     override fun onCreate() {
         super.onCreate()
         instance = this
     }
 
     override fun newImageLoader(): ImageLoader {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val isLowRam = activityManager?.isLowRamDevice ?: (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)
+
         val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
             override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
             override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
@@ -37,21 +47,43 @@ class NexusApp : Application(), ImageLoaderFactory {
             .readTimeout(15, TimeUnit.SECONDS)
             .build()
 
-        return ImageLoader.Builder(this)
+        val loader = ImageLoader.Builder(this)
             .okHttpClient(okHttpClient)
+            .bitmapConfig(Bitmap.Config.RGB_565) // 50% less RAM usage per poster/logo
+            .allowRgb565(true)
+            .allowHardware(!isLowRam) // Prevent GPU texture OOM on older Android/TV devices
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.25)
+                    .maxSizePercent(if (isLowRam) 0.12 else 0.20)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.05)
+                    .maxSizePercent(0.04)
                     .build()
             }
-            .crossfade(true)
+            .crossfade(false) // Disable heavy crossfade animation on low-end chipsets for maximum FPS
             .build()
+
+        activeImageLoader = loader
+        return loader
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        try {
+            if (level >= TRIM_MEMORY_RUNNING_LOW) {
+                activeImageLoader?.memoryCache?.clear()
+            }
+        } catch (_: Exception) {}
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        try {
+            activeImageLoader?.memoryCache?.clear()
+        } catch (_: Exception) {}
     }
 
     companion object {
