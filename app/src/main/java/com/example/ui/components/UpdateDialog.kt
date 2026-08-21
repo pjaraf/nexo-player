@@ -70,7 +70,8 @@ fun UpdateDialog(
         },
         properties = DialogProperties(
             dismissOnBackPress = !updateInfo.isMandatory && downloadState !is UpdateDownloadState.Downloading,
-            dismissOnClickOutside = !updateInfo.isMandatory && downloadState !is UpdateDownloadState.Downloading
+            dismissOnClickOutside = !updateInfo.isMandatory && downloadState !is UpdateDownloadState.Downloading,
+            usePlatformDefaultWidth = false
         )
     ) {
         Surface(
@@ -81,7 +82,8 @@ fun UpdateDialog(
                 Brush.linearGradient(listOf(NexusPrimary, NexusAccent))
             ),
             modifier = Modifier
-                .fillMaxWidth()
+                .widthIn(max = 520.dp)
+                .fillMaxWidth(0.92f)
                 .padding(16.dp)
                 .testTag("update_dialog")
         ) {
