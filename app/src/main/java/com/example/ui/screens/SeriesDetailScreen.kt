@@ -60,6 +60,8 @@ import com.example.player.VlcPlayerView
 import com.example.ui.components.CinematicBackground
 import com.example.ui.components.POSTER_FALLBACK
 import com.example.ui.components.TvFullscreenPlayerOverlay
+import com.example.ui.components.TvAudioSubtitleDialog
+import com.example.ui.components.TvMediaTrackOption
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.delay
@@ -124,8 +126,8 @@ fun SeriesDetailTvScreen(
 
     // Audio and subtitle tracks
     var showTracksDialog by remember { mutableStateOf(false) }
-    var availableAudioTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
-    var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
+    var availableAudioTracks by remember { mutableStateOf<List<TvMediaTrackOption>>(emptyList()) }
+    var availableSubtitleTracks by remember { mutableStateOf<List<TvMediaTrackOption>>(emptyList()) }
     var isSubtitlesDisabled by remember { mutableStateOf(false) }
     var fullScreenResizeModeIndex by remember { mutableIntStateOf(0) }
     val resizeModes = listOf(
@@ -136,10 +138,10 @@ fun SeriesDetailTvScreen(
 
     fun refreshTracks() {
         val audios = playerManager.getAudioTracks().map {
-            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+            TvMediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
         }
         val subs = playerManager.getSubtitleTracks().map {
-            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+            TvMediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
         }
         availableAudioTracks = audios
         availableSubtitleTracks = subs
@@ -845,152 +847,40 @@ fun SeriesDetailTvScreen(
             }
         }
 
-        // Idioma y Subtítulos Dialog
-        if (showTracksDialog) {
-            AlertDialog(
-                onDismissRequest = { showTracksDialog = false },
-                containerColor = Color(0xFF14151F),
-                title = {
-                    Text("Idioma y Subtítulos (VLC)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        // Pistas de Audio
-                        Text("PISTAS DE AUDIO", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                        if (availableAudioTracks.isEmpty()) {
-                            Text("Audio predeterminado", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
-                        } else {
-                            availableAudioTracks.forEach { track ->
-                                var isTrackFocused by remember { mutableStateOf(false) }
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .focusable()
-                                        .onFocusChanged { isTrackFocused = it.isFocused }
-                                        .clickable {
-                                            try {
-                                                playerManager.setAudioTrack(track.id)
-                                                refreshTracks()
-                                            } catch (e: Exception) {
-                                                Log.e("SeriesDetailTv", "Error selecting audio track", e)
-                                            }
-                                        },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = when {
-                                        isTrackFocused -> tvFocusBlue
-                                        track.isSelected -> Color(0xFFE50914)
-                                        else -> Color.White.copy(alpha = 0.1f)
-                                    },
-                                    border = if (isTrackFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(track.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                        if (track.isSelected) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
-
-                        // Subtítulos
-                        Text("SUBTÍTULOS", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                        // Desactivar Subtítulos Option
-                        var isDisableSubFocused by remember { mutableStateOf(false) }
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .focusable()
-                                .onFocusChanged { isDisableSubFocused = it.isFocused }
-                                .clickable {
-                                    try {
-                                        playerManager.setSubtitleTrack(-1)
-                                        isSubtitlesDisabled = true
-                                        refreshTracks()
-                                    } catch (e: Exception) {
-                                        Log.e("SeriesDetailTv", "Error disabling subtitles", e)
-                                    }
-                                },
-                            shape = RoundedCornerShape(8.dp),
-                            color = when {
-                                isDisableSubFocused -> tvFocusBlue
-                                isSubtitlesDisabled -> Color(0xFFE50914)
-                                else -> Color.White.copy(alpha = 0.1f)
-                            },
-                            border = if (isDisableSubFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Desactivados", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                if (isSubtitlesDisabled) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-
-                        availableSubtitleTracks.forEach { track ->
-                            var isSubFocused by remember { mutableStateOf(false) }
-                            val isChosen = track.isSelected && !isSubtitlesDisabled
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .focusable()
-                                    .onFocusChanged { isSubFocused = it.isFocused }
-                                    .clickable {
-                                        try {
-                                            playerManager.setSubtitleTrack(track.id)
-                                            isSubtitlesDisabled = false
-                                            refreshTracks()
-                                        } catch (e: Exception) {
-                                            Log.e("SeriesDetailTv", "Error setting subtitle track", e)
-                                        }
-                                    },
-                                shape = RoundedCornerShape(8.dp),
-                                color = when {
-                                    isSubFocused -> tvFocusBlue
-                                    isChosen -> Color(0xFFE50914)
-                                    else -> Color.White.copy(alpha = 0.1f)
-                                },
-                                border = if (isSubFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(track.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                    if (isChosen) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showTracksDialog = false }) {
-                        Text("Cerrar", color = tvFocusBlue, fontWeight = FontWeight.Bold)
-                    }
+        // Idioma y Subtítulos Dialog (VLC) - 100% D-Pad Compatible
+        TvAudioSubtitleDialog(
+            show = showTracksDialog,
+            availableAudioTracks = availableAudioTracks,
+            availableSubtitleTracks = availableSubtitleTracks,
+            isSubtitlesDisabled = isSubtitlesDisabled,
+            onSelectAudioTrack = { trackId ->
+                try {
+                    playerManager.setAudioTrack(trackId)
+                    refreshTracks()
+                } catch (e: Exception) {
+                    Log.e("SeriesDetailTv", "Error selecting audio track", e)
                 }
-            )
-        }
+            },
+            onSelectSubtitleTrack = { trackId ->
+                try {
+                    playerManager.setSubtitleTrack(trackId)
+                    isSubtitlesDisabled = false
+                    refreshTracks()
+                } catch (e: Exception) {
+                    Log.e("SeriesDetailTv", "Error setting subtitle track", e)
+                }
+            },
+            onDisableSubtitles = {
+                try {
+                    playerManager.setSubtitleTrack(-1)
+                    isSubtitlesDisabled = true
+                    refreshTracks()
+                } catch (e: Exception) {
+                    Log.e("SeriesDetailTv", "Error disabling subtitles", e)
+                }
+            },
+            onDismiss = { showTracksDialog = false }
+        )
     }
 }
 

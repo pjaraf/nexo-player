@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import com.example.ui.components.TvAudioSubtitleDialog
+import com.example.ui.components.TvMediaTrackOption
 import com.example.ui.components.ScreenCastDialog
 import com.example.ui.components.TvFullscreenPlayerOverlay
 import androidx.compose.foundation.rememberScrollState
@@ -168,8 +170,8 @@ private fun MovieDetailTvScreen(
     var previewError by remember { mutableStateOf(false) }
 
     // Audio & Subtitle tracks
-    var availableAudioTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
-    var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
+    var availableAudioTracks by remember { mutableStateOf<List<TvMediaTrackOption>>(emptyList()) }
+    var availableSubtitleTracks by remember { mutableStateOf<List<TvMediaTrackOption>>(emptyList()) }
     var isSubtitlesDisabled by remember { mutableStateOf(false) }
     var fullScreenResizeModeIndex by remember { mutableIntStateOf(0) }
     val resizeModes = listOf(
@@ -180,10 +182,10 @@ private fun MovieDetailTvScreen(
 
     fun refreshTracks() {
         val audios = playerManager.getAudioTracks().map {
-            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+            TvMediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
         }
         val subs = playerManager.getSubtitleTracks().map {
-            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+            TvMediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
         }
         availableAudioTracks = audios
         availableSubtitleTracks = subs
@@ -813,57 +815,51 @@ private fun MovieDetailTvScreen(
                         } else {
                             LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                contentPadding = PaddingValues(vertical = 4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                contentPadding = PaddingValues(vertical = 6.dp, horizontal = 2.dp)
                             ) {
                                 items(relatedMovies, key = { it.id }) { relMovie ->
                                     val interactionSource = remember { MutableInteractionSource() }
                                     val isItemFocused by interactionSource.collectIsFocusedAsState()
+                                    val posterUrl = relMovie.streamIcon?.takeIf { it.isNotBlank() } ?: POSTER_FALLBACK
 
                                     Surface(
                                         onClick = { onNavigateMovie(relMovie.id) },
                                         interactionSource = interactionSource,
                                         modifier = Modifier
-                                            .width(130.dp)
-                                            .height(80.dp)
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .width(105.dp)
+                                            .height(155.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .onKeyEvent { keyEvent ->
+                                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                                    when (keyEvent.nativeKeyEvent.keyCode) {
+                                                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                        AndroidKeyEvent.KEYCODE_ENTER,
+                                                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                            onNavigateMovie(relMovie.id)
+                                                            true
+                                                        }
+                                                        else -> false
+                                                    }
+                                                } else false
+                                            }
                                             .testTag("related_movie_${relMovie.id}"),
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isItemFocused) tvFocusBlue else tvButtonDefaultBg,
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Color(0xFF1A1B26),
                                         border = if (isItemFocused) {
-                                            androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                            androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
                                         } else {
-                                            androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
-                                        }
+                                            androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                                        },
+                                        shadowElevation = if (isItemFocused) 12.dp else 2.dp
                                     ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            // Mini Poster Thumbnail
-                                            AsyncImage(
-                                                model = cover?.ifBlank { POSTER_FALLBACK } ?: POSTER_FALLBACK,
-                                                contentDescription = relMovie.name,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier
-                                                    .width(44.dp)
-                                                    .fillMaxHeight()
-                                                    .clip(RoundedCornerShape(6.dp))
-                                            )
-
-                                            // Movie Title
-                                            Text(
-                                                text = relMovie.name,
-                                                color = Color.White,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 3,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
+                                        AsyncImage(
+                                            model = posterUrl,
+                                            contentDescription = relMovie.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                     }
                                 }
                             }
@@ -932,152 +928,40 @@ private fun MovieDetailTvScreen(
             }
         }
 
-        // Idioma y Subtítulos Dialog
-        if (showTracksDialog) {
-            AlertDialog(
-                onDismissRequest = { showTracksDialog = false },
-                containerColor = Color(0xFF14151F),
-                title = {
-                    Text("Idioma y Subtítulos (VLC)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        // Pistas de Audio
-                        Text("PISTAS DE AUDIO", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                        if (availableAudioTracks.isEmpty()) {
-                            Text("Audio predeterminado", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
-                        } else {
-                            availableAudioTracks.forEach { track ->
-                                var isTrackFocused by remember { mutableStateOf(false) }
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .focusable()
-                                        .onFocusChanged { isTrackFocused = it.isFocused }
-                                        .clickable {
-                                            try {
-                                                playerManager.setAudioTrack(track.id)
-                                                refreshTracks()
-                                            } catch (e: Exception) {
-                                                Log.e("MovieDetailTv", "Error selecting audio track", e)
-                                            }
-                                        },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = when {
-                                        isTrackFocused -> tvFocusBlue
-                                        track.isSelected -> tvSelectedRed
-                                        else -> Color.White.copy(alpha = 0.1f)
-                                    },
-                                    border = if (isTrackFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(track.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                        if (track.isSelected) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Divider(color = Color.White.copy(alpha = 0.15f))
-
-                        // Subtítulos
-                        Text("SUBTÍTULOS", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                        // Desactivar Subtítulos Option
-                        var isDisableSubFocused by remember { mutableStateOf(false) }
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .focusable()
-                                .onFocusChanged { isDisableSubFocused = it.isFocused }
-                            .clickable {
-                                try {
-                                    playerManager.setSubtitleTrack(-1)
-                                    isSubtitlesDisabled = true
-                                    refreshTracks()
-                                } catch (e: Exception) {
-                                    Log.e("MovieDetailTv", "Error disabling subtitles", e)
-                                }
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            color = when {
-                                isDisableSubFocused -> tvFocusBlue
-                                isSubtitlesDisabled -> tvSelectedRed
-                                else -> Color.White.copy(alpha = 0.1f)
-                            },
-                            border = if (isDisableSubFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Desactivados", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                if (isSubtitlesDisabled) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-
-                        availableSubtitleTracks.forEach { track ->
-                            var isSubFocused by remember { mutableStateOf(false) }
-                            val isChosen = track.isSelected && !isSubtitlesDisabled
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .focusable()
-                                    .onFocusChanged { isSubFocused = it.isFocused }
-                                    .clickable {
-                                        try {
-                                            playerManager.setSubtitleTrack(track.id)
-                                            isSubtitlesDisabled = false
-                                            refreshTracks()
-                                        } catch (e: Exception) {
-                                            Log.e("MovieDetailTv", "Error selecting subtitle", e)
-                                        }
-                                    },
-                                shape = RoundedCornerShape(8.dp),
-                                color = when {
-                                    isSubFocused -> tvFocusBlue
-                                    isChosen -> tvSelectedRed
-                                    else -> Color.White.copy(alpha = 0.1f)
-                                },
-                                border = if (isSubFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(track.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                    if (isChosen) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showTracksDialog = false }) {
-                        Text("Aceptar", color = tvFocusBlue, fontWeight = FontWeight.Bold)
-                    }
+        // Idioma y Subtítulos Dialog (VLC) - 100% D-Pad Compatible
+        TvAudioSubtitleDialog(
+            show = showTracksDialog,
+            availableAudioTracks = availableAudioTracks,
+            availableSubtitleTracks = availableSubtitleTracks,
+            isSubtitlesDisabled = isSubtitlesDisabled,
+            onSelectAudioTrack = { trackId ->
+                try {
+                    playerManager.setAudioTrack(trackId)
+                    refreshTracks()
+                } catch (e: Exception) {
+                    Log.e("MovieDetailTv", "Error selecting audio track", e)
                 }
-            )
-        }
+            },
+            onSelectSubtitleTrack = { trackId ->
+                try {
+                    playerManager.setSubtitleTrack(trackId)
+                    isSubtitlesDisabled = false
+                    refreshTracks()
+                } catch (e: Exception) {
+                    Log.e("MovieDetailTv", "Error selecting subtitle", e)
+                }
+            },
+            onDisableSubtitles = {
+                try {
+                    playerManager.setSubtitleTrack(-1)
+                    isSubtitlesDisabled = true
+                    refreshTracks()
+                } catch (e: Exception) {
+                    Log.e("MovieDetailTv", "Error disabling subtitles", e)
+                }
+            },
+            onDismiss = { showTracksDialog = false }
+        )
     }
 }
 

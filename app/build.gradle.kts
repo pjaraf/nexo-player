@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexo.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 109
-        versionName = "1.1.98"
+        versionCode = 110
+        versionName = "1.1.99"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

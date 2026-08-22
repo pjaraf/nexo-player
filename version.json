@@ -1,7 +1,7 @@
 {
-    "versionCode": 109,
-    "versionName": "1.1.98",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.98/app-debug.apk",
-    "changelog": "Versión 1.1.98: Navegación completa por los canales y categorías en la barra lateral de TV en vivo con control remoto D-Pad, enfoque automático y cambio instantáneo de canales.",
+    "versionCode": 110,
+    "versionName": "1.1.99",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.99/app-debug.apk",
+    "changelog": "Versión 1.1.99: Navegación y selección con D-Pad en cuadro de pistas de audio y subtítulos, carátulas reales en películas relacionadas y reproducción fluida a pantalla completa.",
     "isMandatory": true
 }

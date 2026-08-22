@@ -107,7 +107,7 @@ class PlayerManager(val context: Context) {
         }
     }
 
-    fun attachViews(layout: VLCVideoLayout, enableSubtitles: Boolean = true, useTextureView: Boolean = false) {
+    fun attachViews(layout: VLCVideoLayout, enableSubtitles: Boolean = true, useTextureView: Boolean = true) {
         try {
             if (attachedLayout != layout) {
                 detachViews()

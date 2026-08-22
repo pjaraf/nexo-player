@@ -13,7 +13,7 @@ fun VlcPlayerView(
     playerManager: PlayerManager,
     modifier: Modifier = Modifier,
     enableSubtitles: Boolean = true,
-    useTextureView: Boolean = false
+    useTextureView: Boolean = true
 ) {
     AndroidView(
         factory = { ctx ->
@@ -29,11 +29,6 @@ fun VlcPlayerView(
         update = { layout ->
             layout.keepScreenOn = true
             playerManager.attachViews(layout, enableSubtitles, useTextureView)
-        },
-        onRelease = {
-            try {
-                playerManager.detachViews()
-            } catch (_: Throwable) {}
         },
         modifier = modifier.fillMaxSize()
     )

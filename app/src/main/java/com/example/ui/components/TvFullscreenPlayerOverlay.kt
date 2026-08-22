@@ -36,6 +36,10 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+
 @Composable
 fun TvFullscreenPlayerOverlay(
     isPlaying: Boolean,
@@ -54,6 +58,11 @@ fun TvFullscreenPlayerOverlay(
     val focusColor = Color(0xFFE50914) // Netflix Red
     val focusGold = Color(0xFFFFC107)
     val playPauseFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
+    BackHandler {
+        onExit()
+    }
 
     LaunchedEffect(Unit) {
         try {
