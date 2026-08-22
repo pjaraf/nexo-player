@@ -123,8 +123,8 @@ private fun MovieDetailTvScreen(
     var showTracksDialog by remember { mutableStateOf(false) }
     var isSynopsisExpanded by remember { mutableStateOf(false) }
 
-    // Full screen in-place mode
-    var isFullScreenMode by remember { mutableStateOf(false) }
+    // Full screen in-place mode (default to true on TV so movies play immediately in full screen)
+    var isFullScreenMode by remember { mutableStateOf(true) }
     var showPlayerControls by remember { mutableStateOf(true) }
     var lastUserInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var isPlaying by remember { mutableStateOf(true) }
@@ -270,6 +270,9 @@ private fun MovieDetailTvScreen(
                 isPreviewLoading = true
                 previewError = false
                 val startPos = savedProgress?.positionMs ?: 0L
+                try {
+                    playerManager.mediaPlayer.volume = 100
+                } catch (_: Throwable) {}
                 playerManager.play(streamUrl, startPos)
                 isPlaying = true
             }
