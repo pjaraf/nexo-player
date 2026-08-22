@@ -120,6 +120,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val isTv = remember { DeviceUtils.isTelevision(context) }
     val isWideScreen = configuration.screenWidthDp >= 600 || isTv
+    var pendingResumeItem by remember { mutableStateOf<Triple<String, String, com.example.data.models.ProgressItem>?>(null) }
 
     val firstCardFocusRequester = remember { FocusRequester() }
     var hasRequestedInitialFocus by remember { mutableStateOf(false) }
@@ -435,7 +436,13 @@ fun HomeScreen(
                                                 kind = "movie",
                                                 containerExtension = movie.containerExtension ?: "mp4"
                                             )
-                                            onNavigateMovie(movie.id)
+                                            val savedProgress = progressList.find { it.key == "movie:${movie.id}" || (it.kind == "movie" && it.id == movie.id) }
+                                            if (savedProgress != null && savedProgress.positionMs > 10_000L && (savedProgress.durationMs <= 0L || savedProgress.positionMs < (savedProgress.durationMs - 30_000L))) {
+                                                pendingResumeItem = Triple(movie.displayName, movie.streamIcon ?: "", savedProgress)
+                                            } else {
+                                                val streamUrl = XtreamApi.getVodStreamUrl(movie.id, movie.containerExtension ?: "mp4")
+                                                onPlayDirect(streamUrl, movie.displayName, "movie", movie.id, movie.streamIcon ?: "", 0L)
+                                            }
                                         },
                                         modifier = Modifier
                                             .width(if (isWideScreen) 130.dp else 115.dp)
@@ -448,6 +455,37 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    // Resume Dialog for Home
+    pendingResumeItem?.let { (title, cover, progress) ->
+        val streamUrl = if (progress.kind == "movie") {
+            XtreamApi.getVodStreamUrl(progress.id, "mp4")
+        } else {
+            XtreamApi.getSeriesStreamUrl(progress.id, "mp4")
+        }
+        ResumePlaybackDialog(
+            title = title,
+            coverUrl = cover,
+            positionMs = progress.positionMs,
+            durationMs = progress.durationMs,
+            onResume = {
+                val pos = progress.positionMs
+                val pKind = progress.kind
+                val pId = progress.id
+                pendingResumeItem = null
+                onPlayDirect(streamUrl, title, pKind, pId, cover, pos)
+            },
+            onStartFromBeginning = {
+                val pKind = progress.kind
+                val pId = progress.id
+                pendingResumeItem = null
+                onPlayDirect(streamUrl, title, pKind, pId, cover, 0L)
+            },
+            onDismiss = {
+                pendingResumeItem = null
+            }
+        )
     }
 
     // --- Series Destacadas (Solo en Teléfonos) ---

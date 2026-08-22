@@ -129,7 +129,8 @@ fun MainTabsScreen(
             MainTab.MOVIES -> {
                 MoviesScreen(
                     viewModel = viewModel,
-                    onNavigateMovie = onNavigateMovieDetail
+                    onNavigateMovie = onNavigateMovieDetail,
+                    onPlayDirect = onNavigatePlayerDirect
                 )
             }
             MainTab.SERIES -> {

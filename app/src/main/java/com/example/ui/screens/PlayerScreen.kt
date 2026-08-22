@@ -13,6 +13,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -915,17 +916,24 @@ fun PlayerScreen(
                         onPlayPause = {
                             if (playerManager.mediaPlayer.isPlaying) {
                                 playerManager.pause()
+                                isPlaying = false
                             } else {
                                 playerManager.resume()
+                                isPlaying = true
                             }
                         },
                         onRewind = {
-                            val target = (playerManager.mediaPlayer.time - 10000L).coerceAtLeast(0L)
+                            val cur = playerManager.mediaPlayer.time.takeIf { it >= 0 } ?: currentPosition
+                            val target = (cur - 10000L).coerceAtLeast(0L)
                             playerManager.seekTo(target)
+                            currentPosition = target
                         },
                         onForward = {
-                            val target = (playerManager.mediaPlayer.time + 10000L).coerceAtMost(duration)
+                            val cur = playerManager.mediaPlayer.time.takeIf { it >= 0 } ?: currentPosition
+                            val maxDur = if (duration > 0) duration else Long.MAX_VALUE
+                            val target = (cur + 10000L).coerceAtMost(maxDur)
                             playerManager.seekTo(target)
+                            currentPosition = target
                         },
                         onExit = onClose,
                         onSubtitles = { showAudioSubtitlesDialog = true },
@@ -1004,7 +1012,7 @@ fun AudioSubtitlesDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "Audio",
+                    "Pistas de Audio",
                     color = TvFocusBlue,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
@@ -1015,23 +1023,51 @@ fun AudioSubtitlesDialog(
                 } else {
                     availableAudioTracks.forEach { track ->
                         val isSelected = track.isSelected
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isFocused by interactionSource.collectIsFocusedAsState()
+
+                        Surface(
+                            onClick = {
+                                onSelectAudio(track)
+                                onDismiss()
+                            },
+                            interactionSource = interactionSource,
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isFocused) TvFocusBlue else if (isSelected) Color.White.copy(alpha = 0.12f) else Color.Transparent,
+                            border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else null,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    onSelectAudio(track)
-                                    onDismiss()
+                                .padding(vertical = 4.dp)
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.nativeKeyEvent.keyCode) {
+                                            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                            android.view.KeyEvent.KEYCODE_ENTER,
+                                            android.view.KeyEvent.KEYCODE_NUMPAD_ENTER,
+                                            android.view.KeyEvent.KEYCODE_BUTTON_A -> {
+                                                onSelectAudio(track)
+                                                onDismiss()
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
                                 }
-                                .padding(vertical = 8.dp)
                         ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = null,
-                                colors = RadioButtonDefaults.colors(selectedColor = TvFocusBlue, unselectedColor = Color.White)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(track.label, color = if (isSelected) Color.White else Color.Gray)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = null,
+                                    colors = RadioButtonDefaults.colors(selectedColor = if (isFocused) Color.White else TvFocusBlue, unselectedColor = Color.White)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(track.label, color = if (isFocused || isSelected) Color.White else Color.Gray, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                            }
                         }
                     }
                 }
@@ -1048,43 +1084,100 @@ fun AudioSubtitlesDialog(
                 if (availableSubtitleTracks.isEmpty()) {
                     Text("No hay subtítulos disponibles.", color = Color.Gray, fontSize = 14.sp)
                 } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    val offInteractionSource = remember { MutableInteractionSource() }
+                    val isOffFocused by offInteractionSource.collectIsFocusedAsState()
+
+                    Surface(
+                        onClick = {
+                            onSelectSubtitle(null)
+                            onDismiss()
+                        },
+                        interactionSource = offInteractionSource,
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isOffFocused) TvFocusBlue else if (isSubtitlesDisabled) Color.White.copy(alpha = 0.12f) else Color.Transparent,
+                        border = if (isOffFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else null,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                onSelectSubtitle(null)
-                                onDismiss()
+                            .padding(vertical = 4.dp)
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.nativeKeyEvent.keyCode) {
+                                        android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                        android.view.KeyEvent.KEYCODE_ENTER,
+                                        android.view.KeyEvent.KEYCODE_NUMPAD_ENTER,
+                                        android.view.KeyEvent.KEYCODE_BUTTON_A -> {
+                                            onSelectSubtitle(null)
+                                            onDismiss()
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                } else false
                             }
-                            .padding(vertical = 8.dp)
                     ) {
-                        RadioButton(
-                            selected = isSubtitlesDisabled,
-                            onClick = null,
-                            colors = RadioButtonDefaults.colors(selectedColor = TvFocusBlue, unselectedColor = Color.White)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Desactivar Subtítulos", color = if (isSubtitlesDisabled) Color.White else Color.Gray)
-                    }
-                    availableSubtitleTracks.forEach { track ->
-                        val isSelected = track.isSelected && !isSubtitlesDisabled
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    onSelectSubtitle(track)
-                                    onDismiss()
-                                }
-                                .padding(vertical = 8.dp)
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             RadioButton(
-                                selected = isSelected,
+                                selected = isSubtitlesDisabled,
                                 onClick = null,
-                                colors = RadioButtonDefaults.colors(selectedColor = TvFocusBlue, unselectedColor = Color.White)
+                                colors = RadioButtonDefaults.colors(selectedColor = if (isOffFocused) Color.White else TvFocusBlue, unselectedColor = Color.White)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(track.label, color = if (isSelected) Color.White else Color.Gray)
+                            Text("Desactivar Subtítulos", color = if (isOffFocused || isSubtitlesDisabled) Color.White else Color.Gray, fontWeight = if (isSubtitlesDisabled) FontWeight.Bold else FontWeight.Normal)
+                        }
+                    }
+
+                    availableSubtitleTracks.forEach { track ->
+                        val isSelected = track.isSelected && !isSubtitlesDisabled
+                        val trackInteractionSource = remember { MutableInteractionSource() }
+                        val isTrackFocused by trackInteractionSource.collectIsFocusedAsState()
+
+                        Surface(
+                            onClick = {
+                                onSelectSubtitle(track)
+                                onDismiss()
+                            },
+                            interactionSource = trackInteractionSource,
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isTrackFocused) TvFocusBlue else if (isSelected) Color.White.copy(alpha = 0.12f) else Color.Transparent,
+                            border = if (isTrackFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.nativeKeyEvent.keyCode) {
+                                            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                            android.view.KeyEvent.KEYCODE_ENTER,
+                                            android.view.KeyEvent.KEYCODE_NUMPAD_ENTER,
+                                            android.view.KeyEvent.KEYCODE_BUTTON_A -> {
+                                                onSelectSubtitle(track)
+                                                onDismiss()
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = null,
+                                    colors = RadioButtonDefaults.colors(selectedColor = if (isTrackFocused) Color.White else TvFocusBlue, unselectedColor = Color.White)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(track.label, color = if (isTrackFocused || isSelected) Color.White else Color.Gray, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                            }
                         }
                     }
                 }
@@ -1095,7 +1188,7 @@ fun AudioSubtitlesDialog(
                 onClick = onDismiss,
                 colors = ButtonDefaults.textButtonColors(contentColor = Color.White)
             ) {
-                Text("Listo", fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Cerrar", fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     )

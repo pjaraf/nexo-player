@@ -41,9 +41,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.api.XtreamApi
+import com.example.data.models.ProgressItem
 import com.example.data.models.VodStream
 import com.example.ui.components.MediaPosterCard
 import com.example.ui.components.POSTER_FALLBACK
+import com.example.ui.components.ResumePlaybackDialog
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 
@@ -64,9 +66,11 @@ fun MoviesScreen(
     val selectedCat by viewModel.selectedVodCat.collectAsState()
     val streams by viewModel.vodStreams.collectAsState()
     val loading by viewModel.vodLoading.collectAsState()
+    val progressList by viewModel.progressList.collectAsState()
 
     var selectedMovie by remember { mutableStateOf<VodStream?>(null) }
     var isCategoriesOpen by remember { mutableStateOf(false) }
+    var pendingResumeMovie by remember { mutableStateOf<Pair<VodStream, ProgressItem>?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadVodCategories()
@@ -416,7 +420,18 @@ fun MoviesScreen(
                                 isAtFirstItem = (index == 0)
                             },
                             onClick = {
-                                onNavigateMovie(movie.id)
+                                selectedMovie = movie
+                                val savedProgress = progressList.find { it.key == "movie:${movie.id}" || (it.kind == "movie" && it.id == movie.id) }
+                                if (savedProgress != null && savedProgress.positionMs > 10_000L && (savedProgress.durationMs <= 0L || savedProgress.positionMs < (savedProgress.durationMs - 30_000L))) {
+                                    pendingResumeMovie = movie to savedProgress
+                                } else {
+                                    val streamUrl = XtreamApi.getVodStreamUrl(movie.id, movie.containerExtension ?: "mp4")
+                                    if (onPlayDirect != null) {
+                                        onPlayDirect(streamUrl, movie.displayName, "movie", movie.id, movie.streamIcon ?: "", 0L)
+                                    } else {
+                                        onNavigateMovie(movie.id)
+                                    }
+                                }
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -425,6 +440,37 @@ fun MoviesScreen(
                     }
                 }
             }
+        }
+
+        // Resume Playback Dialog
+        pendingResumeMovie?.let { (movie, progress) ->
+            val streamUrl = XtreamApi.getVodStreamUrl(movie.id, movie.containerExtension ?: "mp4")
+            ResumePlaybackDialog(
+                title = movie.displayName,
+                coverUrl = movie.streamIcon,
+                positionMs = progress.positionMs,
+                durationMs = progress.durationMs,
+                onResume = {
+                    val pos = progress.positionMs
+                    pendingResumeMovie = null
+                    if (onPlayDirect != null) {
+                        onPlayDirect(streamUrl, movie.displayName, "movie", movie.id, movie.streamIcon ?: "", pos)
+                    } else {
+                        onNavigateMovie(movie.id)
+                    }
+                },
+                onStartFromBeginning = {
+                    pendingResumeMovie = null
+                    if (onPlayDirect != null) {
+                        onPlayDirect(streamUrl, movie.displayName, "movie", movie.id, movie.streamIcon ?: "", 0L)
+                    } else {
+                        onNavigateMovie(movie.id)
+                    }
+                },
+                onDismiss = {
+                    pendingResumeMovie = null
+                }
+            )
         }
 
         // Scrim background when Categories drawer is open

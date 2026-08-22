@@ -1,7 +1,7 @@
 {
-    "versionCode": 113,
-    "versionName": "1.2.02",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.02/app-debug.apk",
-    "changelog": "Versión 1.2.02: Reproducción automática e inmediata a pantalla completa al seleccionar cualquier carátula de película en TV.",
+    "versionCode": 114,
+    "versionName": "1.2.03",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.03/app-debug.apk",
+    "changelog": "Versión 1.2.03: Diálogo para continuar viendo o empezar del inicio en películas y series, reproducción directa a pantalla completa, retorno exacto a la carátula en la lista de películas al salir, y botones de control inferiores completamente funcionales.",
     "isMandatory": true
 }

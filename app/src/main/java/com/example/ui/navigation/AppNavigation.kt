@@ -186,11 +186,6 @@ fun AppNavigation(
                     navController.navigate(Routes.seriesDetail(seriesId))
                 },
                 onNavigatePlayerDirect = { url, title, kind, contentId, img, resumeMs ->
-                    if (kind == "movie" && contentId.isNotBlank()) {
-                        navController.navigate(Routes.movieDetail(contentId))
-                    } else if (kind == "series" && contentId.isNotBlank()) {
-                        navController.navigate(Routes.seriesDetail(contentId))
-                    }
                     navController.navigate(
                         Routes.player(
                             url = url,

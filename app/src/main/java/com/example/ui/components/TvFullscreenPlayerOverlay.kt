@@ -282,6 +282,14 @@ fun TvFullscreenPlayerOverlay(
                             onFocused = onUserInteraction
                         )
                     }
+
+                    // 7. Salir de la película / Volver
+                    TvPlayerActionButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        label = "Salir",
+                        onClick = onExit,
+                        onFocused = onUserInteraction
+                    )
                 }
             }
         }
