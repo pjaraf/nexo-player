@@ -869,16 +869,19 @@ fun PlayerScreen(
                         .fillMaxSize()
                         .padding(24.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.65f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        IconButton(onClick = onClose, modifier = Modifier.testTag("player_close_btn")) {
-                            Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                    // Close button (Mobile only - on TV users use the Back button on remote)
+                    if (!isTv) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.65f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            IconButton(onClick = onClose, modifier = Modifier.testTag("player_close_btn")) {
+                                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                            }
                         }
                     }
 

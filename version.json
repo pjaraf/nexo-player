@@ -1,7 +1,7 @@
 {
-    "versionCode": 107,
-    "versionName": "1.1.96",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.96/app-debug.apk",
-    "changelog": "Versión 1.1.96: Se eliminó por completo el botón y la pantalla de cambiar perfil.",
+    "versionCode": 108,
+    "versionName": "1.1.97",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.97/app-debug.apk",
+    "changelog": "Versión 1.1.97: Nuevo banner Breaking News en TV en Vivo sin botón X, ventana lateral de canales y categorías interactiva con soporte completo para control remoto D-Pad.",
     "isMandatory": true
 }
