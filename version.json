@@ -1,7 +1,7 @@
 {
-    "versionCode": 108,
-    "versionName": "1.1.97",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.97/app-debug.apk",
-    "changelog": "Versión 1.1.97: Nuevo banner Breaking News en TV en Vivo sin botón X, ventana lateral de canales y categorías interactiva con soporte completo para control remoto D-Pad.",
+    "versionCode": 109,
+    "versionName": "1.1.98",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.98/app-debug.apk",
+    "changelog": "Versión 1.1.98: Navegación completa por los canales y categorías en la barra lateral de TV en vivo con control remoto D-Pad, enfoque automático y cambio instantáneo de canales.",
     "isMandatory": true
 }

@@ -135,6 +135,8 @@ private fun TvLiveScreen(
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     val rootFocusRequester = remember { FocusRequester() }
+    val selectedChannelFocusRequester = remember { FocusRequester() }
+    val selectedCategoryFocusRequester = remember { FocusRequester() }
     val channelListState = rememberLazyListState()
     val categoryListState = rememberLazyListState()
 
@@ -261,13 +263,36 @@ private fun TvLiveScreen(
         }
     }
 
-    // Auto-scroll to selected channel when entering channels menu
+    // Auto-scroll and auto-focus when entering channels or categories menu
     LaunchedEffect(menuLevel) {
-        if (menuLevel == TvMenuLevel.CHANNELS && selectedChannel != null) {
-            val idx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }
-            if (idx >= 0) {
+        when (menuLevel) {
+            TvMenuLevel.CHANNELS -> {
+                val idx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }.coerceAtLeast(0)
+                if (displayChannels.isNotEmpty()) {
+                    try {
+                        channelListState.scrollToItem((idx - 2).coerceAtLeast(0))
+                    } catch (_: Throwable) {}
+                }
+                delay(120)
                 try {
-                    channelListState.scrollToItem((idx - 2).coerceAtLeast(0))
+                    selectedChannelFocusRequester.requestFocus()
+                } catch (_: Throwable) {}
+            }
+            TvMenuLevel.CATEGORIES -> {
+                val catIdx = categories.indexOfFirst { it.categoryId == selectedCat }.coerceAtLeast(0)
+                if (categories.isNotEmpty()) {
+                    try {
+                        categoryListState.scrollToItem((catIdx - 1).coerceAtLeast(0))
+                    } catch (_: Throwable) {}
+                }
+                delay(120)
+                try {
+                    selectedCategoryFocusRequester.requestFocus()
+                } catch (_: Throwable) {}
+            }
+            TvMenuLevel.CLOSED -> {
+                try {
+                    rootFocusRequester.requestFocus()
                 } catch (_: Throwable) {}
             }
         }
@@ -592,6 +617,7 @@ private fun TvLiveScreen(
                                     item {
                                         val isSelected = selectedCat == "ALL"
                                         var isFocused by remember { mutableStateOf(false) }
+                                        val itemModifier = if (isSelected) Modifier.focusRequester(selectedCategoryFocusRequester) else Modifier
                                         Surface(
                                             onClick = {
                                                 viewModel.selectLiveCategory("ALL")
@@ -600,8 +626,8 @@ private fun TvLiveScreen(
                                             },
                                             shape = RoundedCornerShape(8.dp),
                                             color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2E2E42) else Color.Transparent,
-                                            border = if (isFocused && !isSelected) BorderStroke(1.5.dp, Color.White) else null,
-                                            modifier = Modifier
+                                            border = if (isFocused) BorderStroke(2.dp, Color(0xFFFF9800)) else null,
+                                            modifier = itemModifier
                                                 .fillMaxWidth()
                                                 .onFocusChanged { isFocused = it.isFocused }
                                                 .onKeyEvent { keyEvent ->
@@ -610,7 +636,9 @@ private fun TvLiveScreen(
                                                         when (keyEvent.nativeKeyEvent.keyCode) {
                                                             AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
                                                             AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                            AndroidKeyEvent.KEYCODE_ENTER -> {
+                                                            AndroidKeyEvent.KEYCODE_ENTER,
+                                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                                 viewModel.selectLiveCategory("ALL")
                                                                 menuLevel = TvMenuLevel.CHANNELS
                                                                 true
@@ -619,7 +647,6 @@ private fun TvLiveScreen(
                                                         }
                                                     } else false
                                                 }
-                                                .focusable()
                                         ) {
                                             Text(
                                                 text = "TODOS LOS CANALES",
@@ -633,6 +660,7 @@ private fun TvLiveScreen(
                                     itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
                                         val isSelected = selectedCat == cat.categoryId
                                         var isFocused by remember { mutableStateOf(false) }
+                                        val itemModifier = if (isSelected) Modifier.focusRequester(selectedCategoryFocusRequester) else Modifier
                                         Surface(
                                             onClick = {
                                                 viewModel.selectLiveCategory(cat.categoryId)
@@ -641,8 +669,8 @@ private fun TvLiveScreen(
                                             },
                                             shape = RoundedCornerShape(8.dp),
                                             color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2E2E42) else Color.Transparent,
-                                            border = if (isFocused && !isSelected) BorderStroke(1.5.dp, Color.White) else null,
-                                            modifier = Modifier
+                                            border = if (isFocused) BorderStroke(2.dp, Color(0xFFFF9800)) else null,
+                                            modifier = itemModifier
                                                 .fillMaxWidth()
                                                 .onFocusChanged { isFocused = it.isFocused }
                                                 .onKeyEvent { keyEvent ->
@@ -651,7 +679,9 @@ private fun TvLiveScreen(
                                                         when (keyEvent.nativeKeyEvent.keyCode) {
                                                             AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
                                                             AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                            AndroidKeyEvent.KEYCODE_ENTER -> {
+                                                            AndroidKeyEvent.KEYCODE_ENTER,
+                                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                                 viewModel.selectLiveCategory(cat.categoryId)
                                                                 menuLevel = TvMenuLevel.CHANNELS
                                                                 true
@@ -660,7 +690,6 @@ private fun TvLiveScreen(
                                                         }
                                                     } else false
                                                 }
-                                                .focusable()
                                         ) {
                                             Text(
                                                 text = cat.categoryName.uppercase(),
@@ -784,6 +813,8 @@ private fun TvLiveScreen(
                             itemsIndexed(displayChannels, key = { index, ch -> "${ch.id}_$index" }) { index, channel ->
                                 val isSelected = selectedChannel?.id == channel.id
                                 val isFav = favorites.any { it.kind == "live" && it.id == channel.id }
+                                val shouldAttachRequester = isSelected || (selectedChannel == null && index == 0)
+                                val itemFocusModifier = if (shouldAttachRequester) Modifier.focusRequester(selectedChannelFocusRequester) else Modifier
                                 ChannelListItemJetGo(
                                     channel = channel,
                                     index = index + 1,
@@ -810,7 +841,7 @@ private fun TvLiveScreen(
                                         viewModel.toggleFavorite("live", channel.id, channel.name, channel.streamIcon)
                                         lastInteractionTime = System.currentTimeMillis()
                                     },
-                                    modifier = Modifier.onKeyEvent { keyEvent ->
+                                    modifier = itemFocusModifier.onKeyEvent { keyEvent ->
                                         if (keyEvent.type == KeyEventType.KeyDown) {
                                             lastInteractionTime = System.currentTimeMillis()
                                             when (keyEvent.nativeKeyEvent.keyCode) {
@@ -1317,54 +1348,68 @@ private fun ChannelListItemJetGo(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(8.dp),
-        color = if (isSelected) activePrimaryColor else if (isFocused) Color(0xFF2C2C3C) else JetCardBg,
-        border = if (isFocused) BorderStroke(2.dp, Color.White) else null,
+        color = if (isFocused) Color(0xFF2C2C3E) else if (isSelected) activePrimaryColor else JetCardBg,
+        border = if (isFocused) BorderStroke(2.5.dp, Color(0xFFFF9800)) else if (isSelected && isTv) BorderStroke(1.5.dp, JetOrangeBright) else null,
         modifier = modifier
             .fillMaxWidth()
-            .height(if (isTv) 54.dp else 48.dp)
+            .height(if (isTv) 56.dp else 48.dp)
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
             .testTag("channel_item_${channel.id}")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = formattedIndex,
-                color = if (isSelected || isFocused) Color.White else activeNumberColor,
-                fontSize = if (isTv) 13.sp else 12.sp,
+                color = if (isFocused) JetOrangeBright else if (isSelected) Color.White else activeNumberColor,
+                fontSize = if (isTv) 13.5.sp else 12.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(32.dp)
+                modifier = Modifier.width(34.dp)
             )
 
             Box(
                 modifier = Modifier
-                    .size(if (isTv) 34.dp else 30.dp)
+                    .size(if (isTv) 36.dp else 30.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.3f)),
+                    .background(Color.Black.copy(alpha = 0.35f)),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
                     model = channel.streamIcon?.takeIf { it.isNotBlank() } ?: CHANNEL_FALLBACK,
                     contentDescription = channel.name,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(if (isTv) 28.dp else 24.dp)
+                    modifier = Modifier.size(if (isTv) 30.dp else 24.dp)
                 )
             }
 
             Text(
                 text = channel.name,
                 color = Color.White,
-                fontSize = if (isTv) 13.5.sp else 12.5.sp,
+                fontSize = if (isTv) 14.sp else 12.5.sp,
                 fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+
+            if (isTv && isSelected) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (isFocused) JetOrange else Color(0xFF1B5E20)
+                ) {
+                    Text(
+                        text = "EN VIVO",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+            }
 
             IconButton(
                 onClick = onFavToggle,
