@@ -1,7 +1,7 @@
 {
-    "versionCode": 106,
-    "versionName": "1.1.95",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.95/app-debug.apk",
-    "changelog": "Versión 1.1.95: Optimización de la pantalla 'Mi Perfil' para TV en formato 16:9 con recuadros reorganizados para evitar cortes y navegación D-Pad completa.",
+    "versionCode": 107,
+    "versionName": "1.1.96",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.96/app-debug.apk",
+    "changelog": "Versión 1.1.96: Se eliminó por completo el botón y la pantalla de cambiar perfil.",
     "isMandatory": true
 }

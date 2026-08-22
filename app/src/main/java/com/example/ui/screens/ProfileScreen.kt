@@ -54,8 +54,6 @@ import kotlinx.coroutines.delay
 fun ProfileScreen(
     viewModel: MainViewModel,
     onNavigateFavorites: () -> Unit,
-    onNavigateSwitchProfile: () -> Unit,
-    onNavigateManageProfiles: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -84,7 +82,6 @@ fun ProfileScreen(
             updateStatusMessage = updateStatusMessage,
             onCheckUpdates = { viewModel.checkForUpdates(manual = true) },
             onNavigateFavorites = onNavigateFavorites,
-            onNavigateSwitchProfile = onNavigateSwitchProfile,
             onLogout = {
                 viewModel.logout()
                 onLogout()
@@ -430,7 +427,6 @@ private fun TvProfileScreenLayout(
     updateStatusMessage: String?,
     onCheckUpdates: () -> Unit,
     onNavigateFavorites: () -> Unit,
-    onNavigateSwitchProfile: () -> Unit,
     onLogout: () -> Unit
 ) {
     val firstFocusRequester = remember { FocusRequester() }
@@ -684,15 +680,6 @@ private fun TvProfileScreenLayout(
                             onClick = onNavigateFavorites,
                             modifier = Modifier.focusRequester(firstFocusRequester),
                             testTag = "tv_profile_favorites_btn"
-                        )
-
-                        // Cambiar Perfil
-                        TvMenuOptionCard(
-                            title = "Cambiar Perfil",
-                            subtitle = "Seleccionar o cambiar de usuario",
-                            icon = Icons.Outlined.People,
-                            onClick = onNavigateSwitchProfile,
-                            testTag = "tv_profile_switch_btn"
                         )
                     }
 

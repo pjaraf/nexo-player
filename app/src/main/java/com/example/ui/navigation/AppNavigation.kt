@@ -29,8 +29,6 @@ import java.nio.charset.StandardCharsets
 object Routes {
     const val SPLASH = "splash"
     const val LOGIN = "login"
-    const val PROFILE_SELECT = "profile_select"
-    const val MANAGE_PROFILES = "manage_profiles"
     const val PIN = "pin/{action}"
     const val TABS = "tabs"
     const val MOVIE_DETAIL = "movie?id={id}"
@@ -144,34 +142,6 @@ fun AppNavigation(
             )
         }
 
-        composable(Routes.PROFILE_SELECT) {
-            ProfileSelectScreen(
-                viewModel = mainViewModel,
-                onProfileSelected = { isKids, needsPin ->
-                    if (needsPin) {
-                        navController.navigate(Routes.pin("enter"))
-                    } else {
-                        navController.navigate(Routes.TABS) {
-                            popUpTo(Routes.PROFILE_SELECT) { inclusive = true }
-                        }
-                    }
-                },
-                onManageProfiles = {
-                    navController.navigate(Routes.MANAGE_PROFILES)
-                }
-            )
-        }
-
-        composable(Routes.MANAGE_PROFILES) {
-            ManageProfilesScreen(
-                viewModel = mainViewModel,
-                onBack = { navController.popBackStack() },
-                onNavigatePin = { action ->
-                    navController.navigate(Routes.pin(action))
-                }
-            )
-        }
-
         composable(
             route = Routes.PIN,
             arguments = listOf(navArgument("action") { type = NavType.StringType; defaultValue = "enter" })
@@ -182,7 +152,7 @@ fun AppNavigation(
                 onSuccess = {
                     if (action == "enter") {
                         navController.navigate(Routes.TABS) {
-                            popUpTo(Routes.PROFILE_SELECT) { inclusive = true }
+                            popUpTo(Routes.LOGIN) { inclusive = true }
                         }
                     } else {
                         navController.popBackStack()
@@ -235,12 +205,6 @@ fun AppNavigation(
                 },
                 onNavigateFavorites = {
                     navController.navigate(Routes.FAVORITES)
-                },
-                onNavigateSwitchProfile = {
-                    navController.navigate(Routes.PROFILE_SELECT)
-                },
-                onNavigateManageProfiles = {
-                    navController.navigate(Routes.MANAGE_PROFILES)
                 },
                 onLogout = {
                     navController.navigate(Routes.LOGIN) {

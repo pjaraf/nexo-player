@@ -67,8 +67,6 @@ fun MainTabsScreen(
     onNavigateSeriesDetail: (seriesId: String) -> Unit,
     onNavigatePlayerDirect: (url: String, title: String, kind: String, contentId: String, image: String, resumeMs: Long) -> Unit,
     onNavigateFavorites: () -> Unit,
-    onNavigateSwitchProfile: () -> Unit,
-    onNavigateManageProfiles: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -144,8 +142,6 @@ fun MainTabsScreen(
                 ProfileScreen(
                     viewModel = viewModel,
                     onNavigateFavorites = onNavigateFavorites,
-                    onNavigateSwitchProfile = onNavigateSwitchProfile,
-                    onNavigateManageProfiles = onNavigateManageProfiles,
                     onLogout = onLogout
                 )
             }
