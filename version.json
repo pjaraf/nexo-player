@@ -1,7 +1,7 @@
 {
-    "versionCode": 102,
-    "versionName": "1.1.91",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.91/app-debug.apk",
-    "changelog": "Versión 1.1.91: Corrección definitiva de cierres en televisores al cargar canales (gestión nativa de memoria en LibVLC, eliminación de doble liberación y SurfaceView directo).",
+    "versionCode": 103,
+    "versionName": "1.1.92",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.92/app-debug.apk",
+    "changelog": "Versión 1.1.92: Restauración definitiva de la interfaz nativa clásica para TV. El video se abrirá directamente en el reproductor principal estable (como antes) para garantizar 100% que la app no se cierre al navegar por los canales.",
     "isMandatory": true
 }

@@ -153,12 +153,22 @@ class PlayerManager(val context: Context) {
                 Log.w("PlayerManager", "Warning stopping prior playback: ${e.message}")
             }
 
-            val newMedia = VlcHelper.createMedia(libVLC, url)
-            mediaPlayer.media = newMedia
-            // LibVLC takes native ownership; release local Java reference to avoid double-free
+            // Safely detach old media reference from player
             try {
-                newMedia.release()
+                mediaPlayer.media = null
             } catch (_: Throwable) {}
+
+            // Release previous media reference
+            try {
+                currentMedia?.release()
+                currentMedia = null
+            } catch (e: Throwable) {
+                Log.w("PlayerManager", "Warning releasing old media: ${e.message}")
+            }
+
+            val newMedia = VlcHelper.createMedia(libVLC, url)
+            currentMedia = newMedia
+            mediaPlayer.media = newMedia
 
             try {
                 targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
@@ -285,6 +295,10 @@ class PlayerManager(val context: Context) {
             } catch (_: Exception) {}
             try {
                 mediaPlayer.media = null
+            } catch (_: Exception) {}
+            try {
+                currentMedia?.release()
+                currentMedia = null
             } catch (_: Exception) {}
             mediaPlayer.release()
         } catch (e: Exception) {
