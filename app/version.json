@@ -1,8 +1,8 @@
 {
-  "versionCode": 103,
-  "versionName": "1.1.92",
-  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.92/app-debug.apk",
-  "changelog": "Versión 1.1.92: Restauración definitiva de la interfaz nativa clásica para TV. El video se abrirá directamente en el reproductor principal estable (como antes) para garantizar 100% que la app no se cierre al navegar por los canales.",
+  "versionCode": 104,
+  "versionName": "1.1.93",
+  "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.1.93/app-debug.apk",
+  "changelog": "Versión 1.1.93: Reproducción directa a pantalla completa al entrar a TV en Vivo, con menú lateral desplegable y auto-ocultable para categorías y canales, y zapping D-Pad nativo.",
   "isMandatory": true
 }
 
