@@ -392,60 +392,6 @@ fun LoginScreen(
                         }
                     }
 
-                    // Load M3U Button (With TV focus & D-Pad support)
-                    var isM3uBtnFocused by remember { mutableStateOf(false) }
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isM3uBtnFocused) TvFocusBlue else Color(0xFF1E1E2C),
-                        border = androidx.compose.foundation.BorderStroke(
-                            if (isM3uBtnFocused) 2.5.dp else 1.dp,
-                            if (isM3uBtnFocused) Color(0xFFFFC107) else Color.White.copy(alpha = 0.2f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(if (isLargeTv) 44.dp else 48.dp)
-                            .onFocusChanged { isM3uBtnFocused = it.isFocused }
-                            .focusable()
-                            .onKeyEvent { keyEvent ->
-                                if (keyEvent.type == KeyEventType.KeyDown) {
-                                    when (keyEvent.nativeKeyEvent.keyCode) {
-                                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                        AndroidKeyEvent.KEYCODE_ENTER,
-                                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                            showM3uDialog = true
-                                            true
-                                        }
-                                        else -> false
-                                    }
-                                } else false
-                            }
-                            .clickable { showM3uDialog = true }
-                            .testTag("login_load_m3u_btn")
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                Icons.Default.PlaylistPlay,
-                                contentDescription = "Cargar lista M3U",
-                                tint = if (isM3uBtnFocused) Color.White else Color(0xFFFFC107),
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Cargar lista M3U",
-                                color = Color.White,
-                                fontSize = if (isLargeTv) 13.sp else 14.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
                     if (isTv) {
                         Spacer(modifier = Modifier.height(if (isLargeTv) 8.dp else 14.dp))
 
