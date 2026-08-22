@@ -13,7 +13,7 @@ fun VlcPlayerView(
     playerManager: PlayerManager,
     modifier: Modifier = Modifier,
     enableSubtitles: Boolean = true,
-    useTextureView: Boolean = true
+    useTextureView: Boolean = false
 ) {
     AndroidView(
         factory = { ctx ->

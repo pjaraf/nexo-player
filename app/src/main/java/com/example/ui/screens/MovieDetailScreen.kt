@@ -126,9 +126,11 @@ private fun MovieDetailTvScreen(
     // Full screen in-place mode
     var isFullScreenMode by remember { mutableStateOf(false) }
     var showPlayerControls by remember { mutableStateOf(true) }
+    var lastUserInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var isPlaying by remember { mutableStateOf(true) }
     var currentPositionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
+    val fullscreenFocusRequester = remember { FocusRequester() }
 
     // PlayerManager for continuous preview and full screen playback
     val playerManager = remember { PlayerManager(context) }
@@ -246,11 +248,20 @@ private fun MovieDetailTvScreen(
         }
     }
 
-    // Auto-hide controls in full screen after 4 seconds
-    LaunchedEffect(showPlayerControls, isFullScreenMode) {
-        if (isFullScreenMode && showPlayerControls) {
-            delay(4000)
+    // Auto-hide controls in full screen after 5 seconds of inactivity
+    LaunchedEffect(showPlayerControls, isFullScreenMode, lastUserInteractionTime, isPlaying) {
+        if (isFullScreenMode && showPlayerControls && isPlaying) {
+            delay(5000)
             showPlayerControls = false
+        }
+    }
+
+    LaunchedEffect(showPlayerControls, isFullScreenMode) {
+        if (isFullScreenMode && !showPlayerControls) {
+            delay(100)
+            try {
+                fullscreenFocusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
     }
 
@@ -873,7 +884,27 @@ private fun MovieDetailTvScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black)
-                    .clickable { showPlayerControls = !showPlayerControls }
+                    .focusRequester(fullscreenFocusRequester)
+                    .focusable(!showPlayerControls)
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown) {
+                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                AndroidKeyEvent.KEYCODE_BACK -> {
+                                    isFullScreenMode = false
+                                    true
+                                }
+                                else -> {
+                                    lastUserInteractionTime = System.currentTimeMillis()
+                                    showPlayerControls = true
+                                    true
+                                }
+                            }
+                        } else false
+                    }
+                    .clickable {
+                        lastUserInteractionTime = System.currentTimeMillis()
+                        showPlayerControls = !showPlayerControls
+                    }
             ) {
                 playerVideoContent()
 
@@ -901,6 +932,7 @@ private fun MovieDetailTvScreen(
                         currentPositionMs = currentPositionMs,
                         durationMs = durationMs,
                         onPlayPause = {
+                            lastUserInteractionTime = System.currentTimeMillis()
                             if (playerManager.mediaPlayer.isPlaying) {
                                 playerManager.pause()
                                 isPlaying = false
@@ -909,19 +941,30 @@ private fun MovieDetailTvScreen(
                                 isPlaying = true
                             }
                         },
-                        onRewind = { playerManager.seekTo((playerManager.mediaPlayer.time - 10000).coerceAtLeast(0L)) },
+                        onRewind = {
+                            lastUserInteractionTime = System.currentTimeMillis()
+                            playerManager.seekTo((playerManager.mediaPlayer.time - 10000).coerceAtLeast(0L))
+                        },
                         onForward = {
+                            lastUserInteractionTime = System.currentTimeMillis()
                             val d = playerManager.mediaPlayer.length.coerceAtLeast(0L)
                             val target = if (d > 0) (playerManager.mediaPlayer.time + 10000).coerceAtMost(d) else (playerManager.mediaPlayer.time + 10000)
                             playerManager.seekTo(target)
                         },
                         onExit = { isFullScreenMode = false },
-                        onSubtitles = { showTracksDialog = true },
+                        onSubtitles = {
+                            lastUserInteractionTime = System.currentTimeMillis()
+                            showTracksDialog = true
+                        },
                         onAspectRatio = {
+                            lastUserInteractionTime = System.currentTimeMillis()
                             fullScreenResizeModeIndex = (fullScreenResizeModeIndex + 1) % resizeModes.size
                             val mode = resizeModes[fullScreenResizeModeIndex]
                             playerManager.setAspectRatio(mode.second)
                             playerManager.setScale(mode.third)
+                        },
+                        onUserInteraction = {
+                            lastUserInteractionTime = System.currentTimeMillis()
                         }
                     )
                 }
