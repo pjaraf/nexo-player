@@ -1,8 +1,13 @@
 package com.example.ui.screens
 
+import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,6 +27,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,6 +59,7 @@ import com.example.player.PlayerManager
 import com.example.player.VlcPlayerView
 import com.example.ui.components.CinematicBackground
 import com.example.ui.components.POSTER_FALLBACK
+import com.example.ui.components.TvFullscreenPlayerOverlay
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.delay
@@ -104,6 +114,90 @@ fun SeriesDetailTvScreen(
 
     val playButtonFocusRequester = remember { FocusRequester() }
     var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+
+    // Full screen state and controls
+    var isFullScreenMode by remember { mutableStateOf(false) }
+    var showPlayerControls by remember { mutableStateOf(true) }
+    var isPlaying by remember { mutableStateOf(true) }
+    var currentPositionMs by remember { mutableLongStateOf(0L) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+
+    // Audio and subtitle tracks
+    var showTracksDialog by remember { mutableStateOf(false) }
+    var availableAudioTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
+    var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackOption>>(emptyList()) }
+    var isSubtitlesDisabled by remember { mutableStateOf(false) }
+    var fullScreenResizeModeIndex by remember { mutableIntStateOf(0) }
+    val resizeModes = listOf(
+        Triple("Ajustar (Original)", null, 0f),
+        Triple("Zoom (Pantalla Completa)", null, 1.25f),
+        Triple("Estirar (16:9)", "16:9", 0f)
+    )
+
+    fun refreshTracks() {
+        val audios = playerManager.getAudioTracks().map {
+            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+        }
+        val subs = playerManager.getSubtitleTracks().map {
+            MediaTrackOption(id = it.id, label = it.name, isSelected = it.isSelected)
+        }
+        availableAudioTracks = audios
+        availableSubtitleTracks = subs
+        isSubtitlesDisabled = subs.none { it.isSelected } || playerManager.mediaPlayer.spuTrack == -1
+    }
+
+    val currentEpisodes = episodesMap[selectedSeason] ?: emptyList()
+
+    fun playNextEpisode() {
+        selectedEpisode?.let { ep ->
+            val epIndex = currentEpisodes.indexOf(ep)
+            val nextEp = currentEpisodes.getOrNull(epIndex + 1)
+            if (nextEp != null) {
+                selectedEpisode = nextEp
+            }
+        }
+    }
+
+    LaunchedEffect(playerManager) {
+        playerManager.onBuffering = { isBuf, _ ->
+            isPreviewLoading = isBuf
+        }
+        playerManager.onPlayingChanged = { playing ->
+            isPlaying = playing
+            if (playing) {
+                previewError = false
+                isPreviewLoading = false
+                refreshTracks()
+            }
+        }
+        playerManager.onTimeChanged = { t ->
+            currentPositionMs = t
+        }
+        playerManager.onLengthChanged = { len ->
+            durationMs = len
+        }
+        playerManager.onTracksChanged = {
+            refreshTracks()
+        }
+        playerManager.onError = { _ ->
+            previewError = true
+            isPreviewLoading = false
+        }
+    }
+
+    LaunchedEffect(playerManager, currentEpisodes, selectedEpisode) {
+        playerManager.onEndReached = {
+            playNextEpisode()
+        }
+    }
+
+    // Auto-hide controls in full screen mode after 4s
+    LaunchedEffect(showPlayerControls, isFullScreenMode, isPlaying) {
+        if (isFullScreenMode && showPlayerControls && isPlaying) {
+            delay(4000)
+            showPlayerControls = false
+        }
+    }
 
     // Lifecycle
     DisposableEffect(lifecycleOwner, playerManager) {
@@ -165,14 +259,40 @@ fun SeriesDetailTvScreen(
         }
     }
 
-    val currentEpisodes = episodesMap[selectedSeason] ?: emptyList()
+    // BackHandler: if in fullscreen, collapse back to preview; else exit detail screen
+    BackHandler {
+        if (isFullScreenMode) {
+            isFullScreenMode = false
+        } else {
+            onBack()
+        }
+    }
+
+    // Unified movable content for the VLC player so it NEVER unmounts or reloads when expanding to fullscreen
+    val playerVideoContent = remember(playerManager) {
+        movableContentOf {
+            VlcPlayerView(
+                playerManager = playerManager,
+                enableSubtitles = true,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+
+    fun enterFullScreen() {
+        try {
+            playerManager.mediaPlayer.volume = 100
+        } catch (_: Throwable) {}
+        isFullScreenMode = true
+        showPlayerControls = true
+    }
+
     val seriesTitle = info?.name ?: "Serie"
     val seriesCover = info?.cover ?: info?.backdropPath?.firstOrNull() ?: POSTER_FALLBACK
     val plotText = info?.plot?.takeIf { it.isNotBlank() } ?: "Disfruta de todos los episodios completos en alta definición y con la mejor calidad de audio."
     val castText = info?.cast?.takeIf { it.isNotBlank() } ?: "No disponible"
     val releaseDate = info?.releaseDate?.takeIf { it.isNotBlank() } ?: info?.releaseDateAlt?.takeIf { it.isNotBlank() } ?: "2023"
     val releaseYear = releaseDate.take(4)
-    val rating = info?.rating?.toString()?.takeIf { it.isNotBlank() && it != "0" }
     
     val rawRating = info?.rating?.toString()?.takeIf { it.isNotBlank() && it != "0" }
     val displayRating = rawRating?.take(3) ?: "7.0"
@@ -183,365 +303,155 @@ fun SeriesDetailTvScreen(
     val tvButtonDefaultBorder = Color.White.copy(alpha = 0.22f)
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // Shared Cinematic Background
-        CinematicBackground()
-        
-        // Dark gradient at the bottom for seasons/episodes
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f), Color.Black),
-                        startY = 200f
-                    )
-                )
-        )
-        
-        // Dark gradient on left for text readability
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent),
-                        endX = 800f
-                    )
-                )
-        )
-
-        if (loading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = tvFocusBlue)
-            }
-        } else {
-            Column(
+        if (!isFullScreenMode) {
+            // Shared Cinematic Background
+            CinematicBackground()
+            
+            // Dark gradient at the bottom for seasons/episodes
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(horizontal = 28.dp, vertical = 18.dp)
-            ) {
-                // TOP SECTION: Details | Poster | Player Preview
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(bottom = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // LEFT: Details (Title, Info, Buttons)
-                    Column(
-                        modifier = Modifier
-                            .weight(1.1f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        // Title + Rating Badge
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = seriesTitle,
-                                style = MaterialTheme.typography.headlineLarge.copy(
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 28.sp,
-                                    color = Color.White,
-                                    letterSpacing = (-0.5).sp
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            // Cyan/Sky-blue Rating Box
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFFE50914), // Red for series rating? Netflix style. Let's use red or the same Cyan.
-                                modifier = Modifier.padding(top = 2.dp)
-                            ) {
-                                Text(
-                                    text = cleanRatingNumber,
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                        
-                        // Metadata Line
-                        val metaLine = listOfNotNull(
-                            releaseDate.takeIf { it.isNotBlank() },
-                            "T$selectedSeason E${selectedEpisode?.epNumber ?: "1"}"
-                        ).joinToString(" | ")
-                        
-                        Text(
-                            text = metaLine,
-                            color = Color.White.copy(alpha = 0.65f),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f), Color.Black),
+                            startY = 200f
                         )
-                        
-                        Spacer(modifier = Modifier.height(14.dp))
-                        
-                        // Synopsis
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = "Sinopsis: ",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = plotText,
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 12.sp,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(14.dp))
-                        
-                        // Buttons
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // "Pantalla completa" button
-                            val fullInteractionSource = remember { MutableInteractionSource() }
-                            val isFullBtnFocused by fullInteractionSource.collectIsFocusedAsState()
+                    )
+            )
+            
+            // Dark gradient on left for text readability
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent),
+                            endX = 800f
+                        )
+                    )
+            )
 
-                            fun launchFullScreen() {
-                                selectedEpisode?.let { ep ->
-                                    val epIndex = currentEpisodes.indexOf(ep)
-                                    val nextEp = currentEpisodes.getOrNull(epIndex + 1)
-                                    
-                                    val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
-                                    val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
-                                    val epImg = ep.info?.movieImage ?: seriesCover
-                                    val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
-                                    
-                                    playerManager.pause()
-                                    
-                                    onPlayEpisode(
-                                        url,
-                                        "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
-                                        "series",
-                                        seriesId,
-                                        epImg,
-                                        0L,
-                                        nextUrl,
-                                        nextEp?.displayTitle,
-                                        nextEp?.epId,
-                                        nextEpImg
-                                    )
-                                }
-                            }
-                            
-                            Surface(
-                                onClick = { launchFullScreen() },
-                                interactionSource = fullInteractionSource,
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
-                                border = if (isFullBtnFocused) {
-                                    androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
-                                } else {
-                                    androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
-                                },
-                                modifier = Modifier
-                                    .height(42.dp)
-                                    .focusRequester(playButtonFocusRequester)
-                                    .onKeyEvent { keyEvent ->
-                                        if (keyEvent.type == KeyEventType.KeyDown) {
-                                            when (keyEvent.nativeKeyEvent.keyCode) {
-                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                AndroidKeyEvent.KEYCODE_ENTER,
-                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                    launchFullScreen()
-                                                    true
-                                                }
-                                                else -> false
-                                            }
-                                        } else false
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .padding(horizontal = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text(
-                                        text = "Pantalla completa",
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            
-                            // Back button (square)
-                            val backInteractionSource = remember { MutableInteractionSource() }
-                            val isBackBtnFocused by backInteractionSource.collectIsFocusedAsState()
-                            
-                            Surface(
-                                onClick = onBack,
-                                interactionSource = backInteractionSource,
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isBackBtnFocused) tvFocusBlue else tvButtonDefaultBg,
-                                border = if (isBackBtnFocused) {
-                                    androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
-                                } else {
-                                    androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
-                                },
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .onKeyEvent { keyEvent ->
-                                        if (keyEvent.type == KeyEventType.KeyDown) {
-                                            when (keyEvent.nativeKeyEvent.keyCode) {
-                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                AndroidKeyEvent.KEYCODE_ENTER,
-                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                    onBack()
-                                                    true
-                                                }
-                                                else -> false
-                                            }
-                                        } else false
-                                    }
-                            ) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Volver",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    
-                    // CENTER: Poster Banner
-                    Surface(
-                        modifier = Modifier
-                            .width(120.dp)
-                            .height(175.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .shadow(16.dp, RoundedCornerShape(12.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.Black
-                    ) {
-                        AsyncImage(
-                            model = seriesCover,
-                            contentDescription = seriesTitle,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    
-                    // RIGHT: Embedded Live Video Preview Player
-                    var isPreviewFocused by remember { mutableStateOf(false) }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(210.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.Black)
-                            .border(
-                                if (isPreviewFocused) 2.5.dp else 1.5.dp,
-                                if (isPreviewFocused) tvFocusBlue else Color.White.copy(alpha = 0.25f),
-                                RoundedCornerShape(14.dp)
-                            )
-                            .focusable()
-                            .onFocusChanged { isPreviewFocused = it.isFocused }
-                            .clickable {
-                                selectedEpisode?.let { ep ->
-                                    val epIndex = currentEpisodes.indexOf(ep)
-                                    val nextEp = currentEpisodes.getOrNull(epIndex + 1)
-                                    val url = XtreamApi.getSeriesStreamUrl(ep.epId, ep.containerExtension ?: "mp4")
-                                    val nextUrl = nextEp?.let { XtreamApi.getSeriesStreamUrl(it.epId, it.containerExtension ?: "mp4") }
-                                    val epImg = ep.info?.movieImage ?: seriesCover
-                                    val nextEpImg = nextEp?.info?.movieImage ?: seriesCover
-                                    
-                                    playerManager.pause()
-                                    onPlayEpisode(
-                                        url,
-                                        "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle}",
-                                        "series",
-                                        seriesId,
-                                        epImg,
-                                        0L,
-                                        nextUrl,
-                                        nextEp?.displayTitle,
-                                        nextEp?.epId,
-                                        nextEpImg
-                                    )
-                                }
-                            }
-                            .testTag("series_preview_player")
-                    ) {
-                        VlcPlayerView(
-                            playerManager = playerManager,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        
-                        // Volume overlay (Muted) or PREVIEW indicator
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(12.dp)
-                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text("PREVIEW", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
+            if (loading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = tvFocusBlue)
                 }
-                
-                // BOTTOM SECTION: Seasons & Episodes (Horizontal list)
+            } else {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .padding(horizontal = 28.dp, vertical = 18.dp)
                 ) {
-                    // Seasons (Text labels)
-                    if (episodesMap.size > 1) {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.padding(bottom = 12.dp)
+                    // TOP SECTION: Details | Poster | Player Preview
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(bottom = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // LEFT: Details (Title, Info, Buttons)
+                        Column(
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            items(episodesMap.keys.toList().sortedBy { it.toIntOrNull() ?: 0 }) { sKey ->
-                                val isSelected = sKey == selectedSeason
-                                
-                                val seasonInteractionSource = remember { MutableInteractionSource() }
-                                val isSeasonFocused by seasonInteractionSource.collectIsFocusedAsState()
+                            // Title + Rating Badge
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = seriesTitle,
+                                    style = MaterialTheme.typography.headlineLarge.copy(
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 28.sp,
+                                        color = Color.White,
+                                        letterSpacing = (-0.5).sp
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                // Cyan/Sky-blue Rating Box
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFFE50914),
+                                    modifier = Modifier.padding(top = 2.dp)
+                                ) {
+                                    Text(
+                                        text = cleanRatingNumber,
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Black,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            // Metadata Line
+                            val metaLine = listOfNotNull(
+                                releaseDate.takeIf { it.isNotBlank() },
+                                "T$selectedSeason E${selectedEpisode?.epNumber ?: "1"}"
+                            ).joinToString(" | ")
+                            
+                            Text(
+                                text = metaLine,
+                                color = Color.White.copy(alpha = 0.65f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            
+                            Spacer(modifier = Modifier.height(14.dp))
+                            
+                            // Synopsis
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "Sinopsis: ",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = plotText,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(14.dp))
+                            
+                            // Buttons: [ ⛶ Pantalla completa ] and [ 💬 Idioma y subtítulos ] and [ ← Volver ]
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // "Pantalla completa" button
+                                val fullInteractionSource = remember { MutableInteractionSource() }
+                                val isFullBtnFocused by fullInteractionSource.collectIsFocusedAsState()
 
                                 Surface(
-                                    onClick = { selectedSeason = sKey },
-                                    interactionSource = seasonInteractionSource,
-                                    color = Color.Transparent,
-                                    shape = RoundedCornerShape(6.dp),
-                                    border = if (isSeasonFocused) androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFC107)) else null,
+                                    onClick = { enterFullScreen() },
+                                    interactionSource = fullInteractionSource,
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isFullBtnFocused) tvFocusBlue else tvButtonDefaultBg,
+                                    border = if (isFullBtnFocused) {
+                                        androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
+                                    } else {
+                                        androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
+                                    },
                                     modifier = Modifier
-                                        .padding(4.dp)
+                                        .height(42.dp)
+                                        .focusRequester(playButtonFocusRequester)
                                         .onKeyEvent { keyEvent ->
                                             if (keyEvent.type == KeyEventType.KeyDown) {
                                                 when (keyEvent.nativeKeyEvent.keyCode) {
@@ -549,7 +459,60 @@ fun SeriesDetailTvScreen(
                                                     AndroidKeyEvent.KEYCODE_ENTER,
                                                     AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
                                                     AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                        selectedSeason = sKey
+                                                        enterFullScreen()
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
+                                        .testTag("btn_series_fullscreen")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .padding(horizontal = 14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = "Pantalla completa",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                // Idioma y Subtítulos Button
+                                val langInteractionSource = remember { MutableInteractionSource() }
+                                val isLangBtnFocused by langInteractionSource.collectIsFocusedAsState()
+                                Surface(
+                                    onClick = { showTracksDialog = true },
+                                    interactionSource = langInteractionSource,
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isLangBtnFocused) tvFocusBlue else tvButtonDefaultBg,
+                                    border = if (isLangBtnFocused) {
+                                        androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
+                                    } else {
+                                        androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
+                                    },
+                                    modifier = Modifier
+                                        .height(42.dp)
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        showTracksDialog = true
                                                         true
                                                     }
                                                     else -> false
@@ -557,69 +520,476 @@ fun SeriesDetailTvScreen(
                                             } else false
                                         }
                                 ) {
-                                    Text(
-                                        text = "Temporada $sKey",
-                                        color = if (isSeasonFocused) Color(0xFFFFC107) else if (isSelected) Color.White else Color.Gray,
-                                        fontSize = 16.sp,
-                                        fontWeight = if (isSelected || isSeasonFocused) FontWeight.Bold else FontWeight.Normal,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .padding(horizontal = 14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = "Idioma y subtítulos",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
+                                
+                                // Back button (square)
+                                val backInteractionSource = remember { MutableInteractionSource() }
+                                val isBackBtnFocused by backInteractionSource.collectIsFocusedAsState()
+                                
+                                Surface(
+                                    onClick = onBack,
+                                    interactionSource = backInteractionSource,
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isBackBtnFocused) tvFocusBlue else tvButtonDefaultBg,
+                                    border = if (isBackBtnFocused) {
+                                        androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
+                                    } else {
+                                        androidx.compose.foundation.BorderStroke(1.dp, tvButtonDefaultBorder)
+                                    },
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        onBack()
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        }
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Volver",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // CENTER: Poster Banner
+                        Surface(
+                            modifier = Modifier
+                                .width(120.dp)
+                                .height(175.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .shadow(16.dp, RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.Black
+                        ) {
+                            AsyncImage(
+                                model = seriesCover,
+                                contentDescription = seriesTitle,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        
+                        // RIGHT: Embedded Live Video Preview Player
+                        var isPreviewFocused by remember { mutableStateOf(false) }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(210.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.Black)
+                                .border(
+                                    if (isPreviewFocused) 2.5.dp else 1.5.dp,
+                                    if (isPreviewFocused) tvFocusBlue else Color.White.copy(alpha = 0.25f),
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .focusable()
+                                .onFocusChanged { isPreviewFocused = it.isFocused }
+                                .clickable {
+                                    enterFullScreen()
+                                }
+                                .testTag("series_preview_player")
+                        ) {
+                            playerVideoContent()
+                            
+                            // Loading spinner
+                            if (isPreviewLoading) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.4f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = tvFocusBlue, modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
+                                }
+                            }
+
+                            // Preview Error / Fallback
+                            if (previewError) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.7f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.PlayCircleOutline, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(40.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Pulse para reproducir", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            // Fullscreen quick icon overlay in top-right
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.6f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Fullscreen, contentDescription = "Pantalla completa", tint = Color.White, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
                     
-                    // Episodes (Square buttons with numbers)
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(bottom = 8.dp)
+                    // BOTTOM SECTION: Seasons & Episodes (Horizontal list)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
                     ) {
-                        items(currentEpisodes) { ep ->
-                            val isSelected = ep.epId == selectedEpisode?.epId
-                            val epInteractionSource = remember { MutableInteractionSource() }
-                            val isEpFocused by epInteractionSource.collectIsFocusedAsState()
-
-                            Surface(
-                                onClick = { selectedEpisode = ep },
-                                interactionSource = epInteractionSource,
-                                modifier = Modifier
-                                    .size(54.dp)
-                                    .onKeyEvent { keyEvent ->
-                                        if (keyEvent.type == KeyEventType.KeyDown) {
-                                            when (keyEvent.nativeKeyEvent.keyCode) {
-                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                AndroidKeyEvent.KEYCODE_ENTER,
-                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                    selectedEpisode = ep
-                                                    true
-                                                }
-                                                else -> false
-                                            }
-                                        } else false
-                                    },
-                                color = if (isSelected) Color.White else if (isEpFocused) tvFocusBlue else Color.White.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(8.dp),
-                                border = if (isEpFocused) {
-                                    androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
-                                } else if (!isSelected) {
-                                    androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
-                                } else null
+                        // Seasons (Text labels)
+                        if (episodesMap.size > 1) {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.padding(bottom = 12.dp)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = ep.epNumber.toString(),
-                                        color = if (isSelected) Color.Black else Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp
-                                    )
+                                items(episodesMap.keys.toList().sortedBy { it.toIntOrNull() ?: 0 }) { sKey ->
+                                    val isSelected = sKey == selectedSeason
+                                    
+                                    val seasonInteractionSource = remember { MutableInteractionSource() }
+                                    val isSeasonFocused by seasonInteractionSource.collectIsFocusedAsState()
+
+                                    Surface(
+                                        onClick = { selectedSeason = sKey },
+                                        interactionSource = seasonInteractionSource,
+                                        color = Color.Transparent,
+                                        shape = RoundedCornerShape(6.dp),
+                                        border = if (isSeasonFocused) androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFC107)) else null,
+                                        modifier = Modifier
+                                            .padding(4.dp)
+                                            .onKeyEvent { keyEvent ->
+                                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                                    when (keyEvent.nativeKeyEvent.keyCode) {
+                                                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                        AndroidKeyEvent.KEYCODE_ENTER,
+                                                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                            selectedSeason = sKey
+                                                            true
+                                                        }
+                                                        else -> false
+                                                    }
+                                                } else false
+                                            }
+                                    ) {
+                                        Text(
+                                            text = "Temporada $sKey",
+                                            color = if (isSeasonFocused) Color(0xFFFFC107) else if (isSelected) Color.White else Color.Gray,
+                                            fontSize = 16.sp,
+                                            fontWeight = if (isSelected || isSeasonFocused) FontWeight.Bold else FontWeight.Normal,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Episodes (Square buttons with numbers)
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(bottom = 8.dp)
+                        ) {
+                            items(currentEpisodes) { ep ->
+                                val isSelected = ep.epId == selectedEpisode?.epId
+                                val epInteractionSource = remember { MutableInteractionSource() }
+                                val isEpFocused by epInteractionSource.collectIsFocusedAsState()
+
+                                Surface(
+                                    onClick = { selectedEpisode = ep },
+                                    interactionSource = epInteractionSource,
+                                    modifier = Modifier
+                                        .size(54.dp)
+                                        .onKeyEvent { keyEvent ->
+                                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                    AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                        selectedEpisode = ep
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else false
+                                        },
+                                    color = if (isSelected) Color.White else if (isEpFocused) tvFocusBlue else Color.White.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = if (isEpFocused) {
+                                        androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFFFC107))
+                                    } else if (!isSelected) {
+                                        androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                                    } else null
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = ep.epNumber.toString(),
+                                            color = if (isSelected) Color.Black else Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        } else {
+            // Full Screen Mode Player View (Seamlessly expanded from preview without reloading)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .clickable { showPlayerControls = !showPlayerControls }
+            ) {
+                playerVideoContent()
+
+                // Loading spinner in full screen
+                if (isPreviewLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = tvFocusBlue, modifier = Modifier.size(52.dp), strokeWidth = 4.dp)
+                    }
+                }
+
+                // Full Screen Controls Overlay
+                val selectedEpTitle = selectedEpisode?.let { ep ->
+                    "$seriesTitle - T${selectedSeason}E${ep.epNumber}: ${ep.displayTitle ?: "Episodio ${ep.epNumber}"}"
+                } ?: seriesTitle
+                val selectedEpThumb = selectedEpisode?.info?.movieImage?.ifBlank { seriesCover } ?: seriesCover
+                val hasNextEp = selectedEpisode?.let { ep ->
+                    val idx = currentEpisodes.indexOf(ep)
+                    idx >= 0 && idx < currentEpisodes.size - 1
+                } ?: false
+
+                AnimatedVisibility(
+                    visible = showPlayerControls,
+                    enter = fadeIn(tween(200)),
+                    exit = fadeOut(tween(200)),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    TvFullscreenPlayerOverlay(
+                        isPlaying = isPlaying,
+                        title = selectedEpTitle,
+                        thumbnailUrl = selectedEpThumb,
+                        currentPositionMs = currentPositionMs,
+                        durationMs = durationMs,
+                        onPlayPause = {
+                            if (playerManager.mediaPlayer.isPlaying) {
+                                playerManager.pause()
+                                isPlaying = false
+                            } else {
+                                playerManager.resume()
+                                isPlaying = true
+                            }
+                        },
+                        onRewind = { playerManager.seekTo((playerManager.mediaPlayer.time - 10000).coerceAtLeast(0L)) },
+                        onForward = {
+                            val d = playerManager.mediaPlayer.length.coerceAtLeast(0L)
+                            val target = if (d > 0) (playerManager.mediaPlayer.time + 10000).coerceAtMost(d) else (playerManager.mediaPlayer.time + 10000)
+                            playerManager.seekTo(target)
+                        },
+                        onExit = { isFullScreenMode = false },
+                        onSubtitles = { showTracksDialog = true },
+                        onSkipNext = if (hasNextEp) { { playNextEpisode() } } else null,
+                        onAspectRatio = {
+                            fullScreenResizeModeIndex = (fullScreenResizeModeIndex + 1) % resizeModes.size
+                            val mode = resizeModes[fullScreenResizeModeIndex]
+                            playerManager.setAspectRatio(mode.second)
+                            playerManager.setScale(mode.third)
+                        }
+                    )
+                }
+            }
+        }
+
+        // Idioma y Subtítulos Dialog
+        if (showTracksDialog) {
+            AlertDialog(
+                onDismissRequest = { showTracksDialog = false },
+                containerColor = Color(0xFF14151F),
+                title = {
+                    Text("Idioma y Subtítulos (VLC)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        // Pistas de Audio
+                        Text("PISTAS DE AUDIO", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                        if (availableAudioTracks.isEmpty()) {
+                            Text("Audio predeterminado", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+                        } else {
+                            availableAudioTracks.forEach { track ->
+                                var isTrackFocused by remember { mutableStateOf(false) }
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .focusable()
+                                        .onFocusChanged { isTrackFocused = it.isFocused }
+                                        .clickable {
+                                            try {
+                                                playerManager.setAudioTrack(track.id)
+                                                refreshTracks()
+                                            } catch (e: Exception) {
+                                                Log.e("SeriesDetailTv", "Error selecting audio track", e)
+                                            }
+                                        },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = when {
+                                        isTrackFocused -> tvFocusBlue
+                                        track.isSelected -> Color(0xFFE50914)
+                                        else -> Color.White.copy(alpha = 0.1f)
+                                    },
+                                    border = if (isTrackFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(track.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                        if (track.isSelected) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+
+                        // Subtítulos
+                        Text("SUBTÍTULOS", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                        // Desactivar Subtítulos Option
+                        var isDisableSubFocused by remember { mutableStateOf(false) }
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .focusable()
+                                .onFocusChanged { isDisableSubFocused = it.isFocused }
+                                .clickable {
+                                    try {
+                                        playerManager.setSubtitleTrack(-1)
+                                        isSubtitlesDisabled = true
+                                        refreshTracks()
+                                    } catch (e: Exception) {
+                                        Log.e("SeriesDetailTv", "Error disabling subtitles", e)
+                                    }
+                                },
+                            shape = RoundedCornerShape(8.dp),
+                            color = when {
+                                isDisableSubFocused -> tvFocusBlue
+                                isSubtitlesDisabled -> Color(0xFFE50914)
+                                else -> Color.White.copy(alpha = 0.1f)
+                            },
+                            border = if (isDisableSubFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Desactivados", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                if (isSubtitlesDisabled) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+
+                        availableSubtitleTracks.forEach { track ->
+                            var isSubFocused by remember { mutableStateOf(false) }
+                            val isChosen = track.isSelected && !isSubtitlesDisabled
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .focusable()
+                                    .onFocusChanged { isSubFocused = it.isFocused }
+                                    .clickable {
+                                        try {
+                                            playerManager.setSubtitleTrack(track.id)
+                                            isSubtitlesDisabled = false
+                                            refreshTracks()
+                                        } catch (e: Exception) {
+                                            Log.e("SeriesDetailTv", "Error setting subtitle track", e)
+                                        }
+                                    },
+                                shape = RoundedCornerShape(8.dp),
+                                color = when {
+                                    isSubFocused -> tvFocusBlue
+                                    isChosen -> Color(0xFFE50914)
+                                    else -> Color.White.copy(alpha = 0.1f)
+                                },
+                                border = if (isSubFocused) androidx.compose.foundation.BorderStroke(1.5.dp, Color.White) else null
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(track.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    if (isChosen) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showTracksDialog = false }) {
+                        Text("Cerrar", color = tvFocusBlue, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
         }
     }
 }

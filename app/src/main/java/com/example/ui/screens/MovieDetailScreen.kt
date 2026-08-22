@@ -131,6 +131,24 @@ private fun MovieDetailTvScreen(
     // PlayerManager for continuous preview and full screen playback
     val playerManager = remember { PlayerManager(context) }
 
+    val playerVideoContent = remember(playerManager) {
+        movableContentOf {
+            VlcPlayerView(
+                playerManager = playerManager,
+                enableSubtitles = true,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+
+    fun enterFullScreen() {
+        try {
+            playerManager.mediaPlayer.volume = 100
+        } catch (_: Throwable) {}
+        isFullScreenMode = true
+        showPlayerControls = true
+    }
+
     var isPreviewLoading by remember { mutableStateOf(false) }
 
     val playButtonFocusRequester = remember { FocusRequester() }
@@ -495,7 +513,7 @@ private fun MovieDetailTvScreen(
                                 val isFullBtnFocused by fullInteractionSource.collectIsFocusedAsState()
                                 Surface(
                                     onClick = {
-                                        isFullScreenMode = true
+                                        enterFullScreen()
                                     },
                                     interactionSource = fullInteractionSource,
                                     shape = RoundedCornerShape(10.dp),
@@ -515,7 +533,7 @@ private fun MovieDetailTvScreen(
                                                     AndroidKeyEvent.KEYCODE_ENTER,
                                                     AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
                                                     AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                        isFullScreenMode = true
+                                                        enterFullScreen()
                                                         true
                                                     }
                                                     else -> false
@@ -691,14 +709,11 @@ private fun MovieDetailTvScreen(
                                 .focusable()
                                 .onFocusChanged { isPreviewFocused = it.isFocused }
                                 .clickable {
-                                    isFullScreenMode = true
+                                    enterFullScreen()
                                 }
                                 .testTag("movie_preview_player")
                         ) {
-                        VlcPlayerView(
-                            playerManager = playerManager,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                            playerVideoContent()
 
                             // Loading spinner
                             if (isPreviewLoading) {
@@ -857,15 +872,14 @@ private fun MovieDetailTvScreen(
                 }
             }
         } else {
-            // Full Screen Mode Player View
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                VlcPlayerView(
-                    playerManager = playerManager,
-                    enableSubtitles = true,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable { showPlayerControls = !showPlayerControls }
-                )
+            // Full Screen Mode Player View (Seamlessly expanded from preview without reloading)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .clickable { showPlayerControls = !showPlayerControls }
+            ) {
+                playerVideoContent()
 
                 // Loading spinner in full screen
                 if (isPreviewLoading) {
