@@ -35,6 +35,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -281,17 +282,7 @@ fun SeriesDetailTvScreen(
         }
     }
 
-    // Unified movable content for the VLC player so it NEVER unmounts or reloads when expanding to fullscreen
-    val playerVideoContent = remember(playerManager) {
-        movableContentOf {
-            VlcPlayerView(
-                playerManager = playerManager,
-                enableSubtitles = true,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
-
+    // Unified VLC player management
     fun enterFullScreen() {
         try {
             playerManager.mediaPlayer.volume = 100
@@ -316,6 +307,13 @@ fun SeriesDetailTvScreen(
     val tvButtonDefaultBorder = Color.White.copy(alpha = 0.22f)
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // Persistent VLC Video Player at root: NEVER detached, NEVER reparented, 100% surface preservation
+        VlcPlayerView(
+            playerManager = playerManager,
+            enableSubtitles = true,
+            modifier = Modifier.fillMaxSize()
+        )
+
         if (!isFullScreenMode) {
             // Shared Cinematic Background
             CinematicBackground()
@@ -617,14 +615,14 @@ fun SeriesDetailTvScreen(
                             )
                         }
                         
-                        // RIGHT: Embedded Live Video Preview Player
+                        // RIGHT: Embedded Trailer / Play Action Card
                         var isPreviewFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(210.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color.Black)
+                                .background(Color(0xFF14151F))
                                 .border(
                                     if (isPreviewFocused) 2.5.dp else 1.5.dp,
                                     if (isPreviewFocused) tvFocusBlue else Color.White.copy(alpha = 0.25f),
@@ -635,49 +633,62 @@ fun SeriesDetailTvScreen(
                                 .clickable {
                                     enterFullScreen()
                                 }
-                                .testTag("series_preview_player")
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.nativeKeyEvent.keyCode) {
+                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                            AndroidKeyEvent.KEYCODE_ENTER,
+                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                                                enterFullScreen()
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                }
+                                .testTag("series_preview_player"),
+                            contentAlignment = Alignment.Center
                         ) {
-                            playerVideoContent()
-                            
-                            // Loading spinner
-                            if (isPreviewLoading) {
-                                Box(
+                            if (!seriesCover.isBlank()) {
+                                AsyncImage(
+                                    model = seriesCover,
+                                    contentDescription = seriesTitle,
+                                    contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.4f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(color = tvFocusBlue, modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
-                                }
+                                        .alpha(0.55f)
+                                )
                             }
 
-                            // Preview Error / Fallback
-                            if (previewError) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.7f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(Icons.Default.PlayCircleOutline, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(40.dp))
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text("Pulse para reproducir", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            // Fullscreen quick icon overlay in top-right
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.Black.copy(alpha = 0.6f)),
-                                contentAlignment = Alignment.Center
+                            // Center Play Badge
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isPreviewFocused) tvFocusBlue else Color.Black.copy(alpha = 0.75f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    2.dp,
+                                    if (isPreviewFocused) Color(0xFFFFC107) else Color.White.copy(alpha = 0.4f)
+                                ),
+                                shadowElevation = 8.dp
                             ) {
-                                Icon(Icons.Default.Fullscreen, contentDescription = "Pantalla completa", tint = Color.White, modifier = Modifier.size(18.dp))
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        "Pantalla Completa",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
@@ -788,11 +799,10 @@ fun SeriesDetailTvScreen(
                 }
             }
         } else {
-            // Full Screen Mode Player View (Seamlessly expanded from preview without reloading)
+            // Full Screen Mode Overlay Container (VlcPlayerView is persistently rendered at the root)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black)
                     .focusRequester(fullscreenFocusRequester)
                     .focusable(!showPlayerControls)
                     .onKeyEvent { keyEvent ->
@@ -815,8 +825,6 @@ fun SeriesDetailTvScreen(
                         showPlayerControls = !showPlayerControls
                     }
             ) {
-                playerVideoContent()
-
                 // Loading spinner in full screen
                 if (isPreviewLoading) {
                     Box(

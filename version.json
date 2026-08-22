@@ -1,7 +1,7 @@
 {
-    "versionCode": 111,
-    "versionName": "1.2.00",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.00/app-debug.apk",
-    "changelog": "Versión 1.2.00: Solución a la pantalla negra en TV restaurando el renderizador de hardware SurfaceView, e intercepción de todas las teclas del control remoto D-Pad para mostrar y enfocar controles en pantalla completa.",
+    "versionCode": 112,
+    "versionName": "1.2.01",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.01/app-debug.apk",
+    "changelog": "Versión 1.2.01: Corrección completa de pantalla negra en películas y series con VlcPlayerView continuo en root y barra de controles inferior D-Pad 100% navegable con acceso directo a Play/Pausa, adelantar, retroceder, subtítulos/idioma y formato de pantalla.",
     "isMandatory": true
 }

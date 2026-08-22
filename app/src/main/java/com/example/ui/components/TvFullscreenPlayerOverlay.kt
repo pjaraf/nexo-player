@@ -4,6 +4,7 @@ import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,8 +57,6 @@ fun TvFullscreenPlayerOverlay(
     onAspectRatio: (() -> Unit)? = null,
     onUserInteraction: (() -> Unit)? = null
 ) {
-    val focusColor = Color(0xFFE50914) // Netflix Red
-    val focusGold = Color(0xFFFFC107)
     val playPauseFocusRequester = remember { FocusRequester() }
 
     BackHandler {
@@ -64,8 +64,8 @@ fun TvFullscreenPlayerOverlay(
     }
 
     LaunchedEffect(Unit) {
+        delay(150)
         try {
-            delay(120)
             playPauseFocusRequester.requestFocus()
         } catch (_: Exception) {}
     }
@@ -85,164 +85,121 @@ fun TvFullscreenPlayerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Black.copy(alpha = 0.75f),
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.6f),
+                        Color.Black.copy(alpha = 0.95f)
+                    )
+                )
+            )
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     onUserInteraction?.invoke()
+                    if (keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_BACK) {
+                        onExit()
+                        return@onKeyEvent true
+                    }
                 }
                 false
             }
     ) {
-        // Botón Central Gigante de Play/Pause
-        var isCenterPlayFocused by remember { mutableStateOf(false) }
-        val centerScale by animateFloatAsState(
-            targetValue = if (isCenterPlayFocused) 1.15f else 1.0f,
-            animationSpec = tween(150),
-            label = "center_play_scale"
-        )
-
-        Box(
+        // 1. Barra Superior: Título y botón volver
+        Row(
             modifier = Modifier
-                .align(Alignment.Center)
-                .scale(centerScale)
-                .size(84.dp)
-                .clip(CircleShape)
-                .background(if (isCenterPlayFocused || !isPlaying) focusColor else Color.Black.copy(alpha = 0.6f))
-                .border(3.5.dp, if (isCenterPlayFocused) focusGold else focusColor, CircleShape)
-                .focusRequester(playPauseFocusRequester)
-                .focusable()
-                .onFocusChanged {
-                    isCenterPlayFocused = it.isFocused
-                    if (it.isFocused) onUserInteraction?.invoke()
-                }
-                .onKeyEvent { keyEvent ->
-                    if (keyEvent.type == KeyEventType.KeyDown) {
-                        onUserInteraction?.invoke()
-                        when (keyEvent.nativeKeyEvent.keyCode) {
-                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                            AndroidKeyEvent.KEYCODE_ENTER,
-                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                onPlayPause()
-                                true
-                            }
-                            AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                                onRewind()
-                                true
-                            }
-                            AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                onForward()
-                                true
-                            }
-                            else -> false
-                        }
-                    } else false
-                }
-                .clickable { onPlayPause() }
-                .testTag("tv_center_play_pause"),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .padding(horizontal = 32.dp, vertical = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                tint = Color.White,
-                modifier = Modifier.size(52.dp)
+            TvPlayerActionButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                label = "Volver",
+                onClick = onExit,
+                onFocused = onUserInteraction
+            )
+
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
         }
 
-        // Fila de Controles Inferior: Carátula a la izquierda, Información + Barra + Botones a la derecha
+        // 2. Fila Inferior: Póster + Información + Barra de Tiempo + Botones de Control
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f), Color.Black.copy(alpha = 0.98f))
-                    )
-                )
-                .padding(horizontal = 36.dp, vertical = 24.dp),
+                .padding(horizontal = 32.dp, vertical = 22.dp),
             verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(22.dp)
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // 1. Carátula / Póster
+            // Póster o carátula
             if (thumbnailUrl.isNotBlank()) {
                 AsyncImage(
                     model = thumbnailUrl,
                     contentDescription = title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(width = 110.dp, height = 160.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .shadow(16.dp, RoundedCornerShape(12.dp))
-                        .border(2.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                        .size(width = 95.dp, height = 140.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .shadow(12.dp, RoundedCornerShape(10.dp))
+                        .border(1.5.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(width = 110.dp, height = 160.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF222222))
-                        .border(2.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Tv, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
-                }
             }
 
-            // 2. Título, barra de progreso y botones de acción
+            // Panel de Control Principal
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(bottom = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Título
-                Text(
-                    text = title,
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Barra de Progreso
+                // Barra de Progreso y Tiempo
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
                         text = formatTime(currentPositionMs),
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        fontSize = 14.sp
                     )
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(24.dp),
+                            .height(20.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        // Track base
+                        // Track de fondo
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(6.dp)
-                                .background(Color.White.copy(alpha = 0.3f), CircleShape)
+                                .background(Color.White.copy(alpha = 0.25f), CircleShape)
                         )
 
                         val progress = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-                        // Track activo
+                        // Barra de progreso activa
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(progress)
                                 .height(6.dp)
-                                .background(focusColor, CircleShape)
+                                .background(Color(0xFFE50914), CircleShape)
                         )
 
-                        // Thumb indicador
+                        // Indicador / Thumb
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(progress)
@@ -250,9 +207,9 @@ fun TvFullscreenPlayerOverlay(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(16.dp)
+                                    .size(14.dp)
                                     .clip(CircleShape)
-                                    .background(focusGold)
+                                    .background(Color(0xFFFFC107))
                                     .border(1.5.dp, Color.White, CircleShape)
                             )
                         }
@@ -262,75 +219,69 @@ fun TvFullscreenPlayerOverlay(
                         text = formatTime(durationMs),
                         color = Color.White.copy(alpha = 0.85f),
                         fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        fontSize = 14.sp
                     )
                 }
 
-                // Fila de Botones con soporte total D-Pad
+                // Botones de Reproducción y Opciones (D-Pad navegables en una sola fila continua)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Salir de pantalla completa
-                    TvOverlayIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        description = "Salir",
-                        onClick = onExit,
-                        onFocused = onUserInteraction
-                    )
-
-                    // Retroceder 10s
-                    TvOverlayIconButton(
+                    // 1. Retroceder 10s
+                    TvPlayerActionButton(
                         icon = Icons.Default.FastRewind,
-                        description = "Retroceder 10 segundos",
+                        label = "-10s",
                         onClick = onRewind,
                         onFocused = onUserInteraction
                     )
 
-                    // Play / Pause
-                    TvOverlayIconButton(
+                    // 2. Play / Pausa (Foco Principal Inicial)
+                    TvPlayerActionButton(
                         icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        description = if (isPlaying) "Pausar" else "Reproducir",
-                        isCircularBadge = true,
-                        isPlaying = isPlaying,
+                        label = if (isPlaying) "Pausar" else "Reproducir",
+                        isPrimaryPlay = true,
+                        focusRequester = playPauseFocusRequester,
                         onClick = onPlayPause,
                         onFocused = onUserInteraction
                     )
 
-                    // Avanzar 10s
-                    TvOverlayIconButton(
+                    // 3. Avanzar 10s
+                    TvPlayerActionButton(
                         icon = Icons.Default.FastForward,
-                        description = "Avanzar 10 segundos",
+                        label = "+10s",
                         onClick = onForward,
                         onFocused = onUserInteraction
                     )
 
-                    // Siguiente episodio (Series)
+                    // 4. Siguiente Episodio (Para Series)
                     if (onSkipNext != null) {
-                        TvOverlayIconButton(
+                        TvPlayerActionButton(
                             icon = Icons.Default.SkipNext,
-                            description = "Siguiente episodio",
+                            label = "Sig. Ep.",
                             onClick = onSkipNext,
                             onFocused = onUserInteraction
                         )
                     }
 
-                    // Idioma y Subtítulos
-                    TvOverlayIconButton(
+                    // 5. Idioma y Subtítulos
+                    TvPlayerActionButton(
                         icon = Icons.Default.Language,
-                        description = "Audio y Subtítulos",
+                        label = "Audio / Sub",
                         onClick = onSubtitles,
                         onFocused = onUserInteraction
                     )
 
-                    // Formato de pantalla
-                    TvOverlayIconButton(
-                        icon = Icons.Default.PictureInPictureAlt,
-                        description = "Formato de Pantalla",
-                        onClick = { onAspectRatio?.invoke() },
-                        onFocused = onUserInteraction
-                    )
+                    // 6. Formato de Pantalla (Ajuste / Zoom / 16:9)
+                    if (onAspectRatio != null) {
+                        TvPlayerActionButton(
+                            icon = Icons.Default.AspectRatio,
+                            label = "Pantalla",
+                            onClick = onAspectRatio,
+                            onFocused = onUserInteraction
+                        )
+                    }
                 }
             }
         }
@@ -338,11 +289,11 @@ fun TvFullscreenPlayerOverlay(
 }
 
 @Composable
-private fun TvOverlayIconButton(
+private fun TvPlayerActionButton(
     icon: ImageVector,
-    description: String,
-    isCircularBadge: Boolean = false,
-    isPlaying: Boolean = false,
+    label: String,
+    isPrimaryPlay: Boolean = false,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit,
     onFocused: (() -> Unit)? = null
 ) {
@@ -356,31 +307,34 @@ private fun TvOverlayIconButton(
     }
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.20f else 1.0f,
-        animationSpec = tween(150),
-        label = "icon_btn_scale"
+        targetValue = if (isFocused) 1.15f else 1.0f,
+        animationSpec = tween(120),
+        label = "btn_scale"
     )
 
-    val focusColor = Color(0xFFE50914)
-    val focusGold = Color(0xFFFFC107)
+    val tvFocusBlue = Color(0xFF007AFF)
+    val tvFocusGold = Color(0xFFFFC107)
 
     Surface(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = if (isCircularBadge) CircleShape else RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(10.dp),
         color = when {
-            isFocused -> focusColor
-            isCircularBadge -> Color.White.copy(alpha = 0.15f)
-            else -> Color.Transparent
+            isFocused -> tvFocusBlue
+            isPrimaryPlay -> Color(0xFFE50914)
+            else -> Color.White.copy(alpha = 0.16f)
         },
         border = if (isFocused) {
-            androidx.compose.foundation.BorderStroke(2.5.dp, focusGold)
-        } else if (isCircularBadge) {
-            androidx.compose.foundation.BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f))
-        } else null,
+            BorderStroke(2.5.dp, tvFocusGold)
+        } else if (isPrimaryPlay) {
+            BorderStroke(1.5.dp, Color.White.copy(alpha = 0.5f))
+        } else {
+            BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+        },
         modifier = Modifier
-            .size(52.dp)
             .scale(scale)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .focusable(interactionSource = interactionSource)
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.nativeKeyEvent.keyCode) {
@@ -395,17 +349,25 @@ private fun TvOverlayIconButton(
                     }
                 } else false
             }
-            .testTag("tv_btn_${description.lowercase().replace(" ", "_")}")
+            .testTag("tv_ctrl_${label.lowercase().replace(" ", "_")}")
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = description,
-                tint = if (isFocused) Color.White else Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(if (isCircularBadge) 28.dp else 26.dp)
+                contentDescription = label,
+                tint = Color.White,
+                modifier = Modifier.size(if (isPrimaryPlay) 22.dp else 19.dp)
+            )
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
             )
         }
     }
