@@ -1,7 +1,7 @@
 {
-    "versionCode": 117,
-    "versionName": "1.2.06",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.06/app-debug.apk",
-    "changelog": "Versión 1.2.06: Nueva interfaz moderna en TV en vivo para mandos a distancia (D-Pad). Eliminación de paneles laterales antiguos, nueva Guía Rápida flotante OLED Glass y Banner OSD informativo de emisión en directo.",
+    "versionCode": 118,
+    "versionName": "1.2.07",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.07/app-debug.apk",
+    "changelog": "Versión 1.2.07: Corrección total de navegación D-Pad en el control remoto para TV en Vivo. Transferencia inmediata de foco al abrir la guía, navegación fluida entre categorías y canales (ARRIBA/ABAJO/IZQUIERDA/DERECHA/OK) y prevención de bloqueos de foco.",
     "isMandatory": true
 }

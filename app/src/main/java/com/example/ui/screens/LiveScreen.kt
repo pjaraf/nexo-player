@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -102,7 +104,8 @@ fun LiveScreen(
 private fun TvLiveScreen(
     viewModel: MainViewModel,
     onPlayChannel: (channelId: String, categoryId: String, title: String) -> Unit,
-    onExitToMenu: (() -> Unit)? = null
+    onExitToMenu: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val categories by viewModel.liveCategories.collectAsState()
@@ -123,6 +126,8 @@ private fun TvLiveScreen(
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     val rootFocusRequester = remember { FocusRequester() }
+    val activeChannelFocusRequester = remember { FocusRequester() }
+    val activeCategoryFocusRequester = remember { FocusRequester() }
     val channelListState = rememberLazyListState()
     val categoryListState = rememberLazyListState()
 
@@ -249,7 +254,7 @@ private fun TvLiveScreen(
         }
     }
 
-    // Scroll to currently playing channel when opening quick guide
+    // Scroll to currently playing channel when opening quick guide and transfer focus
     LaunchedEffect(showQuickGuide) {
         if (showQuickGuide) {
             val currentIdx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }.coerceAtLeast(0)
@@ -257,6 +262,12 @@ private fun TvLiveScreen(
                 try {
                     channelListState.scrollToItem((currentIdx - 2).coerceAtLeast(0))
                 } catch (_: Throwable) {}
+            }
+            delay(120)
+            try {
+                activeChannelFocusRequester.requestFocus()
+            } catch (_: Throwable) {
+                try { activeCategoryFocusRequester.requestFocus() } catch (_: Throwable) {}
             }
         } else {
             try {
@@ -292,62 +303,45 @@ private fun TvLiveScreen(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
             .focusRequester(rootFocusRequester)
-            .focusable()
+            .focusable(!showQuickGuide)
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
+                if (!showQuickGuide && keyEvent.type == KeyEventType.KeyDown) {
                     lastInteractionTime = System.currentTimeMillis()
                     val nativeKeyCode = keyEvent.nativeKeyEvent.keyCode
-                    when {
-                        // When quick guide is CLOSED:
-                        !showQuickGuide -> {
-                            when (nativeKeyCode) {
-                                AndroidKeyEvent.KEYCODE_DPAD_UP -> {
-                                    zapChannel(-1)
-                                    true
-                                }
-                                AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
-                                    zapChannel(1)
-                                    true
-                                }
-                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                AndroidKeyEvent.KEYCODE_ENTER,
-                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                AndroidKeyEvent.KEYCODE_BUTTON_A,
-                                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
-                                AndroidKeyEvent.KEYCODE_MENU -> {
-                                    showQuickGuide = true
-                                    showOsdBanner = false
-                                    true
-                                }
-                                AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                    zapDirectionLabel = null
-                                    showOsdBanner = true
-                                    true
-                                }
-                                AndroidKeyEvent.KEYCODE_BACK,
-                                AndroidKeyEvent.KEYCODE_ESCAPE -> {
-                                    onExitToMenu?.invoke()
-                                    true
-                                }
-                                else -> false
-                            }
+                    when (nativeKeyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_UP -> {
+                            zapChannel(-1)
+                            true
                         }
-                        // When quick guide is OPEN:
-                        else -> {
-                            when (nativeKeyCode) {
-                                AndroidKeyEvent.KEYCODE_MENU,
-                                AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                    showQuickGuide = false
-                                    try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
-                                    true
-                                }
-                                else -> false
-                            }
+                        AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                            zapChannel(1)
+                            true
                         }
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_BUTTON_A,
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                        AndroidKeyEvent.KEYCODE_MENU -> {
+                            showQuickGuide = true
+                            showOsdBanner = false
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            zapDirectionLabel = null
+                            showOsdBanner = true
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_BACK,
+                        AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                            onExitToMenu?.invoke()
+                            true
+                        }
+                        else -> false
                     }
                 } else false
             }
@@ -535,134 +529,193 @@ private fun TvLiveScreen(
                     }
 
                     // Selector Horizontal de Categorías (Modern Chips)
-                    LazyColumn(
-                        state = rememberLazyListState(),
+                    LazyRow(
+                        state = categoryListState,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp)
                     ) {
+                        // Chip Favoritos
                         item {
-                            androidx.compose.foundation.lazy.LazyRow(
-                                state = categoryListState,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                // Chip Favoritos
-                                item {
-                                    val isSelected = activeTvTab == LiveSubTab.FAVORITOS
-                                    var isFocused by remember { mutableStateOf(false) }
-                                    Surface(
-                                        onClick = {
-                                            activeTvTab = LiveSubTab.FAVORITOS
+                            val isSelected = activeTvTab == LiveSubTab.FAVORITOS
+                            var isFocused by remember { mutableStateOf(false) }
+                            val isRequesterTarget = isSelected
+                            Surface(
+                                onClick = {
+                                    activeTvTab = LiveSubTab.FAVORITOS
+                                    lastInteractionTime = System.currentTimeMillis()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isFocused) Color(0xFF2C324A) else if (isSelected) JetOrange else Color(0xFF1A1C28),
+                                border = if (isFocused) {
+                                    BorderStroke(2.5.dp, Color(0xFFFF9800))
+                                } else if (isSelected) {
+                                    BorderStroke(1.5.dp, JetOrangeBright)
+                                } else {
+                                    BorderStroke(1.dp, Color(0xFF2B3045))
+                                },
+                                modifier = (if (isRequesterTarget) Modifier.focusRequester(activeCategoryFocusRequester) else Modifier)
+                                    .onFocusChanged { isFocused = it.isFocused }
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
                                             lastInteractionTime = System.currentTimeMillis()
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2C324A) else Color(0xFF1A1C28),
-                                        border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else if (isSelected) BorderStroke(1.dp, JetOrangeBright) else null,
-                                        modifier = Modifier
-                                            .onFocusChanged { isFocused = it.isFocused }
-                                            .onKeyEvent { keyEvent ->
-                                                if (keyEvent.type == KeyEventType.KeyDown &&
-                                                    (keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
-                                                     keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_ENTER)
-                                                ) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                     activeTvTab = LiveSubTab.FAVORITOS
-                                                    lastInteractionTime = System.currentTimeMillis()
                                                     true
-                                                } else false
+                                                }
+                                                AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                                                    try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    true
+                                                }
+                                                AndroidKeyEvent.KEYCODE_BACK,
+                                                AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                                                    showQuickGuide = false
+                                                    try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    true
+                                                }
+                                                else -> false
                                             }
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(13.dp))
-                                            Text(
-                                                text = "Favoritos",
-                                                color = Color.White,
-                                                fontSize = 12.sp,
-                                                fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium
-                                            )
-                                        }
+                                        } else false
                                     }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(14.dp))
+                                    Text(
+                                        text = "Favoritos",
+                                        color = Color.White,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium
+                                    )
                                 }
+                            }
+                        }
 
-                                // Chip Todos
-                                item {
-                                    val isSelected = activeTvTab == LiveSubTab.CATEGORIA && selectedCat == "ALL"
-                                    var isFocused by remember { mutableStateOf(false) }
-                                    Surface(
-                                        onClick = {
-                                            activeTvTab = LiveSubTab.CATEGORIA
-                                            viewModel.selectLiveCategory("ALL")
+                        // Chip Todos
+                        item {
+                            val isSelected = activeTvTab == LiveSubTab.CATEGORIA && selectedCat == "ALL"
+                            var isFocused by remember { mutableStateOf(false) }
+                            val isRequesterTarget = isSelected
+                            Surface(
+                                onClick = {
+                                    activeTvTab = LiveSubTab.CATEGORIA
+                                    viewModel.selectLiveCategory("ALL")
+                                    lastInteractionTime = System.currentTimeMillis()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isFocused) Color(0xFF2C324A) else if (isSelected) JetOrange else Color(0xFF1A1C28),
+                                border = if (isFocused) {
+                                    BorderStroke(2.5.dp, Color(0xFFFF9800))
+                                } else if (isSelected) {
+                                    BorderStroke(1.5.dp, JetOrangeBright)
+                                } else {
+                                    BorderStroke(1.dp, Color(0xFF2B3045))
+                                },
+                                modifier = (if (isRequesterTarget) Modifier.focusRequester(activeCategoryFocusRequester) else Modifier)
+                                    .onFocusChanged { isFocused = it.isFocused }
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
                                             lastInteractionTime = System.currentTimeMillis()
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2C324A) else Color(0xFF1A1C28),
-                                        border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else if (isSelected) BorderStroke(1.dp, JetOrangeBright) else null,
-                                        modifier = Modifier
-                                            .onFocusChanged { isFocused = it.isFocused }
-                                            .onKeyEvent { keyEvent ->
-                                                if (keyEvent.type == KeyEventType.KeyDown &&
-                                                    (keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
-                                                     keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_ENTER)
-                                                ) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                     activeTvTab = LiveSubTab.CATEGORIA
                                                     viewModel.selectLiveCategory("ALL")
-                                                    lastInteractionTime = System.currentTimeMillis()
                                                     true
-                                                } else false
+                                                }
+                                                AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                                                    try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    true
+                                                }
+                                                AndroidKeyEvent.KEYCODE_BACK,
+                                                AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                                                    showQuickGuide = false
+                                                    try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    true
+                                                }
+                                                else -> false
                                             }
-                                    ) {
-                                        Text(
-                                            text = "Todos",
-                                            color = Color.White,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
-                                        )
+                                        } else false
                                     }
-                                }
+                            ) {
+                                Text(
+                                    text = "Todos",
+                                    color = Color.White,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                )
+                            }
+                        }
 
-                                // Categorías del Servidor
-                                itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
-                                    val isSelected = activeTvTab == LiveSubTab.CATEGORIA && selectedCat == cat.categoryId
-                                    var isFocused by remember { mutableStateOf(false) }
-                                    Surface(
-                                        onClick = {
-                                            activeTvTab = LiveSubTab.CATEGORIA
-                                            viewModel.selectLiveCategory(cat.categoryId)
+                        // Categorías del Servidor
+                        itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
+                            val isSelected = activeTvTab == LiveSubTab.CATEGORIA && selectedCat == cat.categoryId
+                            var isFocused by remember { mutableStateOf(false) }
+                            val isRequesterTarget = isSelected
+                            Surface(
+                                onClick = {
+                                    activeTvTab = LiveSubTab.CATEGORIA
+                                    viewModel.selectLiveCategory(cat.categoryId)
+                                    lastInteractionTime = System.currentTimeMillis()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isFocused) Color(0xFF2C324A) else if (isSelected) JetOrange else Color(0xFF1A1C28),
+                                border = if (isFocused) {
+                                    BorderStroke(2.5.dp, Color(0xFFFF9800))
+                                } else if (isSelected) {
+                                    BorderStroke(1.5.dp, JetOrangeBright)
+                                } else {
+                                    BorderStroke(1.dp, Color(0xFF2B3045))
+                                },
+                                modifier = (if (isRequesterTarget) Modifier.focusRequester(activeCategoryFocusRequester) else Modifier)
+                                    .onFocusChanged { isFocused = it.isFocused }
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type == KeyEventType.KeyDown) {
                                             lastInteractionTime = System.currentTimeMillis()
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2C324A) else Color(0xFF1A1C28),
-                                        border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else if (isSelected) BorderStroke(1.dp, JetOrangeBright) else null,
-                                        modifier = Modifier
-                                            .onFocusChanged { isFocused = it.isFocused }
-                                            .onKeyEvent { keyEvent ->
-                                                if (keyEvent.type == KeyEventType.KeyDown &&
-                                                    (keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
-                                                     keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_ENTER)
-                                                ) {
+                                            when (keyEvent.nativeKeyEvent.keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                                AndroidKeyEvent.KEYCODE_ENTER,
+                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                     activeTvTab = LiveSubTab.CATEGORIA
                                                     viewModel.selectLiveCategory(cat.categoryId)
-                                                    lastInteractionTime = System.currentTimeMillis()
                                                     true
-                                                } else false
+                                                }
+                                                AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                                                    try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    true
+                                                }
+                                                AndroidKeyEvent.KEYCODE_BACK,
+                                                AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                                                    showQuickGuide = false
+                                                    try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    true
+                                                }
+                                                else -> false
                                             }
-                                    ) {
-                                        Text(
-                                            text = cat.categoryName,
-                                            color = Color.White,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
-                                        )
+                                        } else false
                                     }
-                                }
+                            ) {
+                                Text(
+                                    text = cat.categoryName,
+                                    color = Color.White,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                )
                             }
                         }
                     }
@@ -693,12 +746,14 @@ private fun TvLiveScreen(
                             itemsIndexed(displayChannels, key = { index, ch -> "${ch.id}_$index" }) { index, channel ->
                                 val isCurrentPlaying = selectedChannel?.id == channel.id
                                 val isFav = favorites.any { it.kind == "live" && it.id == channel.id }
+                                val isRequesterTarget = isCurrentPlaying || (selectedChannel == null && index == 0)
 
                                 ModernTvChannelItem(
                                     channel = channel,
                                     index = index + 1,
                                     isPlaying = isCurrentPlaying,
                                     isFav = isFav,
+                                    modifier = if (isRequesterTarget) Modifier.focusRequester(activeChannelFocusRequester) else Modifier,
                                     onSelect = {
                                         selectedChannel = channel
                                         showQuickGuide = false
@@ -710,6 +765,9 @@ private fun TvLiveScreen(
                                     onFavToggle = {
                                         viewModel.toggleFavorite("live", channel.id, channel.name, channel.streamIcon)
                                         lastInteractionTime = System.currentTimeMillis()
+                                    },
+                                    onNavigateUpToCategory = {
+                                        try { activeCategoryFocusRequester.requestFocus() } catch (_: Throwable) {}
                                     },
                                     onDismissGuide = {
                                         showQuickGuide = false
@@ -736,6 +794,7 @@ private fun ModernTvChannelItem(
     isFav: Boolean,
     onSelect: () -> Unit,
     onFavToggle: () -> Unit,
+    onNavigateUpToCategory: () -> Unit,
     onDismissGuide: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -760,6 +819,17 @@ private fun ModernTvChannelItem(
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_UP -> {
+                            if (index == 1) {
+                                onNavigateUpToCategory()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                            false // Let Compose naturally navigate to the next channel
+                        }
                         AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                         AndroidKeyEvent.KEYCODE_ENTER,
                         AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
@@ -767,7 +837,16 @@ private fun ModernTvChannelItem(
                             onSelect()
                             true
                         }
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
+                            onNavigateUpToCategory()
+                            true
+                        }
                         AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            onDismissGuide()
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_BACK,
+                        AndroidKeyEvent.KEYCODE_ESCAPE -> {
                             onDismissGuide()
                             true
                         }
@@ -837,10 +916,13 @@ private fun ModernTvChannelItem(
                 }
             }
 
-            // Botón Favorito
-            IconButton(
-                onClick = onFavToggle,
-                modifier = Modifier.size(32.dp)
+            // Indicador / Botón Favorito (no focusable para evitar atrapar el D-Pad)
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clickable { onFavToggle() }
+                    .focusProperties { canFocus = false },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isFav) Icons.Default.Star else Icons.Default.StarBorder,
