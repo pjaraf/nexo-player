@@ -1,7 +1,7 @@
 {
-    "versionCode": 116,
-    "versionName": "1.2.05",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.05/app-debug.apk",
-    "changelog": "Versión 1.2.05: Compatibilidad universal multi-dispositivo (Google TV, Android TV, Smart TV Boxes AOSP/antiguos y teléfonos/tablets Android con soporte híbrido táctil y control remoto D-Pad).",
+    "versionCode": 117,
+    "versionName": "1.2.06",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.06/app-debug.apk",
+    "changelog": "Versión 1.2.06: Nueva interfaz moderna en TV en vivo para mandos a distancia (D-Pad). Eliminación de paneles laterales antiguos, nueva Guía Rápida flotante OLED Glass y Banner OSD informativo de emisión en directo.",
     "isMandatory": true
 }

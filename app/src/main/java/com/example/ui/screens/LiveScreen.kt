@@ -66,21 +66,9 @@ enum class LiveSubTab {
 }
 
 /**
- * Estados del menú lateral para Android TV:
- * - CLOSED: Reproductor a pantalla completa, zapping directo con UP/DOWN y OSD banner Breaking News.
- * - CHANNELS: Ventana lateral con lista de canales del grupo seleccionado (1er nivel).
- * - CATEGORIES: Ventana lateral expandida con categorías y canales lado a lado (2do nivel / al presionar 2 veces).
- */
-private enum class TvMenuLevel {
-    CLOSED,
-    CHANNELS,
-    CATEGORIES
-}
-
-/**
  * PANTALLA PRINCIPAL DE TV EN VIVO:
  * - Detección automática de dispositivo:
- *   * SMART TV / TV BOX (isTv = true): Interfaz nativa de TV a pantalla completa, zapping D-Pad, banner OSD y menú lateral sin cierres.
+ *   * SMART TV / TV BOX (isTv = true): Interfaz nativa de TV a pantalla completa, zapping D-Pad, banner OSD y guía flotante moderna.
  *   * TELÉFONOS (isTv = false): Interfaz JetGo con mini-reproductor ajustado a 16:9 y categorías/canales.
  */
 @Composable
@@ -108,7 +96,7 @@ fun LiveScreen(
 }
 
 // =========================================================================
-// INTERFAZ PARA TELEVISORES (SMART TV / ANDROID TV / TV BOX - D-PAD NATIVO)
+// INTERFAZ MODERNA PARA TELEVISORES (SMART TV / GOOGLE TV / TV BOX - D-PAD)
 // =========================================================================
 @Composable
 private fun TvLiveScreen(
@@ -125,8 +113,8 @@ private fun TvLiveScreen(
 
     var activeTvTab by remember { mutableStateOf(LiveSubTab.CATEGORIA) }
     var selectedChannel by remember { mutableStateOf<LiveChannel?>(null) }
-    var menuLevel by remember { mutableStateOf(TvMenuLevel.CLOSED) }
-    var showChannelBanner by remember { mutableStateOf(true) }
+    var showQuickGuide by remember { mutableStateOf(false) }
+    var showOsdBanner by remember { mutableStateOf(true) }
     var zapDirectionLabel by remember { mutableStateOf<String?>(null) }
     var isBuffering by remember { mutableStateOf(false) }
     var hasError by remember { mutableStateOf(false) }
@@ -135,8 +123,6 @@ private fun TvLiveScreen(
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     val rootFocusRequester = remember { FocusRequester() }
-    val selectedChannelFocusRequester = remember { FocusRequester() }
-    val selectedCategoryFocusRequester = remember { FocusRequester() }
     val channelListState = rememberLazyListState()
     val categoryListState = rememberLazyListState()
 
@@ -205,7 +191,7 @@ private fun TvLiveScreen(
             isBuffering = true
             hasError = false
             candidateIndex = 0
-            showChannelBanner = true
+            showOsdBanner = true
 
             val raw = XtreamApi.getLiveStreamCandidates(ch.id)
             val list = mutableListOf<String>()
@@ -244,57 +230,38 @@ private fun TvLiveScreen(
         }
     }
 
-    // Auto-hide channel banner after 4.5 seconds
-    LaunchedEffect(showChannelBanner, selectedChannel) {
-        if (showChannelBanner) {
-            delay(4500)
-            showChannelBanner = false
+    // Auto-hide channel OSD banner after 4 seconds
+    LaunchedEffect(showOsdBanner, selectedChannel) {
+        if (showOsdBanner) {
+            delay(4000)
+            showOsdBanner = false
         }
     }
 
-    // Auto-hide lateral menu after 12 seconds of inactivity
-    LaunchedEffect(menuLevel, lastInteractionTime) {
-        if (menuLevel != TvMenuLevel.CLOSED) {
+    // Auto-hide quick guide after 12 seconds of inactivity
+    LaunchedEffect(showQuickGuide, lastInteractionTime) {
+        if (showQuickGuide) {
             delay(12000)
-            menuLevel = TvMenuLevel.CLOSED
+            showQuickGuide = false
             try {
                 rootFocusRequester.requestFocus()
             } catch (_: Throwable) {}
         }
     }
 
-    // Auto-scroll and auto-focus when entering channels or categories menu
-    LaunchedEffect(menuLevel) {
-        when (menuLevel) {
-            TvMenuLevel.CHANNELS -> {
-                val idx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }.coerceAtLeast(0)
-                if (displayChannels.isNotEmpty()) {
-                    try {
-                        channelListState.scrollToItem((idx - 2).coerceAtLeast(0))
-                    } catch (_: Throwable) {}
-                }
-                delay(120)
+    // Scroll to currently playing channel when opening quick guide
+    LaunchedEffect(showQuickGuide) {
+        if (showQuickGuide) {
+            val currentIdx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }.coerceAtLeast(0)
+            if (displayChannels.isNotEmpty()) {
                 try {
-                    selectedChannelFocusRequester.requestFocus()
+                    channelListState.scrollToItem((currentIdx - 2).coerceAtLeast(0))
                 } catch (_: Throwable) {}
             }
-            TvMenuLevel.CATEGORIES -> {
-                val catIdx = categories.indexOfFirst { it.categoryId == selectedCat }.coerceAtLeast(0)
-                if (categories.isNotEmpty()) {
-                    try {
-                        categoryListState.scrollToItem((catIdx - 1).coerceAtLeast(0))
-                    } catch (_: Throwable) {}
-                }
-                delay(120)
-                try {
-                    selectedCategoryFocusRequester.requestFocus()
-                } catch (_: Throwable) {}
-            }
-            TvMenuLevel.CLOSED -> {
-                try {
-                    rootFocusRequester.requestFocus()
-                } catch (_: Throwable) {}
-            }
+        } else {
+            try {
+                rootFocusRequester.requestFocus()
+            } catch (_: Throwable) {}
         }
     }
 
@@ -309,27 +276,18 @@ private fun TvLiveScreen(
         }
         selectedChannel = displayChannels[newIdx]
         zapDirectionLabel = if (delta > 0) "▲ Siguiente canal" else "▼ Canal anterior"
-        showChannelBanner = true
+        showOsdBanner = true
         lastInteractionTime = System.currentTimeMillis()
     }
 
     // Back button handling
     BackHandler(enabled = true) {
-        when (menuLevel) {
-            TvMenuLevel.CATEGORIES -> {
-                menuLevel = TvMenuLevel.CHANNELS
-                lastInteractionTime = System.currentTimeMillis()
-            }
-            TvMenuLevel.CHANNELS -> {
-                menuLevel = TvMenuLevel.CLOSED
-                lastInteractionTime = System.currentTimeMillis()
-                try {
-                    rootFocusRequester.requestFocus()
-                } catch (_: Throwable) {}
-            }
-            TvMenuLevel.CLOSED -> {
-                onExitToMenu?.invoke()
-            }
+        if (showQuickGuide) {
+            showQuickGuide = false
+            lastInteractionTime = System.currentTimeMillis()
+            try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
+        } else {
+            onExitToMenu?.invoke()
         }
     }
 
@@ -344,8 +302,8 @@ private fun TvLiveScreen(
                     lastInteractionTime = System.currentTimeMillis()
                     val nativeKeyCode = keyEvent.nativeKeyEvent.keyCode
                     when {
-                        // When lateral menu is CLOSED:
-                        menuLevel == TvMenuLevel.CLOSED -> {
+                        // When quick guide is CLOSED:
+                        !showQuickGuide -> {
                             when (nativeKeyCode) {
                                 AndroidKeyEvent.KEYCODE_DPAD_UP -> {
                                     zapChannel(-1)
@@ -355,19 +313,19 @@ private fun TvLiveScreen(
                                     zapChannel(1)
                                     true
                                 }
-                                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
                                 AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                                 AndroidKeyEvent.KEYCODE_ENTER,
                                 AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
                                 AndroidKeyEvent.KEYCODE_BUTTON_A,
+                                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
                                 AndroidKeyEvent.KEYCODE_MENU -> {
-                                    menuLevel = TvMenuLevel.CHANNELS
-                                    showChannelBanner = false
+                                    showQuickGuide = true
+                                    showOsdBanner = false
                                     true
                                 }
                                 AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
                                     zapDirectionLabel = null
-                                    showChannelBanner = true
+                                    showOsdBanner = true
                                     true
                                 }
                                 AndroidKeyEvent.KEYCODE_BACK,
@@ -378,11 +336,12 @@ private fun TvLiveScreen(
                                 else -> false
                             }
                         }
-                        // When lateral menu is OPEN:
+                        // When quick guide is OPEN:
                         else -> {
                             when (nativeKeyCode) {
-                                AndroidKeyEvent.KEYCODE_MENU -> {
-                                    menuLevel = TvMenuLevel.CLOSED
+                                AndroidKeyEvent.KEYCODE_MENU,
+                                AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                    showQuickGuide = false
                                     try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
                                     true
                                 }
@@ -393,12 +352,12 @@ private fun TvLiveScreen(
                 } else false
             }
             .clickable {
-                menuLevel = if (menuLevel == TvMenuLevel.CLOSED) TvMenuLevel.CHANNELS else TvMenuLevel.CLOSED
+                showQuickGuide = !showQuickGuide
                 lastInteractionTime = System.currentTimeMillis()
             }
             .testTag("tv_live_root")
     ) {
-        // 1. Fullscreen VLC Video Player
+        // 1. Fullscreen Video Player
         VlcPlayerView(
             playerManager = playerManager,
             modifier = Modifier.fillMaxSize()
@@ -411,7 +370,7 @@ private fun TvLiveScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
-                    color = Color.Black.copy(alpha = 0.65f),
+                    color = Color.Black.copy(alpha = 0.75f),
                     shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, Color(0xFF333333)),
                     modifier = Modifier.padding(24.dp)
@@ -437,16 +396,16 @@ private fun TvLiveScreen(
             }
         }
 
-        // 3. Error Banner (if stream fails after trying all candidates)
+        // 3. Error Overlay (if stream fails)
         if (hasError && !isBuffering) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f)),
+                    .background(Color.Black.copy(alpha = 0.6f)),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
-                    color = Color(0xFF1E1E1E),
+                    color = Color(0xFF1A1A22),
                     shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.5.dp, PhoneRed),
                     modifier = Modifier.padding(32.dp)
@@ -469,7 +428,7 @@ private fun TvLiveScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Presiona [ARRIBA] o [ABAJO] para cambiar de canal, o [IZQUIERDA] para la lista",
+                            text = "Presiona [ARRIBA] o [ABAJO] para cambiar de canal, o [OK] para abrir la guía",
                             color = JetTextMuted,
                             fontSize = 14.sp,
                             textAlign = TextAlign.Center
@@ -479,9 +438,9 @@ private fun TvLiveScreen(
             }
         }
 
-        // 4. TV Broadcast Breaking News Channel Banner (Overlay inferior estilo emisión)
+        // 4. Modern Broadcast TV Channel OSD Banner (Pill flotante inferior)
         AnimatedVisibility(
-            visible = showChannelBanner && menuLevel == TvMenuLevel.CLOSED,
+            visible = showOsdBanner && !showQuickGuide,
             enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
             modifier = Modifier
@@ -489,309 +448,228 @@ private fun TvLiveScreen(
                 .padding(start = 36.dp, bottom = 28.dp)
         ) {
             val currentIdx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }
-            val chNumber = if (currentIdx >= 0) "${currentIdx + 1}" else "1"
+            val chNumber = if (currentIdx >= 0) String.format("%03d", currentIdx + 1) else "001"
             val categoryLabel = if (activeTvTab == LiveSubTab.FAVORITOS) {
                 "FAVORITOS"
             } else {
                 categories.find { it.categoryId == selectedCat }?.categoryName?.uppercase() ?: "TRANSMISIÓN EN VIVO HD"
             }
 
-            BreakingNewsTvBanner(
-                channelName = selectedChannel?.name ?: "CANAL EN VIVO",
+            ModernTvOsdBanner(
                 channelNumber = chNumber,
+                channelName = selectedChannel?.name ?: "CANAL EN VIVO",
                 categoryName = categoryLabel,
                 channelLogoUrl = selectedChannel?.streamIcon,
-                directionLabel = zapDirectionLabel,
-                totalChannels = displayChannels.size,
-                currentIndex = if (currentIdx >= 0) currentIdx + 1 else 1
+                directionLabel = zapDirectionLabel
             )
         }
 
-        // 5. Ventana lateral interactiva: Canales (1er nivel) y Categorías (2do nivel al presionar 2 veces [←])
+        // 5. MODERNA GUÍA RÁPIDA DE CANALES FLOTANTE (ESTILO OLED SMART TV)
         AnimatedVisibility(
-            visible = menuLevel != TvMenuLevel.CLOSED,
+            visible = showQuickGuide,
             enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
             exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(),
-            modifier = Modifier.fillMaxHeight().align(Alignment.CenterStart)
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 24.dp, top = 20.dp, bottom = 20.dp)
+                .width(400.dp)
+                .fillMaxHeight()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color(0xF80B0B0E),
-                                Color(0xF4121216),
-                                Color(0xE8141418),
-                                Color(0xB0101014),
-                                Color.Transparent
-                            )
-                        )
-                    )
-                    .padding(vertical = 18.dp, horizontal = 16.dp)
+            Surface(
+                color = Color(0xF40E1019),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.5.dp, Color(0xFF282C40)),
+                shadowElevation = 24.dp,
+                modifier = Modifier.fillMaxSize()
             ) {
-                // COLUMNA 1: CATEGORÍAS (Se expande al presionar 2 veces o presionar IZQUIERDA en la lista)
-                AnimatedVisibility(
-                    visible = menuLevel == TvMenuLevel.CATEGORIES,
-                    enter = expandHorizontally() + fadeIn(),
-                    exit = shrinkHorizontally() + fadeOut()
-                ) {
-                    Row {
-                        Column(
-                            modifier = Modifier
-                                .width(240.dp)
-                                .fillMaxHeight()
-                                .background(Color(0xFF16161C).copy(alpha = 0.95f), RoundedCornerShape(16.dp))
-                                .border(1.2.dp, Color(0xFF2C2C38), RoundedCornerShape(16.dp))
-                                .padding(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "CATEGORÍAS",
-                                    color = Color.White,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Black
-                                )
-                                Text(
-                                    text = "[→ Canales]",
-                                    color = JetOrangeBright,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            // Sub Tabs: Categorías / Favoritos
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        activeTvTab = LiveSubTab.CATEGORIA
-                                        lastInteractionTime = System.currentTimeMillis()
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (activeTvTab == LiveSubTab.CATEGORIA) JetOrange else Color(0xFF24242C),
-                                        contentColor = Color.White
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.weight(1f).height(34.dp)
-                                ) {
-                                    Text("Todas", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Button(
-                                    onClick = {
-                                        activeTvTab = LiveSubTab.FAVORITOS
-                                        lastInteractionTime = System.currentTimeMillis()
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (activeTvTab == LiveSubTab.FAVORITOS) JetOrange else Color(0xFF24242C),
-                                        contentColor = Color.White
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.weight(1f).height(34.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(13.dp))
-                                        Text("Favs", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            if (activeTvTab == LiveSubTab.CATEGORIA) {
-                                LazyColumn(
-                                    state = categoryListState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    item {
-                                        val isSelected = selectedCat == "ALL"
-                                        var isFocused by remember { mutableStateOf(false) }
-                                        val itemModifier = if (isSelected) Modifier.focusRequester(selectedCategoryFocusRequester) else Modifier
-                                        Surface(
-                                            onClick = {
-                                                viewModel.selectLiveCategory("ALL")
-                                                menuLevel = TvMenuLevel.CHANNELS
-                                                lastInteractionTime = System.currentTimeMillis()
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2E2E42) else Color.Transparent,
-                                            border = if (isFocused) BorderStroke(2.dp, Color(0xFFFF9800)) else null,
-                                            modifier = itemModifier
-                                                .fillMaxWidth()
-                                                .onFocusChanged { isFocused = it.isFocused }
-                                                .onKeyEvent { keyEvent ->
-                                                    if (keyEvent.type == KeyEventType.KeyDown) {
-                                                        lastInteractionTime = System.currentTimeMillis()
-                                                        when (keyEvent.nativeKeyEvent.keyCode) {
-                                                            AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
-                                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                            AndroidKeyEvent.KEYCODE_ENTER,
-                                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                                viewModel.selectLiveCategory("ALL")
-                                                                menuLevel = TvMenuLevel.CHANNELS
-                                                                true
-                                                            }
-                                                            else -> false
-                                                        }
-                                                    } else false
-                                                }
-                                        ) {
-                                            Text(
-                                                text = "TODOS LOS CANALES",
-                                                color = if (isSelected || isFocused) Color.White else JetTextMuted,
-                                                fontSize = 12.5.sp,
-                                                fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
-                                            )
-                                        }
-                                    }
-                                    itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
-                                        val isSelected = selectedCat == cat.categoryId
-                                        var isFocused by remember { mutableStateOf(false) }
-                                        val itemModifier = if (isSelected) Modifier.focusRequester(selectedCategoryFocusRequester) else Modifier
-                                        Surface(
-                                            onClick = {
-                                                viewModel.selectLiveCategory(cat.categoryId)
-                                                menuLevel = TvMenuLevel.CHANNELS
-                                                lastInteractionTime = System.currentTimeMillis()
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2E2E42) else Color.Transparent,
-                                            border = if (isFocused) BorderStroke(2.dp, Color(0xFFFF9800)) else null,
-                                            modifier = itemModifier
-                                                .fillMaxWidth()
-                                                .onFocusChanged { isFocused = it.isFocused }
-                                                .onKeyEvent { keyEvent ->
-                                                    if (keyEvent.type == KeyEventType.KeyDown) {
-                                                        lastInteractionTime = System.currentTimeMillis()
-                                                        when (keyEvent.nativeKeyEvent.keyCode) {
-                                                            AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
-                                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                            AndroidKeyEvent.KEYCODE_ENTER,
-                                                            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                                            AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                                viewModel.selectLiveCategory(cat.categoryId)
-                                                                menuLevel = TvMenuLevel.CHANNELS
-                                                                true
-                                                            }
-                                                            else -> false
-                                                        }
-                                                    } else false
-                                                }
-                                        ) {
-                                            Text(
-                                                text = cat.categoryName.uppercase(),
-                                                color = if (isSelected || isFocused) Color.White else JetTextMuted,
-                                                fontSize = 12.5.sp,
-                                                fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Canales marcados con estrella",
-                                        color = JetTextMuted,
-                                        fontSize = 12.sp,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-                    }
-                }
-
-                // COLUMNA 2: LISTA DE CANALES (Ventana Lateral Principal)
                 Column(
                     modifier = Modifier
-                        .width(360.dp)
-                        .fillMaxHeight()
-                        .background(Color(0xFF16161C).copy(alpha = 0.95f), RoundedCornerShape(16.dp))
-                        .border(1.2.dp, Color(0xFF2C2C38), RoundedCornerShape(16.dp))
-                        .padding(12.dp)
+                        .fillMaxSize()
+                        .padding(14.dp)
                 ) {
-                    val currentCatName = if (activeTvTab == LiveSubTab.FAVORITOS) {
-                        "FAVORITOS"
-                    } else {
-                        categories.find { it.categoryId == selectedCat }?.categoryName?.uppercase() ?: "TODOS LOS CANALES"
-                    }
-
-                    // Encabezado con Botón/Pill de Categorías y cantidad de canales
-                    Surface(
-                        onClick = {
-                            menuLevel = if (menuLevel == TvMenuLevel.CATEGORIES) TvMenuLevel.CHANNELS else TvMenuLevel.CATEGORIES
-                            lastInteractionTime = System.currentTimeMillis()
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF20202A),
-                        border = BorderStroke(1.dp, if (menuLevel == TvMenuLevel.CATEGORIES) JetOrange else Color(0xFF333344)),
+                    // Header de la Guía
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 10.dp)
+                            .padding(horizontal = 6.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.weight(1f)
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(JetOrange, RoundedCornerShape(6.dp)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = if (menuLevel == TvMenuLevel.CATEGORIES) JetOrange else Color(0xFF303040)
-                                ) {
-                                    Text(
-                                        text = "◄ CATEGORÍAS",
-                                        color = Color.White,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                    )
-                                }
-                                Text(
-                                    text = currentCatName,
-                                    color = Color.White,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                Icon(
+                                    imageVector = Icons.Default.Tv,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                             Text(
-                                text = "${displayChannels.size} ch",
+                                text = "GUÍA DE CANALES",
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFF1E2130)
+                        ) {
+                            Text(
+                                text = "${displayChannels.size} Canales",
                                 color = JetOrangeBright,
                                 fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }
 
+                    // Selector Horizontal de Categorías (Modern Chips)
+                    LazyColumn(
+                        state = rememberLazyListState(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                    ) {
+                        item {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                state = categoryListState,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                // Chip Favoritos
+                                item {
+                                    val isSelected = activeTvTab == LiveSubTab.FAVORITOS
+                                    var isFocused by remember { mutableStateOf(false) }
+                                    Surface(
+                                        onClick = {
+                                            activeTvTab = LiveSubTab.FAVORITOS
+                                            lastInteractionTime = System.currentTimeMillis()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2C324A) else Color(0xFF1A1C28),
+                                        border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else if (isSelected) BorderStroke(1.dp, JetOrangeBright) else null,
+                                        modifier = Modifier
+                                            .onFocusChanged { isFocused = it.isFocused }
+                                            .onKeyEvent { keyEvent ->
+                                                if (keyEvent.type == KeyEventType.KeyDown &&
+                                                    (keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+                                                     keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_ENTER)
+                                                ) {
+                                                    activeTvTab = LiveSubTab.FAVORITOS
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    true
+                                                } else false
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(13.dp))
+                                            Text(
+                                                text = "Favoritos",
+                                                color = Color.White,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Chip Todos
+                                item {
+                                    val isSelected = activeTvTab == LiveSubTab.CATEGORIA && selectedCat == "ALL"
+                                    var isFocused by remember { mutableStateOf(false) }
+                                    Surface(
+                                        onClick = {
+                                            activeTvTab = LiveSubTab.CATEGORIA
+                                            viewModel.selectLiveCategory("ALL")
+                                            lastInteractionTime = System.currentTimeMillis()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2C324A) else Color(0xFF1A1C28),
+                                        border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else if (isSelected) BorderStroke(1.dp, JetOrangeBright) else null,
+                                        modifier = Modifier
+                                            .onFocusChanged { isFocused = it.isFocused }
+                                            .onKeyEvent { keyEvent ->
+                                                if (keyEvent.type == KeyEventType.KeyDown &&
+                                                    (keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+                                                     keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_ENTER)
+                                                ) {
+                                                    activeTvTab = LiveSubTab.CATEGORIA
+                                                    viewModel.selectLiveCategory("ALL")
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    true
+                                                } else false
+                                            }
+                                    ) {
+                                        Text(
+                                            text = "Todos",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                                        )
+                                    }
+                                }
+
+                                // Categorías del Servidor
+                                itemsIndexed(categories, key = { index, cat -> "${cat.categoryId}_$index" }) { _, cat ->
+                                    val isSelected = activeTvTab == LiveSubTab.CATEGORIA && selectedCat == cat.categoryId
+                                    var isFocused by remember { mutableStateOf(false) }
+                                    Surface(
+                                        onClick = {
+                                            activeTvTab = LiveSubTab.CATEGORIA
+                                            viewModel.selectLiveCategory(cat.categoryId)
+                                            lastInteractionTime = System.currentTimeMillis()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSelected) JetOrange else if (isFocused) Color(0xFF2C324A) else Color(0xFF1A1C28),
+                                        border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFC107)) else if (isSelected) BorderStroke(1.dp, JetOrangeBright) else null,
+                                        modifier = Modifier
+                                            .onFocusChanged { isFocused = it.isFocused }
+                                            .onKeyEvent { keyEvent ->
+                                                if (keyEvent.type == KeyEventType.KeyDown &&
+                                                    (keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+                                                     keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_ENTER)
+                                                ) {
+                                                    activeTvTab = LiveSubTab.CATEGORIA
+                                                    viewModel.selectLiveCategory(cat.categoryId)
+                                                    lastInteractionTime = System.currentTimeMillis()
+                                                    true
+                                                } else false
+                                            }
+                                    ) {
+                                        Text(
+                                            text = cat.categoryName,
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Lista Vertical Moderna de Canales
                     if (loading && channels.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(color = JetOrange, modifier = Modifier.size(36.dp))
@@ -799,41 +677,33 @@ private fun TvLiveScreen(
                     } else if (displayChannels.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
-                                text = "No hay canales en esta categoría",
+                                text = if (activeTvTab == LiveSubTab.FAVORITOS) "Sin canales favoritos guardados" else "No hay canales en esta categoría",
                                 color = JetTextMuted,
-                                fontSize = 14.sp
+                                fontSize = 13.5.sp,
+                                textAlign = TextAlign.Center
                             )
                         }
                     } else {
                         LazyColumn(
                             state = channelListState,
                             modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            contentPadding = PaddingValues(vertical = 4.dp)
                         ) {
                             itemsIndexed(displayChannels, key = { index, ch -> "${ch.id}_$index" }) { index, channel ->
-                                val isSelected = selectedChannel?.id == channel.id
+                                val isCurrentPlaying = selectedChannel?.id == channel.id
                                 val isFav = favorites.any { it.kind == "live" && it.id == channel.id }
-                                val shouldAttachRequester = isSelected || (selectedChannel == null && index == 0)
-                                val itemFocusModifier = if (shouldAttachRequester) Modifier.focusRequester(selectedChannelFocusRequester) else Modifier
-                                ChannelListItemJetGo(
+
+                                ModernTvChannelItem(
                                     channel = channel,
                                     index = index + 1,
-                                    isSelected = isSelected,
+                                    isPlaying = isCurrentPlaying,
                                     isFav = isFav,
-                                    isTv = true,
-                                    onClick = {
+                                    onSelect = {
                                         selectedChannel = channel
-                                        menuLevel = TvMenuLevel.CLOSED
+                                        showQuickGuide = false
                                         zapDirectionLabel = null
-                                        showChannelBanner = true
-                                        lastInteractionTime = System.currentTimeMillis()
-                                        try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
-                                    },
-                                    onDoubleClick = {
-                                        selectedChannel = channel
-                                        menuLevel = TvMenuLevel.CLOSED
-                                        zapDirectionLabel = null
-                                        showChannelBanner = true
+                                        showOsdBanner = true
                                         lastInteractionTime = System.currentTimeMillis()
                                         try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
                                     },
@@ -841,35 +711,9 @@ private fun TvLiveScreen(
                                         viewModel.toggleFavorite("live", channel.id, channel.name, channel.streamIcon)
                                         lastInteractionTime = System.currentTimeMillis()
                                     },
-                                    modifier = itemFocusModifier.onKeyEvent { keyEvent ->
-                                        if (keyEvent.type == KeyEventType.KeyDown) {
-                                            lastInteractionTime = System.currentTimeMillis()
-                                            when (keyEvent.nativeKeyEvent.keyCode) {
-                                                AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                                                    // Al presionar izquierda en la lista de canales, abre Categorías
-                                                    menuLevel = TvMenuLevel.CATEGORIES
-                                                    true
-                                                }
-                                                AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                                    // Al presionar derecha en canales, cierra la ventana y vuelve al reproductor
-                                                    menuLevel = TvMenuLevel.CLOSED
-                                                    try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
-                                                    true
-                                                }
-                                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                                                AndroidKeyEvent.KEYCODE_ENTER,
-                                                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                                                AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                                    selectedChannel = channel
-                                                    menuLevel = TvMenuLevel.CLOSED
-                                                    zapDirectionLabel = null
-                                                    showChannelBanner = true
-                                                    try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
-                                                    true
-                                                }
-                                                else -> false
-                                            }
-                                        } else false
+                                    onDismissGuide = {
+                                        showQuickGuide = false
+                                        try { rootFocusRequester.requestFocus() } catch (_: Throwable) {}
                                     }
                                 )
                             }
@@ -880,6 +724,274 @@ private fun TvLiveScreen(
         }
     }
 }
+
+/**
+ * Item de canal moderno optimizado para control remoto en TV (D-Pad).
+ */
+@Composable
+private fun ModernTvChannelItem(
+    channel: LiveChannel,
+    index: Int,
+    isPlaying: Boolean,
+    isFav: Boolean,
+    onSelect: () -> Unit,
+    onFavToggle: () -> Unit,
+    onDismissGuide: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val formattedIndex = String.format("%03d", index)
+    var isFocused by remember { mutableStateOf(false) }
+
+    Surface(
+        onClick = onSelect,
+        shape = RoundedCornerShape(10.dp),
+        color = if (isFocused) Color(0xFF1E3A8A) else if (isPlaying) Color(0xFF1A1D2E) else Color(0xFF131520),
+        border = if (isFocused) {
+            BorderStroke(2.5.dp, Color(0xFFFFD700))
+        } else if (isPlaying) {
+            BorderStroke(1.5.dp, JetOrange)
+        } else {
+            BorderStroke(1.dp, Color(0xFF222638))
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .onFocusChanged { isFocused = it.isFocused }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_BUTTON_A -> {
+                            onSelect()
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            onDismissGuide()
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_PROG_YELLOW,
+                        AndroidKeyEvent.KEYCODE_BUTTON_Y -> {
+                            onFavToggle()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+            .testTag("tv_channel_${channel.id}")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Número de canal
+            Text(
+                text = formattedIndex,
+                color = if (isFocused) Color(0xFFFFD700) else if (isPlaying) JetOrangeBright else Color(0xFF8E95A5),
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.width(32.dp)
+            )
+
+            // Logo del canal
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF090A10)),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = channel.streamIcon?.takeIf { it.isNotBlank() } ?: CHANNEL_FALLBACK,
+                    contentDescription = channel.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+
+            // Nombre del canal
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = channel.name,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = if (isPlaying || isFocused) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isPlaying) {
+                    Text(
+                        text = "● Reproduciendo ahora",
+                        color = Color(0xFF4CAF50),
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Botón Favorito
+            IconButton(
+                onClick = onFavToggle,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFav) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = "Favorito",
+                    tint = if (isFav) Color(0xFFFFC107) else Color(0xFF6B7280),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Modern OSD Channel Banner para TV con diseño Glassmorphic.
+ */
+@Composable
+private fun ModernTvOsdBanner(
+    channelNumber: String,
+    channelName: String,
+    categoryName: String,
+    channelLogoUrl: String?,
+    directionLabel: String?,
+    modifier: Modifier = Modifier
+) {
+    val currentTime = remember {
+        val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+        sdf.format(java.util.Date())
+    }
+
+    Surface(
+        color = Color(0xF20F121C),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.5.dp, Color(0xFF2C324A)),
+        shadowElevation = 18.dp,
+        modifier = modifier
+            .widthIn(min = 340.dp, max = 560.dp)
+            .height(68.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Badge Número Canal
+            Box(
+                modifier = Modifier
+                    .background(
+                        Brush.linearGradient(listOf(Color(0xFFE50914), Color(0xFFDE5B17))),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = channelNumber,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+
+            // Logo Canal
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!channelLogoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = channelLogoUrl,
+                        contentDescription = channelName,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(36.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Tv,
+                        contentDescription = null,
+                        tint = JetOrange,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // Info Canal y Categoría
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = channelName,
+                    color = Color.White,
+                    fontSize = 15.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "$currentTime • $categoryName",
+                        color = Color(0xFFA0A5B5),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (!directionLabel.isNullOrBlank()) {
+                        Text(
+                            text = directionLabel,
+                            color = JetOrangeBright,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Badge LIVE
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = Color(0xFF1B5E20)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(Color(0xFF4CAF50), CircleShape)
+                    )
+                    Text(
+                        text = "EN VIVO",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
+        }
+    }
+}
+
 
 // =========================================================================
 // INTERFAZ PARA TELÉFONOS (MÓVIL / MINI REPRODUCTOR 16:9 AJUSTADO)
