@@ -130,12 +130,21 @@ private fun TvLiveScreen(
     val activeCategoryFocusRequester = remember { FocusRequester() }
     val channelListState = rememberLazyListState()
     val categoryListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     val favoriteChannels = remember(favorites, channels) {
         val favIds = favorites.filter { it.kind == "live" }.map { it.id }.toSet()
         channels.filter { favIds.contains(it.id) }
     }
     val displayChannels = if (activeTvTab == LiveSubTab.FAVORITOS) favoriteChannels else channels
+
+    val targetChannelIndex = remember(displayChannels, selectedChannel) {
+        if (displayChannels.isEmpty()) 0
+        else {
+            val idx = displayChannels.indexOfFirst { it.id == selectedChannel?.id }
+            if (idx >= 0) idx else 0
+        }
+    }
 
     // Dedicated VLC player for TV Live
     val playerManager = remember { PlayerManager(context) }
@@ -252,6 +261,13 @@ private fun TvLiveScreen(
                 rootFocusRequester.requestFocus()
             } catch (_: Throwable) {}
         }
+    }
+
+    // Reset scroll to top when category changes
+    LaunchedEffect(selectedCat, activeTvTab) {
+        try {
+            channelListState.scrollToItem(0)
+        } catch (_: Throwable) {}
     }
 
     // Scroll to currently playing channel when opening quick guide and transfer focus
@@ -545,6 +561,10 @@ private fun TvLiveScreen(
                                 onClick = {
                                     activeTvTab = LiveSubTab.FAVORITOS
                                     lastInteractionTime = System.currentTimeMillis()
+                                    coroutineScope.launch {
+                                        delay(100)
+                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                    }
                                 },
                                 shape = RoundedCornerShape(8.dp),
                                 color = if (isFocused) Color(0xFF2C324A) else if (isSelected) JetOrange else Color(0xFF1A1C28),
@@ -566,10 +586,17 @@ private fun TvLiveScreen(
                                                 AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
                                                 AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                     activeTvTab = LiveSubTab.FAVORITOS
+                                                    coroutineScope.launch {
+                                                        delay(100)
+                                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    }
                                                     true
                                                 }
                                                 AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
-                                                    try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    coroutineScope.launch {
+                                                        delay(50)
+                                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    }
                                                     true
                                                 }
                                                 AndroidKeyEvent.KEYCODE_BACK,
@@ -609,6 +636,10 @@ private fun TvLiveScreen(
                                     activeTvTab = LiveSubTab.CATEGORIA
                                     viewModel.selectLiveCategory("ALL")
                                     lastInteractionTime = System.currentTimeMillis()
+                                    coroutineScope.launch {
+                                        delay(100)
+                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                    }
                                 },
                                 shape = RoundedCornerShape(8.dp),
                                 color = if (isFocused) Color(0xFF2C324A) else if (isSelected) JetOrange else Color(0xFF1A1C28),
@@ -631,10 +662,17 @@ private fun TvLiveScreen(
                                                 AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                     activeTvTab = LiveSubTab.CATEGORIA
                                                     viewModel.selectLiveCategory("ALL")
+                                                    coroutineScope.launch {
+                                                        delay(100)
+                                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    }
                                                     true
                                                 }
                                                 AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
-                                                    try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    coroutineScope.launch {
+                                                        delay(50)
+                                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    }
                                                     true
                                                 }
                                                 AndroidKeyEvent.KEYCODE_BACK,
@@ -668,6 +706,10 @@ private fun TvLiveScreen(
                                     activeTvTab = LiveSubTab.CATEGORIA
                                     viewModel.selectLiveCategory(cat.categoryId)
                                     lastInteractionTime = System.currentTimeMillis()
+                                    coroutineScope.launch {
+                                        delay(100)
+                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                    }
                                 },
                                 shape = RoundedCornerShape(8.dp),
                                 color = if (isFocused) Color(0xFF2C324A) else if (isSelected) JetOrange else Color(0xFF1A1C28),
@@ -690,10 +732,17 @@ private fun TvLiveScreen(
                                                 AndroidKeyEvent.KEYCODE_BUTTON_A -> {
                                                     activeTvTab = LiveSubTab.CATEGORIA
                                                     viewModel.selectLiveCategory(cat.categoryId)
+                                                    coroutineScope.launch {
+                                                        delay(100)
+                                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    }
                                                     true
                                                 }
                                                 AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
-                                                    try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    coroutineScope.launch {
+                                                        delay(50)
+                                                        try { activeChannelFocusRequester.requestFocus() } catch (_: Throwable) {}
+                                                    }
                                                     true
                                                 }
                                                 AndroidKeyEvent.KEYCODE_BACK,
@@ -746,7 +795,7 @@ private fun TvLiveScreen(
                             itemsIndexed(displayChannels, key = { index, ch -> "${ch.id}_$index" }) { index, channel ->
                                 val isCurrentPlaying = selectedChannel?.id == channel.id
                                 val isFav = favorites.any { it.kind == "live" && it.id == channel.id }
-                                val isRequesterTarget = isCurrentPlaying || (selectedChannel == null && index == 0)
+                                val isRequesterTarget = (index == targetChannelIndex)
 
                                 ModernTvChannelItem(
                                     channel = channel,
