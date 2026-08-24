@@ -591,10 +591,23 @@ object XtreamApi {
         val u = AppStorage.getUsername()
         val p = AppStorage.getPassword()
         if (u.isNotBlank() && p.isNotBlank() && cid.isNotBlank()) {
-            list.add("$baseUrl/live/$u/$p/$cid.ts")
-            list.add("$baseUrl/live/$u/$p/$cid.m3u8")
-            list.add("$baseUrl/$u/$p/$cid")
-            list.add("$baseUrl/live/$u/$p/$cid")
+            val base = baseUrl
+            val httpBase = if (base.startsWith("https://", ignoreCase = true)) {
+                "http://" + base.substring(8)
+            } else null
+
+            // TS format (default and most reliable IPTV container)
+            list.add("$base/live/$u/$p/$cid.ts")
+            httpBase?.let { list.add("$it/live/$u/$p/$cid.ts") }
+
+            // M3U8 HLS format
+            list.add("$base/live/$u/$p/$cid.m3u8")
+            httpBase?.let { list.add("$it/live/$u/$p/$cid.m3u8") }
+
+            // Direct stream without extension
+            list.add("$base/$u/$p/$cid")
+            list.add("$base/live/$u/$p/$cid")
+            httpBase?.let { list.add("$it/$u/$p/$cid") }
         }
         return list.distinct()
     }
@@ -616,11 +629,26 @@ object XtreamApi {
         val p = AppStorage.getPassword()
         if (u.isBlank() || p.isBlank() || sid.isBlank()) return emptyList()
         val ext = extension.ifBlank { "mp4" }
+        val base = baseUrl
+        val httpBase = if (base.startsWith("https://", ignoreCase = true)) {
+            "http://" + base.substring(8)
+        } else null
+
         val list = mutableListOf<String>()
-        list.add("$baseUrl/movie/$u/$p/$sid.$ext")
-        if (ext != "mp4") list.add("$baseUrl/movie/$u/$p/$sid.mp4")
-        if (ext != "mkv") list.add("$baseUrl/movie/$u/$p/$sid.mkv")
-        if (ext != "ts") list.add("$baseUrl/movie/$u/$p/$sid.ts")
+        list.add("$base/movie/$u/$p/$sid.$ext")
+        httpBase?.let { list.add("$it/movie/$u/$p/$sid.$ext") }
+        if (ext != "mp4") {
+            list.add("$base/movie/$u/$p/$sid.mp4")
+            httpBase?.let { list.add("$it/movie/$u/$p/$sid.mp4") }
+        }
+        if (ext != "mkv") {
+            list.add("$base/movie/$u/$p/$sid.mkv")
+            httpBase?.let { list.add("$it/movie/$u/$p/$sid.mkv") }
+        }
+        if (ext != "ts") {
+            list.add("$base/movie/$u/$p/$sid.ts")
+            httpBase?.let { list.add("$it/movie/$u/$p/$sid.ts") }
+        }
         return list.distinct()
     }
 
@@ -641,10 +669,22 @@ object XtreamApi {
         val p = AppStorage.getPassword()
         if (u.isBlank() || p.isBlank() || eid.isBlank()) return emptyList()
         val ext = extension.ifBlank { "mp4" }
+        val base = baseUrl
+        val httpBase = if (base.startsWith("https://", ignoreCase = true)) {
+            "http://" + base.substring(8)
+        } else null
+
         val list = mutableListOf<String>()
-        list.add("$baseUrl/series/$u/$p/$eid.$ext")
-        if (ext != "mp4") list.add("$baseUrl/series/$u/$p/$eid.mp4")
-        if (ext != "mkv") list.add("$baseUrl/series/$u/$p/$eid.mkv")
+        list.add("$base/series/$u/$p/$eid.$ext")
+        httpBase?.let { list.add("$it/series/$u/$p/$eid.$ext") }
+        if (ext != "mp4") {
+            list.add("$base/series/$u/$p/$eid.mp4")
+            httpBase?.let { list.add("$it/series/$u/$p/$eid.mp4") }
+        }
+        if (ext != "mkv") {
+            list.add("$base/series/$u/$p/$eid.mkv")
+            httpBase?.let { list.add("$it/series/$u/$p/$eid.mkv") }
+        }
         return list.distinct()
     }
 }

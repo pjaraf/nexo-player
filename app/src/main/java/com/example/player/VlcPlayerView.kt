@@ -30,6 +30,9 @@ fun VlcPlayerView(
             layout.keepScreenOn = true
             playerManager.attachViews(layout, enableSubtitles, useTextureView)
         },
+        onRelease = {
+            playerManager.detachViews()
+        },
         modifier = modifier
     )
 }

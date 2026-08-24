@@ -12,26 +12,22 @@ object VlcHelper {
     fun getLibVLC(context: Context): LibVLC {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: run {
-                val numCores = Runtime.getRuntime().availableProcessors().coerceIn(2, 8)
                 val options = ArrayList<String>().apply {
                     // Global caching buffers optimized for high stability and smooth decoding
-                    add("--network-caching=2500")
-                    add("--live-caching=2000")
-                    add("--file-caching=3000")
-                    add("--sout-mux-caching=2000")
+                    add("--network-caching=3000")
+                    add("--live-caching=2500")
+                    add("--file-caching=3500")
+                    add("--sout-mux-caching=2500")
                     add("--http-reconnect")
                     add("--http-continuous")
                     add("--rtsp-tcp")
-                    add("--clock-jitter=0")
-                    add("--clock-synchro=0")
-                    add("--avcodec-threads=$numCores")
+                    add("--no-ssl-verify")
+                    add("--gnutls-verify-trust=0")
                     add("--audio-time-stretch")
                     add("--no-sub-autodetect-file")
                     add("--no-video-title-show")
                     add("--no-stats")
                     add("--no-osd")
-                    add("--drop-late-frames")
-                    add("--skip-frames")
                     add("--http-user-agent=Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.5.4")
                 }
                 LibVLC(context.applicationContext, options).also {
@@ -49,19 +45,20 @@ object VlcHelper {
         }
         val isLiveStream = url.contains("/live/") || url.endsWith(".m3u8") || url.contains(".m3u8?") || url.endsWith(".ts") || url.contains(".ts?")
         return Media(libVLC, cleanUri).apply {
-            // Enable HW decoding with software fallback so all IPTV & VOD codecs play smoothly without lag
+            // Enable HW decoding with software fallback so all IPTV & VOD codecs play smoothly without lag or crash
             setHWDecoderEnabled(true, false)
+            addOption(":no-ssl-verify")
+            addOption(":http-no-ssl-verify")
             if (isLiveStream) {
-                // Stable Live TV buffer (2.0s buffer prevents stuttering and handles network jitter seamlessly)
-                addOption(":network-caching=2000")
-                addOption(":live-caching=2000")
+                // Stable Live TV buffer (2.5s buffer prevents stuttering and handles network jitter seamlessly)
+                addOption(":network-caching=2500")
+                addOption(":live-caching=2500")
                 addOption(":http-reconnect")
                 addOption(":http-continuous")
-                addOption(":clock-jitter=0")
             } else {
-                // Generous buffer for VOD (Movies & Series): 4.5s buffer prevents freezing / stuttering on high bitrate movies
-                addOption(":network-caching=4500")
-                addOption(":file-caching=4500")
+                // Generous buffer for VOD (Movies & Series): 4.0s buffer prevents freezing / stuttering on high bitrate movies
+                addOption(":network-caching=4000")
+                addOption(":file-caching=4000")
                 addOption(":http-reconnect")
                 addOption(":http-continuous")
             }

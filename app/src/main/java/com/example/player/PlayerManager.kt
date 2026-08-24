@@ -208,18 +208,13 @@ class PlayerManager(val context: Context) {
                 Log.w("PlayerManager", "Warning stopping prior playback: ${e.message}")
             }
 
-            // Safely detach old media reference from player
-            try {
-                mediaPlayer.media = null
-            } catch (_: Throwable) {}
-
-            // Release previous media reference
+            // Release previous media reference safely
             try {
                 currentMedia?.release()
-                currentMedia = null
             } catch (e: Throwable) {
                 Log.w("PlayerManager", "Warning releasing old media: ${e.message}")
             }
+            currentMedia = null
 
             val newMedia = VlcHelper.createMedia(libVLC, url)
             currentMedia = newMedia
