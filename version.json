@@ -1,8 +1,8 @@
 {
-    "versionCode": 126,
-    "versionName": "1.2.15",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.15/app-release.apk",
-    "changelog": "Versión 1.2.15: Solución a cierres inesperados en servidores HTTPS/SSL (Nexo Fusion), compatibilidad total de reproducción con certificados seguros y prevención de errores nativos en TV.",
+    "versionCode": 127,
+    "versionName": "1.2.16",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.16/app-release.apk",
+    "changelog": "Versión 1.2.16: Corrección definitiva de cierres inesperados al abrir TV, Películas y Series en Smart TV y dispositivos Android. Compatibilidad universal para todas las arquitecturas.",
     "isMandatory": true
 }
 

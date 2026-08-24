@@ -11,7 +11,7 @@ object VlcHelper {
 
     fun getLibVLC(context: Context): LibVLC {
         return libVLCInstance ?: synchronized(this) {
-            libVLCInstance ?: run {
+            libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
                     // Global caching buffers optimized for high stability and smooth decoding
                     add("--network-caching=3000")
@@ -21,8 +21,6 @@ object VlcHelper {
                     add("--http-reconnect")
                     add("--http-continuous")
                     add("--rtsp-tcp")
-                    add("--no-ssl-verify")
-                    add("--gnutls-verify-trust=0")
                     add("--audio-time-stretch")
                     add("--no-sub-autodetect-file")
                     add("--no-video-title-show")
@@ -30,9 +28,17 @@ object VlcHelper {
                     add("--no-osd")
                     add("--http-user-agent=Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.5.4")
                 }
-                LibVLC(context.applicationContext, options).also {
-                    libVLCInstance = it
+                LibVLC(context.applicationContext, options)
+            } catch (e: Throwable) {
+                Log.e("VlcHelper", "Failed to create LibVLC with custom options, attempting default fallback", e)
+                try {
+                    LibVLC(context.applicationContext, ArrayList<String>())
+                } catch (e2: Throwable) {
+                    Log.e("VlcHelper", "Critical: Failed to create LibVLC with empty options, using basic constructor", e2)
+                    LibVLC(context.applicationContext)
                 }
+            }.also {
+                libVLCInstance = it
             }
         }
     }
