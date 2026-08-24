@@ -152,95 +152,8 @@ fun HomeScreen(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-                // --- 1. Background Layer: Use CinematicBackground (same as Login screen) if no item selected or when empty ---
-                val currentBackdrop = selectedMedia?.backdropUrl?.takeIf { it.isNotBlank() }
-
-                if (currentBackdrop != null) {
-                    Crossfade(
-                        targetState = currentBackdrop,
-                        animationSpec = tween(durationMillis = 400),
-                        label = "backdrop_crossfade"
-                    ) { imageUrl ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(if (isWideScreen) 620.dp else 440.dp)
-                        ) {
-                            // 1. Ambient Background Glow Layer (Subtle darkened ambient backdrop)
-                            AsyncImage(
-                                model = imageUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .alpha(0.35f)
-                            )
-
-                            // 2. Full Uncropped Crisp Poster Art (Aligned beautifully in 16:9 aspect on TV)
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = if (isWideScreen) Alignment.TopEnd else Alignment.TopCenter
-                            ) {
-                                AsyncImage(
-                                    model = imageUrl,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Fit,
-                                    alignment = if (isWideScreen) Alignment.TopEnd else Alignment.TopCenter,
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .then(
-                                            if (isWideScreen) {
-                                                Modifier
-                                                    .fillMaxWidth(0.55f)
-                                                    .padding(end = 48.dp, top = 20.dp, bottom = 48.dp)
-                                                    .clip(RoundedCornerShape(12.dp))
-                                            } else {
-                                                Modifier.fillMaxWidth()
-                                            }
-                                        )
-                                )
-                            }
-
-                            // 3. Left-to-Right vignette gradient shadow (Ensures title/texts are 100% readable)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(
-                                                NexusBackground,
-                                                NexusBackground.copy(alpha = 0.95f),
-                                                NexusBackground.copy(alpha = 0.65f),
-                                                Color.Black.copy(alpha = 0.20f),
-                                                Color.Transparent
-                                            ),
-                                            startX = 0f,
-                                            endX = if (isWideScreen) 1100f else 500f
-                                        )
-                                    )
-                            )
-
-                            // 4. Vertical dark gradient (Fades smoothly into bottom rows)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Black.copy(alpha = 0.75f),
-                                                Color.Transparent,
-                                                NexusBackground.copy(alpha = 0.85f),
-                                                NexusBackground
-                                            )
-                                        )
-                                    )
-                            )
-                        }
-                    }
-                } else {
-                    // Exact same cinematic poster wall background as Login screen
-                    CinematicBackground()
-                }
+                // --- 1. Background Layer: Use CinematicBackground (same as Login screen) ---
+                CinematicBackground()
 
                 // --- 2. Main Scrollable Content ---
                 Column(
@@ -259,14 +172,130 @@ fun HomeScreen(
                     // --- Dynamic Hero Details for TV & Mobile (Shows current selected title or default greeting) ---
                     val media = selectedMedia
                     if (media != null) {
+                        if (isWideScreen || isTv) {
+                            // TV side-by-side Hero: Info on Left, Complete Full Poster on Right
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp)
+                                    .padding(top = 8.dp, bottom = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(end = 36.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // Badge (N SERIES / N PELICULA)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "N",
+                                            style = MaterialTheme.typography.titleLarge.copy(
+                                                fontWeight = FontWeight.Black,
+                                                color = Color(0xFFE50914),
+                                                fontFamily = FontFamily.SansSerif,
+                                                fontSize = 22.sp
+                                            )
+                                        )
+                                        Text(
+                                            text = if (media.kind == "series") "SERIE" else "PELÍCULA",
+                                            style = MaterialTheme.typography.labelLarge.copy(
+                                                fontWeight = FontWeight.Black,
+                                                letterSpacing = 3.sp,
+                                                color = Color.White.copy(alpha = 0.9f),
+                                                fontSize = 12.sp
+                                            )
+                                        )
+
+                                        if (!media.rating.isNullOrBlank() && media.rating != "0") {
+                                            Surface(
+                                                color = Color.Black.copy(alpha = 0.65f),
+                                                shape = RoundedCornerShape(4.dp),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                                modifier = Modifier.padding(start = 6.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(13.dp))
+                                                    Text(text = media.rating.take(3), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Large Headline Title
+                                    Text(
+                                        text = media.title,
+                                        style = MaterialTheme.typography.headlineLarge.copy(
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 32.sp,
+                                            color = Color.White,
+                                            letterSpacing = 0.5.sp,
+                                            lineHeight = 38.sp
+                                        ),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+
+                                    // Plot Description Synopsis
+                                    if (!media.description.isNullOrBlank()) {
+                                        Text(
+                                            text = media.description,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                color = Color.White.copy(alpha = 0.88f),
+                                                fontSize = 14.sp,
+                                                lineHeight = 20.sp
+                                            ),
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.widthIn(max = 680.dp)
+                                        )
+                                    }
+                                }
+
+                                // Right side: Full complete vertical cover of the focused movie/series
+                                val posterUrl = media.backdropUrl?.takeIf { it.isNotBlank() } ?: POSTER_FALLBACK
+                                Crossfade(
+                                    targetState = posterUrl,
+                                    animationSpec = tween(durationMillis = 300),
+                                    label = "tv_hero_poster_crossfade"
+                                ) { targetPosterUrl ->
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Color(0xFF14141E),
+                                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.White.copy(alpha = 0.25f)),
+                                        shadowElevation = 10.dp,
+                                        modifier = Modifier
+                                            .width(160.dp)
+                                            .height(235.dp)
+                                            .padding(end = 16.dp)
+                                    ) {
+                                        AsyncImage(
+                                            model = targetPosterUrl,
+                                            contentDescription = media.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            // Mobile layout: Single column
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 20.dp)
-                                    .padding(top = if (isWideScreen) 32.dp else 12.dp, bottom = 16.dp),
+                                    .padding(top = 12.dp, bottom = 16.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                // Badge (N SERIES / N PELICULA)
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -309,35 +338,33 @@ fun HomeScreen(
                                     }
                                 }
 
-                                // Large Headline Title
                                 Text(
                                     text = media.title,
                                     style = MaterialTheme.typography.headlineLarge.copy(
                                         fontWeight = FontWeight.Black,
-                                        fontSize = if (isWideScreen) 38.sp else 26.sp,
+                                        fontSize = 26.sp,
                                         color = Color.White,
                                         letterSpacing = 0.5.sp,
-                                        lineHeight = if (isWideScreen) 44.sp else 32.sp
+                                        lineHeight = 32.sp
                                     ),
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
 
-                                // Plot Description Synopsis
                                 if (!media.description.isNullOrBlank()) {
                                     Text(
                                         text = media.description,
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             color = Color.White.copy(alpha = 0.88f),
-                                            fontSize = if (isWideScreen) 14.sp else 12.5.sp,
+                                            fontSize = 12.5.sp,
                                             lineHeight = 18.sp
                                         ),
-                                        maxLines = if (isWideScreen) 3 else 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.widthIn(max = 680.dp)
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
+                        }
                     } else {
                         // Empty/Welcome Hero when there is no content loaded
                         Column(

@@ -1,7 +1,7 @@
 {
-    "versionCode": 122,
-    "versionName": "1.2.11",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.11/app-debug.apk",
-    "changelog": "Versión 1.2.11: Reducción del tamaño del APK a ~25MB (optimización de binarios ARM), nueva interfaz de Series con mini reproductor y mejoras de estabilidad.",
+    "versionCode": 123,
+    "versionName": "1.2.12",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.12/app-debug.apk",
+    "changelog": "Versión 1.2.12: Nuevo fondo cinemático en pantalla principal para TV y carátula completa del contenido enfocado.",
     "isMandatory": true
 }
