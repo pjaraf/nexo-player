@@ -219,7 +219,6 @@ private fun TvLiveScreen(
             }
             candidates = list
 
-            delay(120)
             if (list.isNotEmpty()) {
                 try {
                     playerManager.play(list[0], 0L)
@@ -373,40 +372,7 @@ private fun TvLiveScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // 2. Buffering Indicator
-        if (isBuffering) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    color = Color.Black.copy(alpha = 0.75f),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color(0xFF333333)),
-                    modifier = Modifier.padding(24.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            color = JetOrange,
-                            strokeWidth = 3.5.dp,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Text(
-                            text = "Cargando señal en vivo...",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-        }
-
-        // 3. Error Overlay (if stream fails)
+        // 2. Error Overlay (only shown if stream completely fails to load)
         if (hasError && !isBuffering) {
             Box(
                 modifier = Modifier
@@ -448,7 +414,7 @@ private fun TvLiveScreen(
             }
         }
 
-        // 4. Modern Broadcast TV Channel OSD Banner (Pill flotante inferior)
+        // 3. Modern Broadcast TV Channel OSD Banner (Pill flotante inferior)
         AnimatedVisibility(
             visible = showOsdBanner && !showQuickGuide,
             enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
@@ -470,7 +436,8 @@ private fun TvLiveScreen(
                 channelName = selectedChannel?.name ?: "CANAL EN VIVO",
                 categoryName = categoryLabel,
                 channelLogoUrl = selectedChannel?.streamIcon,
-                directionLabel = zapDirectionLabel
+                directionLabel = zapDirectionLabel,
+                isBuffering = isBuffering
             )
         }
 
@@ -994,6 +961,7 @@ private fun ModernTvOsdBanner(
     categoryName: String,
     channelLogoUrl: String?,
     directionLabel: String?,
+    isBuffering: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val currentTime = remember {
@@ -1096,10 +1064,10 @@ private fun ModernTvOsdBanner(
                 }
             }
 
-            // Badge LIVE
+            // Badge LIVE / Conectando
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = Color(0xFF1B5E20)
+                color = if (isBuffering) Color(0xFF422E10) else Color(0xFF1B5E20)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
@@ -1109,10 +1077,10 @@ private fun ModernTvOsdBanner(
                     Box(
                         modifier = Modifier
                             .size(6.dp)
-                            .background(Color(0xFF4CAF50), CircleShape)
+                            .background(if (isBuffering) JetOrange else Color(0xFF4CAF50), CircleShape)
                     )
                     Text(
-                        text = "EN VIVO",
+                        text = if (isBuffering) "CONECTANDO" else "EN VIVO",
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black
@@ -1206,8 +1174,6 @@ private fun PhoneLiveScreen(
                 if (single.isNotBlank()) list.add(single)
             }
             channelCandidates = list
-
-            delay(180)
 
             if (list.isNotEmpty()) {
                 try {

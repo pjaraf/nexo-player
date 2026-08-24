@@ -1,7 +1,7 @@
 {
-    "versionCode": 119,
-    "versionName": "1.2.08",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.08/app-debug.apk",
-    "changelog": "Versión 1.2.08: Solución al foco D-Pad en las categorías y canales de TV. Al pulsar OK o ABAJO en cualquier categoría, el foco del control remoto baja de forma instantánea a los canales de dicha categoría.",
+    "versionCode": 120,
+    "versionName": "1.2.09",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.09/app-debug.apk",
+    "changelog": "Versión 1.2.09: Eliminación del cuadro de 'Cargando señal en vivo' en el centro de la pantalla, cambio de canales ultrarrápido sin retrasos y optimización de LibVLC a baja latencia sin microcortes ni congelamientos.",
     "isMandatory": true
 }
