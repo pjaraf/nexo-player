@@ -1,7 +1,8 @@
 {
-    "versionCode": 123,
-    "versionName": "1.2.12",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.12/app-debug.apk",
-    "changelog": "Versión 1.2.12: Nuevo fondo cinemático en pantalla principal para TV y carátula completa del contenido enfocado.",
+    "versionCode": 124,
+    "versionName": "1.2.13",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.13/app-debug.apk",
+    "changelog": "Versión 1.2.13: Corrección integral de reproducción en TV en vivo y películas (adelantar/retroceder sin cierres y carga instantánea).",
     "isMandatory": true
 }
+

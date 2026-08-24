@@ -243,6 +243,21 @@ private fun TvLiveScreen(
         }
     }
 
+    // Fast watchdog for Live TV: if candidate hangs or takes > 2.5s, switch to next candidate
+    LaunchedEffect(selectedChannel, candidateIndex, candidates) {
+        if (candidates.size > 1 && candidateIndex + 1 < candidates.size) {
+            delay(2500)
+            if (isBuffering && !playerManager.mediaPlayer.isPlaying) {
+                Log.w("TvLiveScreen", "Live channel watchdog triggered for candidate $candidateIndex, trying next...")
+                candidateIndex++
+                try {
+                    isBuffering = true
+                    playerManager.play(candidates[candidateIndex], 0L)
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
     // Auto-hide channel OSD banner after 4 seconds
     LaunchedEffect(showOsdBanner, selectedChannel) {
         if (showOsdBanner) {
@@ -1197,6 +1212,20 @@ private fun PhoneLiveScreen(
             } else {
                 playerHasError = true
                 isPlayerBuffering = false
+            }
+        }
+    }
+
+    // Fast watchdog for mobile player
+    LaunchedEffect(selectedChannel, candidateIndex, channelCandidates) {
+        if (channelCandidates.size > 1 && candidateIndex + 1 < channelCandidates.size) {
+            delay(2500)
+            if (isPlayerBuffering && !playerManager.mediaPlayer.isPlaying) {
+                candidateIndex++
+                try {
+                    isPlayerBuffering = true
+                    playerManager.play(channelCandidates[candidateIndex], 0L)
+                } catch (_: Throwable) {}
             }
         }
     }

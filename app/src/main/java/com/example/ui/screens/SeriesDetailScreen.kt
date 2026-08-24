@@ -193,7 +193,15 @@ fun SeriesDetailTvScreen(
 
     LaunchedEffect(playerManager, currentEpisodes, selectedEpisode) {
         playerManager.onEndReached = {
-            playNextEpisode()
+            val curTime = playerManager.time
+            val dur = playerManager.length
+            val isTrueEnd = dur > 0L && curTime >= (dur - 6000L)
+            if (isTrueEnd) {
+                playNextEpisode()
+            } else {
+                Log.d("SeriesDetailTv", "Ignored premature EndReached in SeriesDetail (pos=$curTime, dur=$dur)")
+                try { playerManager.resume() } catch (_: Throwable) {}
+            }
         }
     }
 

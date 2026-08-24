@@ -169,11 +169,23 @@ fun PlayerScreen(
         }
     }
 
-    // Multi-candidate stream URLs for Live TV (tries .ts, .m3u8, raw /live/, raw)
-    val candidates = remember(currentChannelId, initialStreamUrl, isLive) {
+    // Multi-candidate stream URLs for Live TV & VOD (tries fallback formats & extensions)
+    val candidates = remember(currentChannelId, initialStreamUrl, isLive, contentId, kind) {
         if (isLive && !currentChannelId.isNullOrBlank()) {
             val list = XtreamApi.getLiveStreamCandidates(currentChannelId!!)
             if (list.isNotEmpty()) list else listOf(initialStreamUrl)
+        } else if (!isLive && !contentId.isNullOrBlank()) {
+            val list = if (kind == "series") {
+                XtreamApi.getSeriesStreamCandidates(contentId!!)
+            } else {
+                XtreamApi.getVodStreamCandidates(contentId!!)
+            }
+            val combined = mutableListOf<String>()
+            if (initialStreamUrl.isNotBlank()) combined.add(initialStreamUrl)
+            for (item in list) {
+                if (!combined.contains(item)) combined.add(item)
+            }
+            if (combined.isNotEmpty()) combined else listOf(initialStreamUrl)
         } else {
             listOf(initialStreamUrl)
         }
@@ -411,16 +423,24 @@ fun PlayerScreen(
             refreshTracks()
         }
         playerManager.onEndReached = {
-            isLoading = false
-            if (kind == "movie") {
-                onClose()
-            } else if (kind == "series") {
-                playNextEpisode()
+            val curTime = playerManager.time
+            val dur = playerManager.length
+            val isTrueEnd = dur > 0L && curTime >= (dur - 6000L)
+            if (isTrueEnd) {
+                isLoading = false
+                if (kind == "movie") {
+                    onClose()
+                } else if (kind == "series") {
+                    playNextEpisode()
+                }
+            } else {
+                Log.d("PlayerScreen", "Ignored premature EndReached in PlayerScreen (pos=$curTime, dur=$dur)")
+                try { playerManager.resume() } catch (_: Throwable) {}
             }
         }
         playerManager.onError = { error ->
             Log.w("PlayerScreen", "VLC Player error on $streamUrl: $error")
-            if (isLive && candidateIndex + 1 < candidates.size) {
+            if (candidateIndex + 1 < candidates.size) {
                 candidateIndex++
                 streamUrl = candidates[candidateIndex]
             } else {
@@ -436,7 +456,7 @@ fun PlayerScreen(
         errorMsg = null
         if (isLive) {
             // Give smooth debounce on live channel zap
-            delay(200)
+            delay(150)
         }
         try {
             val startPos = if (candidateIndex == 0) resumeMs else 0L
@@ -444,7 +464,7 @@ fun PlayerScreen(
             applyResizeMode(currentResizeMode)
         } catch (e: Exception) {
             Log.e("PlayerScreen", "Error starting VLC stream $streamUrl", e)
-            if (isLive && candidateIndex + 1 < candidates.size) {
+            if (candidateIndex + 1 < candidates.size) {
                 candidateIndex++
                 streamUrl = candidates[candidateIndex]
             } else {
@@ -454,10 +474,10 @@ fun PlayerScreen(
         }
     }
 
-    // Watchdog fallback for live streams stuck in buffering for > 6 seconds
+    // Watchdog fallback for live streams stuck in buffering for > 2.5 seconds
     LaunchedEffect(streamUrl, isLive) {
         if (isLive && candidates.size > 1) {
-            delay(6000)
+            delay(2500)
             if (isLoading && !playerManager.mediaPlayer.isPlaying) {
                 Log.w("PlayerScreen", "Watchdog triggered for $streamUrl, trying next candidate...")
                 if (candidateIndex + 1 < candidates.size) {

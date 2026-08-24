@@ -144,6 +144,9 @@ private fun MovieDetailTvScreen(
     }
 
     var isPreviewLoading by remember { mutableStateOf(false) }
+    var previewError by remember { mutableStateOf(false) }
+    var movieCandidates by remember(movieId) { mutableStateOf<List<String>>(emptyList()) }
+    var movieCandidateIndex by remember(movieId) { mutableIntStateOf(0) }
 
     val playButtonFocusRequester = remember { FocusRequester() }
     var hasRequestedInitialFocus by remember { mutableStateOf(false) }
@@ -159,7 +162,6 @@ private fun MovieDetailTvScreen(
             }
         }
     }
-    var previewError by remember { mutableStateOf(false) }
 
     // Audio & Subtitle tracks
     var availableAudioTracks by remember { mutableStateOf<List<TvMediaTrackOption>>(emptyList()) }
@@ -232,9 +234,39 @@ private fun MovieDetailTvScreen(
         playerManager.onTracksChanged = {
             refreshTracks()
         }
-        playerManager.onError = {
-            previewError = true
-            isPreviewLoading = false
+        playerManager.onEndReached = {
+            val curTime = playerManager.time
+            val dur = playerManager.length
+            val isTrueEnd = dur > 0L && curTime >= (dur - 6000L)
+            if (isTrueEnd) {
+                isPreviewLoading = false
+                isPlaying = false
+                if (isFullScreenMode) {
+                    isFullScreenMode = false
+                }
+            } else {
+                Log.d("MovieDetailTv", "Ignored premature EndReached (pos=$curTime, dur=$dur)")
+                try { playerManager.resume() } catch (_: Throwable) {}
+            }
+        }
+        playerManager.onError = { error ->
+            Log.w("MovieDetailTv", "VLC Error candidate $movieCandidateIndex: $error")
+            if (movieCandidateIndex + 1 < movieCandidates.size) {
+                movieCandidateIndex++
+                val nextUrl = movieCandidates[movieCandidateIndex]
+                try {
+                    isPreviewLoading = true
+                    previewError = false
+                    val startPos = currentPositionMs.takeIf { it > 0L } ?: (savedProgress?.positionMs ?: 0L)
+                    playerManager.play(nextUrl, startPos)
+                } catch (_: Throwable) {
+                    previewError = true
+                    isPreviewLoading = false
+                }
+            } else {
+                previewError = true
+                isPreviewLoading = false
+            }
         }
     }
 
@@ -263,7 +295,10 @@ private fun MovieDetailTvScreen(
 
         val movieData = detail?.movieData
         val ext = movieData?.containerExtension ?: "mp4"
-        val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
+        val candidatesList = XtreamApi.getVodStreamCandidates(movieId, ext)
+        movieCandidates = if (candidatesList.isNotEmpty()) candidatesList else listOf(XtreamApi.getVodStreamUrl(movieId, ext))
+        movieCandidateIndex = 0
+        val streamUrl = movieCandidates.firstOrNull() ?: ""
 
         try {
             if (streamUrl.isNotBlank()) {

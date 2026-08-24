@@ -576,7 +576,7 @@ object XtreamApi {
         val u = AppStorage.getUsername()
         val p = AppStorage.getPassword()
         if (u.isNotBlank() && p.isNotBlank() && cid.isNotBlank()) {
-            return "$baseUrl/live/$u/$p/$cid.ts"
+            return "$baseUrl/live/$u/$p/$cid.m3u8"
         }
         return ""
     }
@@ -594,8 +594,9 @@ object XtreamApi {
             list.add("$baseUrl/live/$u/$p/$cid.m3u8")
             list.add("$baseUrl/live/$u/$p/$cid.ts")
             list.add("$baseUrl/$u/$p/$cid")
+            list.add("$baseUrl/live/$u/$p/$cid")
         }
-        return list
+        return list.distinct()
     }
 
     fun getVodStreamUrl(streamId: String, extension: String = "mp4"): String {
@@ -609,6 +610,20 @@ object XtreamApi {
         return "$baseUrl/movie/$u/$p/$sid.$ext"
     }
 
+    fun getVodStreamCandidates(streamId: String, extension: String = "mp4"): List<String> {
+        val sid = cleanId(streamId)
+        val u = AppStorage.getUsername()
+        val p = AppStorage.getPassword()
+        if (u.isBlank() || p.isBlank() || sid.isBlank()) return emptyList()
+        val ext = extension.ifBlank { "mp4" }
+        val list = mutableListOf<String>()
+        list.add("$baseUrl/movie/$u/$p/$sid.$ext")
+        if (ext != "mp4") list.add("$baseUrl/movie/$u/$p/$sid.mp4")
+        if (ext != "mkv") list.add("$baseUrl/movie/$u/$p/$sid.mkv")
+        if (ext != "ts") list.add("$baseUrl/movie/$u/$p/$sid.ts")
+        return list.distinct()
+    }
+
     fun getSeriesStreamUrl(episodeId: String, extension: String = "mp4"): String {
         val eid = cleanId(episodeId)
         val u = AppStorage.getUsername()
@@ -618,5 +633,18 @@ object XtreamApi {
             return ""
         }
         return "$baseUrl/series/$u/$p/$eid.$ext"
+    }
+
+    fun getSeriesStreamCandidates(episodeId: String, extension: String = "mp4"): List<String> {
+        val eid = cleanId(episodeId)
+        val u = AppStorage.getUsername()
+        val p = AppStorage.getPassword()
+        if (u.isBlank() || p.isBlank() || eid.isBlank()) return emptyList()
+        val ext = extension.ifBlank { "mp4" }
+        val list = mutableListOf<String>()
+        list.add("$baseUrl/series/$u/$p/$eid.$ext")
+        if (ext != "mp4") list.add("$baseUrl/series/$u/$p/$eid.mp4")
+        if (ext != "mkv") list.add("$baseUrl/series/$u/$p/$eid.mkv")
+        return list.distinct()
     }
 }

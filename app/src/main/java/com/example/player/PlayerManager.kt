@@ -38,6 +38,10 @@ class PlayerManager(val context: Context) {
     private var targetAspectRatio: String? = null
     private var targetScale: Float? = null
 
+    private var pendingStartPositionMs: Long = 0L
+    private var lastSeekTimestamp: Long = 0L
+    private var isSeekingInProgress: Boolean = false
+
     val isPlaying: Boolean
         get() = try {
             mediaPlayer.isPlaying
@@ -72,6 +76,19 @@ class PlayerManager(val context: Context) {
                             targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
                             targetScale?.let { mediaPlayer.scale = it }
                         } catch (_: Throwable) {}
+
+                        // Safely apply pending resume start position now that player is actually decoding frames
+                        if (pendingStartPositionMs > 0L) {
+                            val startPos = pendingStartPositionMs
+                            pendingStartPositionMs = 0L
+                            try {
+                                mediaPlayer.time = startPos
+                            } catch (e: Throwable) {
+                                Log.w("PlayerManager", "Delayed seek to $startPos failed: ${e.message}")
+                            }
+                        }
+
+                        isSeekingInProgress = false
                         try { onBuffering?.invoke(false, 100f) } catch (_: Throwable) {}
                         try { onPlayingChanged?.invoke(true) } catch (_: Throwable) {}
                         try { onTracksChanged?.invoke() } catch (_: Throwable) {}
@@ -80,18 +97,53 @@ class PlayerManager(val context: Context) {
                         try { onPlayingChanged?.invoke(false) } catch (_: Throwable) {}
                     }
                     MediaPlayer.Event.TimeChanged -> {
-                        try { onTimeChanged?.invoke(event.timeChanged) } catch (_: Throwable) {}
+                        val currentTimeMs = event.timeChanged
+                        // If there is still a pending start position and we get first time event, apply it
+                        if (pendingStartPositionMs > 0L) {
+                            val startPos = pendingStartPositionMs
+                            pendingStartPositionMs = 0L
+                            try { mediaPlayer.time = startPos } catch (_: Throwable) {}
+                        }
+                        try { onTimeChanged?.invoke(currentTimeMs) } catch (_: Throwable) {}
                     }
                     MediaPlayer.Event.LengthChanged -> {
-                        try { onLengthChanged?.invoke(event.lengthChanged) } catch (_: Throwable) {}
+                        val currentLenMs = event.lengthChanged
+                        if (pendingStartPositionMs > 0L && currentLenMs > 0L) {
+                            val startPos = pendingStartPositionMs
+                            pendingStartPositionMs = 0L
+                            try { mediaPlayer.time = startPos } catch (_: Throwable) {}
+                        }
+                        try { onLengthChanged?.invoke(currentLenMs) } catch (_: Throwable) {}
                     }
                     MediaPlayer.Event.EndReached -> {
-                        try { onEndReached?.invoke() } catch (_: Throwable) {}
+                        val now = System.currentTimeMillis()
+                        val isRecentSeek = (now - lastSeekTimestamp) < 3000L || isSeekingInProgress
+                        val currentPos = try { mediaPlayer.time } catch (_: Throwable) { 0L }
+                        val totalLen = try { mediaPlayer.length } catch (_: Throwable) { 0L }
+                        val isTrueEnd = totalLen > 0L && currentPos >= (totalLen - 5000L)
+
+                        if (isRecentSeek || !isTrueEnd) {
+                            Log.d("PlayerManager", "Ignored premature EndReached during seek/buffering (pos=$currentPos, len=$totalLen)")
+                            try {
+                                mediaPlayer.play()
+                            } catch (_: Throwable) {}
+                        } else {
+                            try { onEndReached?.invoke() } catch (_: Throwable) {}
+                        }
                     }
                     MediaPlayer.Event.EncounteredError -> {
-                        Log.e("PlayerManager", "VLC Error de reproducción en: $currentUrl")
-                        try { onBuffering?.invoke(false, 0f) } catch (_: Throwable) {}
-                        try { onError?.invoke("Error de reproducción en VLC") } catch (_: Throwable) {}
+                        val now = System.currentTimeMillis()
+                        val isRecentSeek = (now - lastSeekTimestamp) < 2500L
+                        if (isRecentSeek) {
+                            Log.w("PlayerManager", "Transient VLC error during seek ignored, attempting auto-resume...")
+                            try {
+                                mediaPlayer.play()
+                            } catch (_: Throwable) {}
+                        } else {
+                            Log.e("PlayerManager", "VLC Error de reproducción en: $currentUrl")
+                            try { onBuffering?.invoke(false, 0f) } catch (_: Throwable) {}
+                            try { onError?.invoke("Error de reproducción en VLC") } catch (_: Throwable) {}
+                        }
                     }
                     MediaPlayer.Event.Vout -> {
                         try {
@@ -142,6 +194,9 @@ class PlayerManager(val context: Context) {
         }
         try {
             currentUrl = url
+            pendingStartPositionMs = startPositionMs.coerceAtLeast(0L)
+            lastSeekTimestamp = 0L
+            isSeekingInProgress = false
             Log.d("PlayerManager", "VLC Reproduciendo: $url (startPos=$startPositionMs)")
 
             // Cleanly stop prior playback before loading new media
@@ -176,9 +231,6 @@ class PlayerManager(val context: Context) {
             } catch (_: Throwable) {}
 
             mediaPlayer.play()
-            if (startPositionMs > 0L) {
-                mediaPlayer.time = startPositionMs
-            }
         } catch (e: Throwable) {
             Log.e("PlayerManager", "Error al reproducir con VLC: $url", e)
             onError?.invoke(e.localizedMessage ?: "Error al reproducir")
@@ -210,6 +262,7 @@ class PlayerManager(val context: Context) {
     @Synchronized
     fun stop() {
         try {
+            pendingStartPositionMs = 0L
             mediaPlayer.stop()
         } catch (e: Exception) {
             Log.e("PlayerManager", "Error al detener VLC", e)
@@ -219,7 +272,18 @@ class PlayerManager(val context: Context) {
     @Synchronized
     fun seekTo(timeMs: Long) {
         try {
-            mediaPlayer.time = timeMs.coerceAtLeast(0L)
+            val totalLen = length
+            val safeTarget = if (totalLen > 0L) {
+                timeMs.coerceIn(0L, (totalLen - 2000L).coerceAtLeast(0L))
+            } else {
+                timeMs.coerceAtLeast(0L)
+            }
+            lastSeekTimestamp = System.currentTimeMillis()
+            isSeekingInProgress = true
+            mediaPlayer.time = safeTarget
+            if (!mediaPlayer.isPlaying) {
+                mediaPlayer.play()
+            }
         } catch (e: Exception) {
             Log.e("PlayerManager", "Error al hacer seek en VLC", e)
         }
