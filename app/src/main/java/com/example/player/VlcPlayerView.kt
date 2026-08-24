@@ -30,6 +30,6 @@ fun VlcPlayerView(
             layout.keepScreenOn = true
             playerManager.attachViews(layout, enableSubtitles, useTextureView)
         },
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
     )
 }
