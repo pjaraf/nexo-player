@@ -148,8 +148,9 @@ private fun TvLiveScreen(
 
     // Dedicated VLC player for TV Live
     val playerManager = remember { PlayerManager(context) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
-    DisposableEffect(playerManager) {
+    DisposableEffect(lifecycleOwner, playerManager) {
         playerManager.setAspectRatio("16:9")
         playerManager.setScale(0f)
         playerManager.onBuffering = { buffering, _ ->
@@ -178,7 +179,22 @@ private fun TvLiveScreen(
                 isBuffering = false
             }
         }
+
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE, androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    try { playerManager.pause() } catch (_: Throwable) {}
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    try { playerManager.resume() } catch (_: Throwable) {}
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             playerManager.release()
         }
     }
@@ -1135,8 +1151,9 @@ private fun PhoneLiveScreen(
 
     // Embedded VLC Instance for phone preview
     val playerManager = remember { PlayerManager(context) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
-    DisposableEffect(playerManager) {
+    DisposableEffect(lifecycleOwner, playerManager) {
         playerManager.setAspectRatio("16:9")
         playerManager.setScale(0f)
         playerManager.onBuffering = { buffering, _ ->
@@ -1166,7 +1183,21 @@ private fun PhoneLiveScreen(
             }
         }
 
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE, androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    try { playerManager.pause() } catch (_: Throwable) {}
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    try { playerManager.resume() } catch (_: Throwable) {}
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             playerManager.release()
         }
     }

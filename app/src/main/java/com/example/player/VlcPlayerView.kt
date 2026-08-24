@@ -2,7 +2,6 @@ package com.example.player
 
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -13,7 +12,7 @@ fun VlcPlayerView(
     playerManager: PlayerManager,
     modifier: Modifier = Modifier,
     enableSubtitles: Boolean = true,
-    useTextureView: Boolean = false
+    useTextureView: Boolean = true
 ) {
     AndroidView(
         factory = { ctx ->
@@ -36,3 +35,4 @@ fun VlcPlayerView(
         modifier = modifier
     )
 }
+

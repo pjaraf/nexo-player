@@ -2,6 +2,8 @@ package com.example.player
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -20,6 +22,7 @@ data class VlcTrackInfo(
  */
 class PlayerManager(val context: Context) {
 
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val libVLC: LibVLC = VlcHelper.getLibVLC(context)
     val mediaPlayer: MediaPlayer = MediaPlayer(libVLC)
     private var attachedLayout: VLCVideoLayout? = null
@@ -69,7 +72,9 @@ class PlayerManager(val context: Context) {
                 when (event.type) {
                     MediaPlayer.Event.Buffering -> {
                         val percent = event.buffering
-                        try { onBuffering?.invoke(percent < 100.0f, percent) } catch (_: Throwable) {}
+                        mainHandler.post {
+                            try { onBuffering?.invoke(percent < 100.0f, percent) } catch (_: Throwable) {}
+                        }
                     }
                     MediaPlayer.Event.Playing -> {
                         try {
@@ -89,12 +94,16 @@ class PlayerManager(val context: Context) {
                         }
 
                         isSeekingInProgress = false
-                        try { onBuffering?.invoke(false, 100f) } catch (_: Throwable) {}
-                        try { onPlayingChanged?.invoke(true) } catch (_: Throwable) {}
-                        try { onTracksChanged?.invoke() } catch (_: Throwable) {}
+                        mainHandler.post {
+                            try { onBuffering?.invoke(false, 100f) } catch (_: Throwable) {}
+                            try { onPlayingChanged?.invoke(true) } catch (_: Throwable) {}
+                            try { onTracksChanged?.invoke() } catch (_: Throwable) {}
+                        }
                     }
                     MediaPlayer.Event.Paused, MediaPlayer.Event.Stopped -> {
-                        try { onPlayingChanged?.invoke(false) } catch (_: Throwable) {}
+                        mainHandler.post {
+                            try { onPlayingChanged?.invoke(false) } catch (_: Throwable) {}
+                        }
                     }
                     MediaPlayer.Event.TimeChanged -> {
                         val currentTimeMs = event.timeChanged
@@ -104,7 +113,9 @@ class PlayerManager(val context: Context) {
                             pendingStartPositionMs = 0L
                             try { mediaPlayer.time = startPos } catch (_: Throwable) {}
                         }
-                        try { onTimeChanged?.invoke(currentTimeMs) } catch (_: Throwable) {}
+                        mainHandler.post {
+                            try { onTimeChanged?.invoke(currentTimeMs) } catch (_: Throwable) {}
+                        }
                     }
                     MediaPlayer.Event.LengthChanged -> {
                         val currentLenMs = event.lengthChanged
@@ -113,7 +124,9 @@ class PlayerManager(val context: Context) {
                             pendingStartPositionMs = 0L
                             try { mediaPlayer.time = startPos } catch (_: Throwable) {}
                         }
-                        try { onLengthChanged?.invoke(currentLenMs) } catch (_: Throwable) {}
+                        mainHandler.post {
+                            try { onLengthChanged?.invoke(currentLenMs) } catch (_: Throwable) {}
+                        }
                     }
                     MediaPlayer.Event.EndReached -> {
                         val now = System.currentTimeMillis()
@@ -128,7 +141,9 @@ class PlayerManager(val context: Context) {
                                 mediaPlayer.play()
                             } catch (_: Throwable) {}
                         } else {
-                            try { onEndReached?.invoke() } catch (_: Throwable) {}
+                            mainHandler.post {
+                                try { onEndReached?.invoke() } catch (_: Throwable) {}
+                            }
                         }
                     }
                     MediaPlayer.Event.EncounteredError -> {
@@ -141,8 +156,10 @@ class PlayerManager(val context: Context) {
                             } catch (_: Throwable) {}
                         } else {
                             Log.e("PlayerManager", "VLC Error de reproducción en: $currentUrl")
-                            try { onBuffering?.invoke(false, 0f) } catch (_: Throwable) {}
-                            try { onError?.invoke("Error de reproducción en VLC") } catch (_: Throwable) {}
+                            mainHandler.post {
+                                try { onBuffering?.invoke(false, 0f) } catch (_: Throwable) {}
+                                try { onError?.invoke("Error de reproducción en VLC") } catch (_: Throwable) {}
+                            }
                         }
                     }
                     MediaPlayer.Event.Vout -> {
@@ -150,7 +167,9 @@ class PlayerManager(val context: Context) {
                             targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
                             targetScale?.let { mediaPlayer.scale = it }
                         } catch (_: Throwable) {}
-                        try { onTracksChanged?.invoke() } catch (_: Throwable) {}
+                        mainHandler.post {
+                            try { onTracksChanged?.invoke() } catch (_: Throwable) {}
+                        }
                     }
                 }
             } catch (t: Throwable) {
@@ -159,7 +178,7 @@ class PlayerManager(val context: Context) {
         }
     }
 
-    fun attachViews(layout: VLCVideoLayout, enableSubtitles: Boolean = true, useTextureView: Boolean = false) {
+    fun attachViews(layout: VLCVideoLayout, enableSubtitles: Boolean = true, useTextureView: Boolean = true) {
         try {
             if (attachedLayout != layout) {
                 detachViews()
@@ -189,7 +208,9 @@ class PlayerManager(val context: Context) {
     @Synchronized
     fun play(url: String, startPositionMs: Long = 0L) {
         if (url.isBlank()) {
-            onError?.invoke("URL de transmisión inválida")
+            mainHandler.post {
+                onError?.invoke("URL de transmisión inválida")
+            }
             return
         }
         try {
@@ -209,12 +230,15 @@ class PlayerManager(val context: Context) {
             }
 
             // Release previous media reference safely
+            val oldMedia = currentMedia
+            currentMedia = null
             try {
-                currentMedia?.release()
+                if (oldMedia != null && !oldMedia.isReleased) {
+                    oldMedia.release()
+                }
             } catch (e: Throwable) {
                 Log.w("PlayerManager", "Warning releasing old media: ${e.message}")
             }
-            currentMedia = null
 
             val newMedia = VlcHelper.createMedia(libVLC, url)
             currentMedia = newMedia
@@ -228,7 +252,9 @@ class PlayerManager(val context: Context) {
             mediaPlayer.play()
         } catch (e: Throwable) {
             Log.e("PlayerManager", "Error al reproducir con VLC: $url", e)
-            onError?.invoke(e.localizedMessage ?: "Error al reproducir")
+            mainHandler.post {
+                onError?.invoke(e.localizedMessage ?: "Error al reproducir")
+            }
         }
     }
 
@@ -353,11 +379,12 @@ class PlayerManager(val context: Context) {
                 mediaPlayer.stop()
             } catch (_: Exception) {}
             try {
-                mediaPlayer.media = null
-            } catch (_: Exception) {}
-            try {
-                currentMedia?.release()
+                val mediaToRelease = currentMedia
                 currentMedia = null
+                mediaPlayer.media = null
+                if (mediaToRelease != null && !mediaToRelease.isReleased) {
+                    mediaToRelease.release()
+                }
             } catch (_: Exception) {}
             mediaPlayer.release()
         } catch (e: Exception) {
@@ -365,3 +392,4 @@ class PlayerManager(val context: Context) {
         }
     }
 }
+
