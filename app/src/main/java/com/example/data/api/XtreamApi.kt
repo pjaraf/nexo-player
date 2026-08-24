@@ -576,7 +576,7 @@ object XtreamApi {
         val u = AppStorage.getUsername()
         val p = AppStorage.getPassword()
         if (u.isNotBlank() && p.isNotBlank() && cid.isNotBlank()) {
-            return "$baseUrl/live/$u/$p/$cid.m3u8"
+            return "$baseUrl/live/$u/$p/$cid.ts"
         }
         return ""
     }
@@ -591,8 +591,8 @@ object XtreamApi {
         val u = AppStorage.getUsername()
         val p = AppStorage.getPassword()
         if (u.isNotBlank() && p.isNotBlank() && cid.isNotBlank()) {
-            list.add("$baseUrl/live/$u/$p/$cid.m3u8")
             list.add("$baseUrl/live/$u/$p/$cid.ts")
+            list.add("$baseUrl/live/$u/$p/$cid.m3u8")
             list.add("$baseUrl/$u/$p/$cid")
             list.add("$baseUrl/live/$u/$p/$cid")
         }

@@ -474,10 +474,10 @@ fun PlayerScreen(
         }
     }
 
-    // Watchdog fallback for live streams stuck in buffering for > 2.5 seconds
+    // Watchdog fallback for live streams stuck in buffering for > 7.5 seconds
     LaunchedEffect(streamUrl, isLive) {
         if (isLive && candidates.size > 1) {
-            delay(2500)
+            delay(7500)
             if (isLoading && !playerManager.mediaPlayer.isPlaying) {
                 Log.w("PlayerScreen", "Watchdog triggered for $streamUrl, trying next candidate...")
                 if (candidateIndex + 1 < candidates.size) {

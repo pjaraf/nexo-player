@@ -243,12 +243,12 @@ private fun TvLiveScreen(
         }
     }
 
-    // Fast watchdog for Live TV: if candidate hangs or takes > 2.5s, switch to next candidate
+    // Watchdog for Live TV: only switch candidates if connection is unresponsive after 7.5s
     LaunchedEffect(selectedChannel, candidateIndex, candidates) {
         if (candidates.size > 1 && candidateIndex + 1 < candidates.size) {
-            delay(2500)
+            delay(7500)
             if (isBuffering && !playerManager.mediaPlayer.isPlaying) {
-                Log.w("TvLiveScreen", "Live channel watchdog triggered for candidate $candidateIndex, trying next...")
+                Log.w("TvLiveScreen", "Live channel timeout triggered for candidate $candidateIndex, trying next...")
                 candidateIndex++
                 try {
                     isBuffering = true
@@ -1216,10 +1216,10 @@ private fun PhoneLiveScreen(
         }
     }
 
-    // Fast watchdog for mobile player
+    // Watchdog for mobile player
     LaunchedEffect(selectedChannel, candidateIndex, channelCandidates) {
         if (channelCandidates.size > 1 && candidateIndex + 1 < channelCandidates.size) {
-            delay(2500)
+            delay(7500)
             if (isPlayerBuffering && !playerManager.mediaPlayer.isPlaying) {
                 candidateIndex++
                 try {
