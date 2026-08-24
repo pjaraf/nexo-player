@@ -1,7 +1,7 @@
 {
-    "versionCode": 120,
-    "versionName": "1.2.09",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.09/app-debug.apk",
-    "changelog": "Versión 1.2.09: Eliminación del cuadro de 'Cargando señal en vivo' en el centro de la pantalla, cambio de canales ultrarrápido sin retrasos y optimización de LibVLC a baja latencia sin microcortes ni congelamientos.",
+    "versionCode": 121,
+    "versionName": "1.2.10",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.10/app-debug.apk",
+    "changelog": "Versión 1.2.10: Nueva pantalla de Series con mini reproductor y reproducción fluida en pantalla completa sin cortes, mejoras de navegación D-Pad y estabilidad general.",
     "isMandatory": true
 }
