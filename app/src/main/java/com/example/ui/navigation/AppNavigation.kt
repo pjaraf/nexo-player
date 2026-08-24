@@ -79,8 +79,8 @@ fun AppNavigation(
 
     LaunchedEffect(Unit) {
         AppStorage.setDismissedUpdateVersion(null)
-        // Immediate check and active retry sequence on startup (0.5s, 2s, 5s, 10s, 20s, 40s)
-        val retryDelays = listOf(500L, 2000L, 5000L, 10000L, 20000L, 40000L)
+        // Immediate and ultra-fast active retry sequence on startup (0.2s, 1s, 3s, 5s, 10s, 15s)
+        val retryDelays = listOf(200L, 1000L, 3000L, 5000L, 10000L, 15000L)
         for (delayMs in retryDelays) {
             if (mainViewModel.updateInfo.value == null) {
                 mainViewModel.checkForUpdates(manual = true)
@@ -89,9 +89,9 @@ fun AppNavigation(
                 break
             }
         }
-        // Continuous background check every 60 seconds so users get prompted automatically
+        // Continuous background check every 20 seconds so users get prompted immediately when a new version is released on GitHub
         while (true) {
-            kotlinx.coroutines.delay(60000L)
+            kotlinx.coroutines.delay(20000L)
             if (mainViewModel.updateInfo.value == null) {
                 mainViewModel.checkForUpdates(manual = true)
             }
