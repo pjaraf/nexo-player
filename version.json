@@ -1,8 +1,8 @@
 {
-    "versionCode": 124,
-    "versionName": "1.2.13",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.13/app-debug.apk",
-    "changelog": "Versión 1.2.13: Corrección integral de reproducción en TV en vivo y películas (adelantar/retroceder sin cierres y carga instantánea).",
+    "versionCode": 125,
+    "versionName": "1.2.14",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.14/app-release.apk",
+    "changelog": "Versión 1.2.14: Estabilidad total en canales de TV en vivo, búfer optimizado para películas/series sin congelamientos y mejoras de rendimiento.",
     "isMandatory": true
 }
 
