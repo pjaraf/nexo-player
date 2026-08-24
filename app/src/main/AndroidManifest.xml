@@ -54,6 +54,7 @@
     <application
         android:name=".NexusApp"
         android:allowBackup="true"
+        android:extractNativeLibs="true"
         android:largeHeap="true"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"

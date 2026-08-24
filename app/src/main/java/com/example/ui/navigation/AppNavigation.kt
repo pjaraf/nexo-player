@@ -79,8 +79,8 @@ fun AppNavigation(
 
     LaunchedEffect(Unit) {
         AppStorage.setDismissedUpdateVersion(null)
-        // Immediate and ultra-fast active retry sequence on startup (0.2s, 1s, 3s, 5s, 10s, 15s)
-        val retryDelays = listOf(200L, 1000L, 3000L, 5000L, 10000L, 15000L)
+        // Immediate and ultra-fast active retry sequence on startup (0.2s, 1s, 2.5s, 5s, 10s, 15s)
+        val retryDelays = listOf(200L, 1000L, 2500L, 5000L, 10000L, 15000L)
         for (delayMs in retryDelays) {
             if (mainViewModel.updateInfo.value == null) {
                 mainViewModel.checkForUpdates(manual = true)
@@ -89,12 +89,27 @@ fun AppNavigation(
                 break
             }
         }
-        // Continuous background check every 20 seconds so users get prompted immediately when a new version is released on GitHub
+        // Continuous background check every 15 seconds so users get prompted immediately when a new version is released on GitHub
         while (true) {
-            kotlinx.coroutines.delay(20000L)
+            kotlinx.coroutines.delay(15000L)
             if (mainViewModel.updateInfo.value == null) {
                 mainViewModel.checkForUpdates(manual = true)
             }
+        }
+    }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                if (mainViewModel.updateInfo.value == null) {
+                    mainViewModel.checkForUpdates(manual = true)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

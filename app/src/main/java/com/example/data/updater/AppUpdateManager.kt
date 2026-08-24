@@ -14,6 +14,8 @@ import com.example.data.storage.AppStorage
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -122,54 +124,46 @@ object AppUpdateManager {
     }
 
     /**
-     * Checks both version.json and GitHub Releases API for a newer version.
+     * Checks both version.json (direct GitHub API + raw endpoints) and GitHub Releases API in parallel
+     * for instantaneous detection the moment an update is uploaded to GitHub.
      */
     suspend fun checkForUpdates(customUrl: String? = null, force: Boolean = false): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Checking update. Current version: $currentVersionName (code $currentVersionCode)")
 
-            // 1. First attempt: Check version.json
-            val versionInfo = fetchFromVersionJson(customUrl)
-            if (versionInfo != null) {
-                val isNewer = isUpdateNewer(
-                    remoteVersionName = versionInfo.versionName,
-                    remoteVersionCode = versionInfo.versionCode,
-                    currentVersionName = currentVersionName,
-                    currentVersionCode = currentVersionCode
-                )
+            // Parallel lookup: Query both GitHub direct API and version.json endpoints simultaneously
+            val candidate: UpdateInfo? = coroutineScope {
+                val deferredVersion = async(Dispatchers.IO) { fetchFromVersionJson(customUrl) }
+                val deferredReleases = async(Dispatchers.IO) { fetchFromGitHubReleases() }
 
-                if (isNewer) {
-                    val dismissed = AppStorage.getDismissedUpdateVersion()
-                    if (!force && !versionInfo.isMandatory && dismissed == versionInfo.versionName) {
-                        Log.d(TAG, "Update v${versionInfo.versionName} was previously dismissed")
-                    } else {
-                        Log.i(TAG, "New update found: v${versionInfo.versionName} (code=${versionInfo.versionCode})")
-                        _latestUpdateInfo.value = versionInfo
-                        AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                        return@withContext versionInfo
-                    }
-                }
+                val versionInfo = deferredVersion.await()
+                val releaseInfo = deferredReleases.await()
+
+                // Pick candidate with higher version
+                val validList: List<UpdateInfo> = listOfNotNull(versionInfo, releaseInfo)
+                validList.maxWithOrNull { a, b ->
+                    val cmp = compareVersions(a.versionName, b.versionName)
+                    if (cmp != 0) cmp else a.versionCode.compareTo(b.versionCode)
+                } ?: versionInfo ?: releaseInfo
             }
 
-            // 2. Second attempt: Check GitHub Releases API directly if version.json didn't yield an update
-            val releaseInfo = fetchFromGitHubReleases()
-            if (releaseInfo != null) {
+            if (candidate != null) {
                 val isNewer = isUpdateNewer(
-                    remoteVersionName = releaseInfo.versionName,
-                    remoteVersionCode = releaseInfo.versionCode,
+                    remoteVersionName = candidate.versionName,
+                    remoteVersionCode = candidate.versionCode,
                     currentVersionName = currentVersionName,
                     currentVersionCode = currentVersionCode
                 )
 
                 if (isNewer) {
                     val dismissed = AppStorage.getDismissedUpdateVersion()
-                    if (!force && !releaseInfo.isMandatory && dismissed == releaseInfo.versionName) {
-                        Log.d(TAG, "Update v${releaseInfo.versionName} was previously dismissed")
+                    if (!force && !candidate.isMandatory && dismissed == candidate.versionName) {
+                        Log.d(TAG, "Update v${candidate.versionName} was previously dismissed")
                     } else {
-                        Log.i(TAG, "New update found via GitHub: v${releaseInfo.versionName}")
-                        _latestUpdateInfo.value = releaseInfo
+                        Log.i(TAG, "New update found instantly: v${candidate.versionName} (code=${candidate.versionCode})")
+                        _latestUpdateInfo.value = candidate
                         AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                        return@withContext releaseInfo
+                        return@withContext candidate
                     }
                 }
             }
@@ -184,9 +178,13 @@ object AppUpdateManager {
             return@withContext null
         }
     }
+
     private fun fetchFromVersionJson(customUrl: String?): UpdateInfo? {
         val configuredUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
         val candidateUrls = mutableListOf<String>()
+        // 1. Direct GitHub Repository Contents API (Zero CDN delay, immediate commit reflection)
+        candidateUrls.add("https://api.github.com/repos/pjaraf/nexo-player/contents/version.json")
+        // 2. Direct raw github user content with cache buster
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
         candidateUrls.add(configuredUrl)
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/master/version.json")
@@ -194,18 +192,27 @@ object AppUpdateManager {
 
         for (url in candidateUrls.distinct()) {
             try {
-                val normalized = normalizeUrl(url)
-                val cacheBuster = if (normalized.contains("?")) "&_t=${System.currentTimeMillis()}" else "?_t=${System.currentTimeMillis()}"
-                val targetUrl = "$normalized$cacheBuster"
+                val isGitHubApi = url.contains("api.github.com")
+                val targetUrl = if (isGitHubApi) {
+                    url
+                } else {
+                    val normalized = normalizeUrl(url)
+                    val cacheBuster = if (normalized.contains("?")) "&_t=${System.currentTimeMillis()}" else "?_t=${System.currentTimeMillis()}"
+                    "$normalized$cacheBuster"
+                }
 
-                val request = Request.Builder()
+                val reqBuilder = Request.Builder()
                     .url(targetUrl)
                     .header("User-Agent", "Nexo-Updater/${currentVersionName}")
                     .header("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
                     .header("Pragma", "no-cache")
                     .header("Expires", "0")
-                    .build()
 
+                if (isGitHubApi) {
+                    reqBuilder.header("Accept", "application/vnd.github.v3.raw")
+                }
+
+                val request = reqBuilder.build()
                 val response = httpClient.newCall(request).execute()
                 if (response.isSuccessful) {
                     val body = response.body?.string()
