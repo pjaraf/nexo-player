@@ -1,8 +1,8 @@
 {
-    "versionCode": 133,
-    "versionName": "1.2.22",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.22/app-debug.apk",
-    "changelog": "Versión 1.2.22: Implementación de playStream con buffer optimizado de 1000ms, clock-jitter=0 y clock-synchro=0 para reproducción ultra fluida en vivo.",
+    "versionCode": 134,
+    "versionName": "1.2.23",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.23/app-debug.apk",
+    "changelog": "Versión 1.2.23: Integración completa de onKeyDown y dispatchKeyEvent para un control total y fluido con controles remotos D-pad de Smart TV y TV Box.",
     "isMandatory": true
 }
 
