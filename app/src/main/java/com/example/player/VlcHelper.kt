@@ -14,17 +14,25 @@ object VlcHelper {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
                     // Global caching buffers optimized for high stability and smooth decoding
-                    add("--network-caching=2500")
-                    add("--live-caching=2000")
-                    add("--file-caching=3000")
-                    add("--sout-mux-caching=2000")
+                    add("--network-caching=5000")
+                    add("--live-caching=5000")
+                    add("--file-caching=5000")
+                    add("--sout-mux-caching=5000")
+
+                    // Hardware Decoding and Video Performance Prioritization
+                    add("--avcodec-hw=any")
+                    add("--drop-late-frames")
+                    add("--skip-frames")
+
                     add("--http-reconnect")
                     add("--http-continuous")
                     add("--rtsp-tcp")
+                    
                     // Prevents audio stuttering/choppiness when synchronizing frame clocks
                     add("--no-audio-time-stretch")
-                    add("--avcodec-skiploopfilter=1")
-                    add("--avcodec-threads=0")
+                    add("--audio-time-stretch=0")
+                    add("--avcodec-skiploopfilter=4") // Maximize performance on older devices
+                    add("--avcodec-threads=2") // Limit to 2 threads to avoid starving the audio thread
                     add("--avcodec-fast")
                     add("--android-display-chroma=RV32")
                     add("--no-sub-autodetect-file")
@@ -63,15 +71,15 @@ object VlcHelper {
             addOption(":clock-jitter=0")
             addOption(":clock-synchro=0")
             if (isLiveStream) {
-                // Stable Live TV buffer (2.0s buffer prevents stuttering and handles network jitter seamlessly)
-                addOption(":network-caching=2000")
-                addOption(":live-caching=2000")
+                // Stable Live TV buffer (5.0s buffer prevents stuttering and handles network jitter seamlessly)
+                addOption(":network-caching=5000")
+                addOption(":live-caching=5000")
                 addOption(":http-reconnect")
                 addOption(":http-continuous")
             } else {
-                // Generous buffer for VOD (Movies & Series): 3.0s buffer prevents freezing / stuttering on high bitrate movies
-                addOption(":network-caching=3000")
-                addOption(":file-caching=3000")
+                // Generous buffer for VOD (Movies & Series): 5.0s buffer prevents freezing / stuttering on high bitrate movies
+                addOption(":network-caching=5000")
+                addOption(":file-caching=5000")
                 addOption(":http-reconnect")
                 addOption(":http-continuous")
             }
