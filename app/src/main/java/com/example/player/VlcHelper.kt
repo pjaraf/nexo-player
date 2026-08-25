@@ -13,13 +13,10 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
-                    add("--avcodec-hw=any")
-                    add("--network-caching=2000")
-                    add("--live-caching=2000")
-                    add("--file-caching=2000")
-                    add("--sout-mux-caching=2000")
-                    add("--clock-jitter=0")
-                    add("--clock-synchro=0")
+                    // Evita crashes del decodificador de hardware en chips de TV (Amlogic/Realtek)
+                    add("--avcodec-hw=any") 
+                    add("--avcodec-skiploopfilter=4") // Reduce carga de CPU al cambiar canal
+                    add("--network-caching=2000")    // Buffer más estable para TV
                     add("--no-stats")
                     add("--no-video-title-show")
                     add("--no-sub-autodetect-file")
