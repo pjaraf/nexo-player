@@ -214,7 +214,7 @@ class PlayerManager(val context: Context) {
         if (newStreamUrl.isBlank()) return
         try {
             currentUrl = newStreamUrl
-            // 1. Destruir de forma segura el reproductor anterior para limpiar la memoria de la TV
+            // 1. Limpiar reproductor anterior
             try {
                 mediaPlayer.stop()
                 detachViews()
@@ -229,54 +229,58 @@ class PlayerManager(val context: Context) {
                 e.printStackTrace()
             }
 
-            // 2. Volver a inicializar LibVLC y el MediaPlayer de forma limpia para el nuevo canal
+            // 2. Inicializar LibVLC si es nulo
             if (libVLC == null) {
                 val options = ArrayList<String>().apply {
                     add("--avcodec-hw=any")
                     add("--network-caching=1500")
-                    add("--no-drop-late-frames")
                 }
                 libVLC = LibVLC(context.applicationContext, options)
             }
 
             val activeLibVLC = libVLC ?: VlcHelper.getLibVLC(context)
-            val newPlayer = MediaPlayer(activeLibVLC)
-            mediaPlayer = newPlayer
-            setupEventListener(newPlayer)
 
-            attachedLayout?.let { layout ->
+            // 3. Crear nuevo MediaPlayer
+            val newPlayer = MediaPlayer(activeLibVLC).apply {
+                mediaPlayer = this
+                setupEventListener(this)
+
+                attachedLayout?.let { layout ->
+                    try {
+                        attachViews(layout, null, false, false)
+                    } catch (_: Exception) {}
+                }
+
+                val cleanUri = try {
+                    Uri.parse(newStreamUrl.trim())
+                } catch (_: Exception) {
+                    Uri.EMPTY
+                }
+
+                val media = Media(activeLibVLC, cleanUri).apply {
+                    // Si algún canal específico sigue dando pantalla negra / cierre,
+                    // cambia temporalmente el primer valor a 'false' para usar decodificación por software
+                    try {
+                        setHWDecoderEnabled(true, false)
+                    } catch (_: Throwable) {}
+                    addOption(":network-caching=1500")
+                    addOption(":no-ssl-verify")
+                    addOption(":http-no-ssl-verify")
+                }
+                
+                currentMedia = media
+                this.media = media
                 try {
-                    newPlayer.attachViews(layout, null, false, false)
-                } catch (_: Exception) {}
-            }
-
-            val cleanUri = try {
-                Uri.parse(newStreamUrl.trim())
-            } catch (_: Exception) {
-                Uri.EMPTY
-            }
-
-            val media = Media(activeLibVLC, cleanUri).apply {
-                try {
-                    setHWDecoderEnabled(true, false)
+                    media.release()
                 } catch (_: Throwable) {}
-                addOption(":network-caching=1500")
-                addOption(":no-ssl-verify")
-                addOption(":http-no-ssl-verify")
+
+                try {
+                    targetAspectRatio?.let { aspectRatio = it }
+                    targetScale?.let { scale = it }
+                } catch (_: Throwable) {}
+
+                play()
             }
-
-            currentMedia = media
-            newPlayer.media = media
-            try {
-                media.release()
-            } catch (_: Throwable) {}
-
-            try {
-                targetAspectRatio?.let { newPlayer.aspectRatio = it }
-                targetScale?.let { newPlayer.scale = it }
-            } catch (_: Throwable) {}
-
-            newPlayer.play()
         } catch (e: Exception) {
             e.printStackTrace()
             Log.e("PlayerManager", "Error in changeChannelCompletely: ${e.message}")
