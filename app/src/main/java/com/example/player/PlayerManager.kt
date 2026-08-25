@@ -214,27 +214,10 @@ class PlayerManager(val context: Context) {
         if (newStreamUrl.isBlank()) return
         try {
             currentUrl = newStreamUrl
-            if (libVLC == null) {
-                val options = ArrayList<String>().apply {
-                    add("--no-mediacodec-all")
-                    add("--no-mediacodec-dr")
-                    add("--no-omxil-dr")
-                    add("--avcodec-hw=none")
-                    add("--vout=android_display,none")
-                    add("--network-caching=2000")
-                    add("--no-stats")
-                }
-                libVLC = LibVLC(context.applicationContext, options)
-            }
             val activeLibVLC = libVLC ?: VlcHelper.getLibVLC(context)
+            libVLC = activeLibVLC
 
-            if (mediaPlayer == null) {
-                mediaPlayer = MediaPlayer(activeLibVLC).apply {
-                    setupEventListener(this)
-                }
-            }
-
-            mediaPlayer?.let { player ->
+            mediaPlayer.let { player ->
                 if (player.isPlaying) {
                     player.stop()
                 }
@@ -247,15 +230,7 @@ class PlayerManager(val context: Context) {
                     } catch (_: Exception) {}
                 }
 
-                val media = Media(activeLibVLC, Uri.parse(newStreamUrl)).apply {
-                    setHWDecoderEnabled(false, false)
-                    addOption(":network-caching=2000")
-                    addOption(":clock-jitter=0")
-                    addOption(":clock-synchro=0")
-                    addOption(":no-ssl-verify")
-                    addOption(":http-no-ssl-verify")
-                }
-
+                val media = VlcHelper.createMedia(activeLibVLC, newStreamUrl)
                 currentMedia = media
                 player.media = media
                 try {

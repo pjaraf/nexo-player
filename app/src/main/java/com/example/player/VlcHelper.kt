@@ -13,15 +13,13 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
-                    // Desactiva el decodificador de hardware que causa la pantalla negra
-                    add("--no-mediacodec-all")
-                    add("--no-mediacodec-dr")
-                    add("--no-omxil-dr")
-                    add("--avcodec-hw=none") // Forzar decodificación por CPU/software
-                    
-                    // Forzar renderizado directo a Surface
-                    add("--vout=android_display,none")
+                    add("--avcodec-hw=any")
                     add("--network-caching=2000")
+                    add("--live-caching=2000")
+                    add("--file-caching=2000")
+                    add("--sout-mux-caching=2000")
+                    add("--clock-jitter=0")
+                    add("--clock-synchro=0")
                     add("--no-stats")
                     add("--no-video-title-show")
                     add("--no-sub-autodetect-file")
@@ -50,9 +48,8 @@ object VlcHelper {
         }
         val isLiveStream = url.contains("/live/") || url.endsWith(".m3u8") || url.contains(".m3u8?") || url.endsWith(".ts") || url.contains(".ts?") || url.contains("m3u8")
         return Media(libVLC, cleanUri).apply {
-            // Regla de oro para Android TV: forzar decodificación por software (false, false) para evitar cierres en HEVC/H.265
             try {
-                setHWDecoderEnabled(false, false)
+                setHWDecoderEnabled(true, true)
             } catch (_: Throwable) {}
             
             addOption(":no-ssl-verify")
