@@ -1,8 +1,8 @@
 {
-    "versionCode": 135,
-    "versionName": "1.2.24",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.24/app-debug.apk",
-    "changelog": "Versión 1.2.24: Configuración estricta de focusable=false en VLCVideoLayout para permitir la navegación fluida con el D-pad en Smart TVs.",
+    "versionCode": 136,
+    "versionName": "1.2.25",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.25/app-debug.apk",
+    "changelog": "Versión 1.2.25: Configuración exacta de LibVLC con --avcodec-hw=any, --network-caching=2000 y prevención de crashes en Smart TVs Amlogic/Realtek.",
     "isMandatory": true
 }
 

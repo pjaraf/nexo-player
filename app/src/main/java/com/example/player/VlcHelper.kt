@@ -13,32 +13,13 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
-                    // Global caching buffers optimized for high stability and smooth decoding
-                    add("--network-caching=5000")
-                    add("--live-caching=5000")
-                    add("--file-caching=5000")
-                    add("--sout-mux-caching=5000")
-
-                    // Hardware Decoding and Video Performance Prioritization
-                    add("--avcodec-hw=any")
-                    add("--drop-late-frames")
-                    add("--skip-frames")
-
-                    add("--http-reconnect")
-                    add("--http-continuous")
-                    add("--rtsp-tcp")
-                    
-                    // Prevents audio stuttering/choppiness when synchronizing frame clocks
-                    add("--no-audio-time-stretch")
-                    add("--audio-time-stretch=0")
-                    add("--avcodec-skiploopfilter=4") // Maximize performance on older devices
-                    add("--avcodec-threads=2") // Limit to 2 threads to avoid starving the audio thread
-                    add("--avcodec-fast")
-                    add("--android-display-chroma=RV32")
-                    add("--no-sub-autodetect-file")
-                    add("--no-video-title-show")
+                    // Evita crashes del decodificador de hardware en chips de TV (Amlogic/Realtek)
+                    add("--avcodec-hw=any") 
+                    add("--avcodec-skiploopfilter=4") // Reduce carga de CPU al cambiar canal
+                    add("--network-caching=2000")    // Buffer más estable para TV
                     add("--no-stats")
-                    add("--no-osd")
+                    add("--no-video-title-show")
+                    add("--no-sub-autodetect-file")
                     add("--http-user-agent=Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.5.4")
                 }
                 LibVLC(context.applicationContext, options)
