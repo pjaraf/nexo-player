@@ -1,8 +1,8 @@
 {
-    "versionCode": 132,
-    "versionName": "1.2.21",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.21/app-debug.apk",
-    "changelog": "Versión 1.2.21: Protección total anti-cierre para Smart TV y TV Box. Soporte robusto y reproducción fluida para todos los canales de IPTV, HLS y TS sin interrupciones.",
+    "versionCode": 133,
+    "versionName": "1.2.22",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.22/app-debug.apk",
+    "changelog": "Versión 1.2.22: Implementación de playStream con buffer optimizado de 1000ms, clock-jitter=0 y clock-synchro=0 para reproducción ultra fluida en vivo.",
     "isMandatory": true
 }
 
