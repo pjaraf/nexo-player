@@ -257,7 +257,41 @@ class PlayerManager(val context: Context) {
 
     @Synchronized
     fun changeChannelSafe(streamUrl: String) {
-        changeChannelCompletely(streamUrl)
+        if (streamUrl.isBlank()) return
+        mediaPlayer?.let { player ->
+            // 1. Detener y desvincular inmediatamente
+            if (player.isPlaying) {
+                player.stop()
+            }
+            
+            // 2. Liberar el Media anterior
+            val oldMedia = player.media
+            player.media = null
+            try {
+                oldMedia?.release()
+            } catch (_: Throwable) {}
+            currentMedia = null
+
+            // 3. Crear el nuevo Media
+            val activeLibVLC = libVLC ?: VlcHelper.getLibVLC(context)
+            libVLC = activeLibVLC
+            val newMedia = Media(activeLibVLC, Uri.parse(streamUrl)).apply {
+                setHWDecoderEnabled(true, false) // Hardware decoder seguro
+                addOption(":network-caching=2000")
+                addOption(":clock-jitter=0")
+                addOption(":clock-synchro=0")
+                addOption(":no-ssl-verify")
+                addOption(":http-no-ssl-verify")
+            }
+
+            // 4. Asignar y reproducir
+            currentMedia = newMedia
+            player.media = newMedia
+            try {
+                newMedia.release()
+            } catch (_: Throwable) {}
+            player.play()
+        }
     }
 
     @Synchronized

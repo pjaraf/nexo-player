@@ -1,8 +1,8 @@
 {
-    "versionCode": 151,
-    "versionName": "1.2.40",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.40/app-debug.apk",
-    "changelog": "Versión 1.2.40: Actualización general de versión para despliegue y estabilidad en Smart TV.",
+    "versionCode": 152,
+    "versionName": "1.2.41",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.41/app-debug.apk",
+    "changelog": "Versión 1.2.41: Implementación de changeChannelSafe con liberación de media anterior y decodificación de hardware segura para TV Box.",
     "isMandatory": true
 }
 
