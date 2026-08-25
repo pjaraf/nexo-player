@@ -1,8 +1,8 @@
 {
-    "versionCode": 146,
-    "versionName": "1.2.35",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.35/app-debug.apk",
-    "changelog": "Versión 1.2.35: Desactivación de decodificadores hardware problemáticos y forzado de decodificación por software y renderizado android_display para evitar pantallas negras en TV.",
+    "versionCode": 147,
+    "versionName": "1.2.36",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.36/app-debug.apk",
+    "changelog": "Versión 1.2.36: Configuración de setHWDecoderEnabled(false, false) con sincronización de reloj y caché de red de 2000ms para asegurar imagen perfecta en cualquier TV Box.",
     "isMandatory": true
 }
 

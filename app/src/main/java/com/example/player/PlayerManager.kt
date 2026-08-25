@@ -263,12 +263,10 @@ class PlayerManager(val context: Context) {
                 }
 
                 val media = Media(activeLibVLC, cleanUri).apply {
-                    // Si algún canal específico sigue dando pantalla negra / cierre,
-                    // cambia temporalmente el primer valor a 'false' para usar decodificación por software
-                    try {
-                        setHWDecoderEnabled(true, false)
-                    } catch (_: Throwable) {}
-                    addOption(":network-caching=1500")
+                    setHWDecoderEnabled(false, false) // 100% Software: asegura imagen en cualquier TV Box
+                    addOption(":network-caching=2000")
+                    addOption(":clock-jitter=0")
+                    addOption(":clock-synchro=0")
                     addOption(":no-ssl-verify")
                     addOption(":http-no-ssl-verify")
                 }
