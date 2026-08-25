@@ -1,8 +1,8 @@
 {
-    "versionCode": 162,
-    "versionName": "1.2.51",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.51/app-debug.apk",
-    "changelog": "Versión 1.2.51: Implementación de componentes ExoPlayerManager y ExoPlayerView con PlayerView configurado sin controles y sin foco para Android TV.",
+    "versionCode": 163,
+    "versionName": "1.2.52",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.52/app-debug.apk",
+    "changelog": "Versión 1.2.52: Configuración avanzada de ExoPlayer con seek back increment de 10s, playWhenReady y manejo robusto de errores de reproducción con Toast.",
     "isMandatory": true
 }
 
