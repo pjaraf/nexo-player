@@ -9,6 +9,7 @@ import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
+import java.util.concurrent.Executors
 
 data class VlcTrackInfo(
     val id: Int,
@@ -499,6 +500,45 @@ class PlayerManager(val context: Context) {
             libVLC?.release()
         } catch (_: Exception) {}
         libVLC = null
+    }
+
+    private val playerExecutor = Executors.newSingleThreadExecutor()
+
+    fun playChannelFast(channelUrl: String) {
+        playerExecutor.execute {
+            try {
+                // Detener el canal anterior en segundo plano
+                val player = mediaPlayer
+                if (player.isPlaying) {
+                    player.stop()
+                }
+                val oldMedia = player.media
+                player.media = null
+                oldMedia?.release()
+
+                // Crear el nuevo stream usando VlcHelper para decodificación y opciones robustas
+                val activeLibVLC = libVLC ?: VlcHelper.getLibVLC(context)
+                libVLC = activeLibVLC
+                val media = VlcHelper.createMedia(activeLibVLC, channelUrl).apply {
+                    addOption(":network-caching=500")
+                    addOption(":clock-jitter=0")
+                }
+
+                currentMedia = media
+                // Asignar y reproducir en el hilo de la UI
+                mainHandler.post {
+                    try {
+                        player.media = media
+                        media.release()
+                        player.play()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }
 
