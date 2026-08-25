@@ -479,5 +479,26 @@ class PlayerManager(val context: Context) {
             Log.e("PlayerManager", "Error al liberar VLC MediaPlayer", e)
         }
     }
+
+    fun onStart(layout: VLCVideoLayout) {
+        attachViews(layout, enableSubtitles = true, useTextureView = false)
+    }
+
+    fun onStop() {
+        try {
+            if (mediaPlayer.isPlaying) {
+                mediaPlayer.stop()
+            }
+        } catch (_: Exception) {}
+        detachViews()
+    }
+
+    fun onDestroy() {
+        release()
+        try {
+            libVLC?.release()
+        } catch (_: Exception) {}
+        libVLC = null
+    }
 }
 
