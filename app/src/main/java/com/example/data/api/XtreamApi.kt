@@ -143,7 +143,10 @@ object XtreamApi {
 
     // --- Live TV from Custom Playlist / M3U / Xtream Server ---
     suspend fun loadM3uContent(customUrl: String? = null): String? = withContext(Dispatchers.IO) {
-        val targetUrl = (customUrl ?: AppStorage.getM3uUrl()).ifBlank { LIVE_PLAYLIST_URL }
+        var targetUrl = (customUrl ?: AppStorage.getM3uUrl()).ifBlank { LIVE_PLAYLIST_URL }
+        if (targetUrl.contains("dropbox.com")) {
+            targetUrl = targetUrl.replace("www.dropbox.com", "dl.dropboxusercontent.com")
+        }
         try {
             val request = Request.Builder()
                 .url(targetUrl)
@@ -165,13 +168,13 @@ object XtreamApi {
     private suspend fun fetchLiveM3uContent(): String? = loadM3uContent(LIVE_PLAYLIST_URL)
 
     fun parseM3uText(content: String): Pair<List<LiveChannel>, List<LiveCategory>> {
-        val entries = content.split("#EXTINF:")
+        val entries = content.split(Regex("(?i)#EXTINF:"))
         val channels = mutableListOf<LiveChannel>()
         val groupCategoriesMap = linkedMapOf<String, String>()
 
         val logoRegex = Regex("""tvg-logo=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
         val groupRegex = Regex("""group-title=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-        val urlRegex = Regex("""(https?://[^\s\r\n"'<>]+)""", RegexOption.IGNORE_CASE)
+        val urlRegex = Regex("""(https?://[^\s\r\n"'<>]+|rtsp://[^\s\r\n"'<>]+|rtmp://[^\s\r\n"'<>]+)""", RegexOption.IGNORE_CASE)
 
         for ((idx, entry) in entries.drop(1).withIndex()) {
             val trimmed = entry.trim()
@@ -196,6 +199,13 @@ object XtreamApi {
                     name = afterComma.substring(0, urlMatch.range.first).trim()
                 } else {
                     name = afterComma.lines().firstOrNull()?.trim() ?: name
+                }
+            }
+
+            if (streamUrl.isBlank()) {
+                val fallbackUrlMatch = urlRegex.find(trimmed)
+                if (fallbackUrlMatch != null) {
+                    streamUrl = fallbackUrlMatch.groupValues[1].trim()
                 }
             }
 
@@ -236,75 +246,60 @@ object XtreamApi {
     private suspend fun parseAndCacheLiveList(): List<LiveChannel> = withContext(Dispatchers.IO) {
         parsedLiveChannels?.let { return@withContext it }
 
-        if (AppStorage.isM3uMode()) {
-            val content = if (AppStorage.isLocalM3uFile()) {
-                AppStorage.getLocalM3uFileContent()
-            } else {
-                loadM3uContent(AppStorage.getM3uUrl())
-            }
-            if (!content.isNullOrBlank()) {
-                val (channels, categories) = parseM3uText(content)
+        // Always prioritize loading the LIVE_PLAYLIST_URL (Dropbox playlist) or custom M3U
+        val targetUrl = AppStorage.getM3uUrl().ifBlank { LIVE_PLAYLIST_URL }
+        val content = if (AppStorage.isLocalM3uFile() && targetUrl.startsWith("local://")) {
+            AppStorage.getLocalM3uFileContent()
+        } else {
+            loadM3uContent(targetUrl)
+        }
+
+        if (!content.isNullOrBlank() && content.contains("EXTINF", ignoreCase = true)) {
+            val (channels, categories) = parseM3uText(content)
+            if (channels.isNotEmpty()) {
                 parsedLiveChannels = channels
                 parsedLiveCategories = categories
                 return@withContext channels
             }
-            return@withContext emptyList()
         }
 
+        // Fallback: try loading LIVE_PLAYLIST_URL directly if custom URL failed
+        if (targetUrl != LIVE_PLAYLIST_URL) {
+            val fallbackContent = loadM3uContent(LIVE_PLAYLIST_URL)
+            if (!fallbackContent.isNullOrBlank()) {
+                val (channels, categories) = parseM3uText(fallbackContent)
+                if (channels.isNotEmpty()) {
+                    parsedLiveChannels = channels
+                    parsedLiveCategories = categories
+                    return@withContext channels
+                }
+            }
+        }
+
+        // Final fallback to Xtream API
         val currentUrl = baseUrl
-        val isLegacyDropboxServer = currentUrl.contains("eliteplusec.com", ignoreCase = true)
-
-        // For Nexo Fusion (https://nexo.fusionx.cl) and any other server:
-        // Use purely its own Xtream live channels to prevent mixing lists or showing unassociated channels
-        if (!isLegacyDropboxServer) {
-            val xtreamJson = fetch(action = "get_live_streams")
-            if (!xtreamJson.isNullOrBlank()) {
-                try {
-                    val type = object : TypeToken<List<LiveChannel>>() {}.type
-                    val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
-                    if (list.isNotEmpty()) {
-                        // Ensure categories are cached to match group names
-                        val cats = getLiveCategories()
-                        val catMap = cats.associate { it.categoryId to it.categoryName }
-                        list.forEach { ch ->
-                            if (ch.groupName.isBlank()) {
-                                ch.groupName = catMap[ch.categoryId] ?: "GENERAL"
-                            }
+        val xtreamJson = fetch(action = "get_live_streams")
+        if (!xtreamJson.isNullOrBlank()) {
+            try {
+                val type = object : TypeToken<List<LiveChannel>>() {}.type
+                val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
+                if (list.isNotEmpty()) {
+                    val cats = getLiveCategories()
+                    val catMap = cats.associate { it.categoryId to it.categoryName }
+                    list.forEach { ch ->
+                        if (ch.groupName.isBlank()) {
+                            ch.groupName = catMap[ch.categoryId] ?: "GENERAL"
                         }
-                        parsedLiveChannels = list
-                        return@withContext list
                     }
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Failed to parse xtream live streams for $currentUrl", e)
+                    parsedLiveChannels = list
+                    return@withContext list
                 }
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed to parse xtream live streams for $currentUrl", e)
             }
-            return@withContext emptyList()
         }
 
-        // Fallback for legacy Elite Plus server with custom dropbox list
-        val content = fetchLiveM3uContent()
-        if (content.isNullOrBlank()) {
-            val xtreamJson = fetch(action = "get_live_streams")
-            if (!xtreamJson.isNullOrBlank()) {
-                try {
-                    val type = object : TypeToken<List<LiveChannel>>() {}.type
-                    val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
-                    if (list.isNotEmpty()) {
-                        parsedLiveChannels = list
-                        return@withContext list
-                    }
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Failed to parse xtream live streams", e)
-                }
-            }
-            return@withContext emptyList()
-        }
-
-        val (channels, categories) = parseM3uText(content)
-        parsedLiveChannels = channels
-        parsedLiveCategories = categories
-
-        return@withContext channels
+        return@withContext emptyList()
     }
 
     suspend fun getLiveCategories(): List<LiveCategory> = withContext(Dispatchers.IO) {
