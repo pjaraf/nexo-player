@@ -1,8 +1,8 @@
 {
-    "versionCode": 145,
-    "versionName": "1.2.34",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.34/app-debug.apk",
-    "changelog": "Versión 1.2.34: Actualización de changeChannelCompletely con la estructura precisa para adjuntar vistas de video y control de decodificación en Smart TV.",
+    "versionCode": 146,
+    "versionName": "1.2.35",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.35/app-debug.apk",
+    "changelog": "Versión 1.2.35: Desactivación de decodificadores hardware problemáticos y forzado de decodificación por software y renderizado android_display para evitar pantallas negras en TV.",
     "isMandatory": true
 }
 

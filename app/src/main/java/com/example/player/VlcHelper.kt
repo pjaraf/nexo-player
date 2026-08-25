@@ -13,12 +13,15 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
-                    add("--avcodec-hw=any")
-                    add("--avcodec-skiploopfilter=4") // Omite filtros pesados de post-procesado
-                    add("--avcodec-threads=2")        // Limita hilos para no saturar CPUs de 4 núcleos de TV
-                    add("--network-caching=1500")
-                    add("--drop-late-frames")         // Descarta frames retrasados en lugar de congelar la app
-                    add("--skip-frames")
+                    // Desactiva el decodificador de hardware que causa la pantalla negra
+                    add("--no-mediacodec-all")
+                    add("--no-mediacodec-dr")
+                    add("--no-omxil-dr")
+                    add("--avcodec-hw=none") // Forzar decodificación por CPU/software
+                    
+                    // Forzar renderizado directo a Surface
+                    add("--vout=android_display,none")
+                    add("--network-caching=2000")
                     add("--no-stats")
                     add("--no-video-title-show")
                     add("--no-sub-autodetect-file")

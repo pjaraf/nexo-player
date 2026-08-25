@@ -232,8 +232,13 @@ class PlayerManager(val context: Context) {
             // 2. Inicializar LibVLC si es nulo
             if (libVLC == null) {
                 val options = ArrayList<String>().apply {
-                    add("--avcodec-hw=any")
-                    add("--network-caching=1500")
+                    add("--no-mediacodec-all")
+                    add("--no-mediacodec-dr")
+                    add("--no-omxil-dr")
+                    add("--avcodec-hw=none")
+                    add("--vout=android_display,none")
+                    add("--network-caching=2000")
+                    add("--no-stats")
                 }
                 libVLC = LibVLC(context.applicationContext, options)
             }
