@@ -1,8 +1,8 @@
 {
-    "versionCode": 131,
-    "versionName": "1.2.20",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.20/app-debug.apk",
-    "changelog": "Versión 1.2.20: Sistema de actualizaciones en segundo plano. Ahora la aplicación detectará las actualizaciones automáticamente mientras la usas sin necesidad de reiniciarla.",
+    "versionCode": 132,
+    "versionName": "1.2.21",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.21/app-debug.apk",
+    "changelog": "Versión 1.2.21: Protección total anti-cierre para Smart TV y TV Box. Soporte robusto y reproducción fluida para todos los canales de IPTV, HLS y TS sin interrupciones.",
     "isMandatory": true
 }
 

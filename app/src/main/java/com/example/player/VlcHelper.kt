@@ -62,28 +62,26 @@ object VlcHelper {
         } catch (_: Exception) {
             Uri.EMPTY
         }
-        val isLiveStream = url.contains("/live/") || url.endsWith(".m3u8") || url.contains(".m3u8?") || url.endsWith(".ts") || url.contains(".ts?")
+        val isLiveStream = url.contains("/live/") || url.endsWith(".m3u8") || url.contains(".m3u8?") || url.endsWith(".ts") || url.contains(".ts?") || url.contains("m3u8")
         return Media(libVLC, cleanUri).apply {
             // Enable HW decoding with software fallback so all IPTV & VOD codecs play smoothly without lag or crash
-            setHWDecoderEnabled(true, false)
+            try {
+                setHWDecoderEnabled(true, true)
+            } catch (_: Throwable) {}
+            
             addOption(":no-ssl-verify")
             addOption(":http-no-ssl-verify")
             addOption(":clock-jitter=0")
             addOption(":clock-synchro=0")
-            if (isLiveStream) {
-                // Stable Live TV buffer (5.0s buffer prevents stuttering and handles network jitter seamlessly)
-                addOption(":network-caching=5000")
-                addOption(":live-caching=5000")
-                addOption(":http-reconnect")
-                addOption(":http-continuous")
-            } else {
-                // Generous buffer for VOD (Movies & Series): 5.0s buffer prevents freezing / stuttering on high bitrate movies
-                addOption(":network-caching=5000")
-                addOption(":file-caching=5000")
-                addOption(":http-reconnect")
-                addOption(":http-continuous")
-            }
+            addOption(":network-caching=5000")
+            addOption(":live-caching=5000")
+            addOption(":file-caching=5000")
+            addOption(":sout-mux-caching=5000")
+            addOption(":http-reconnect")
+            addOption(":http-continuous")
+            addOption(":rtsp-tcp")
             addOption(":no-sub-autodetect-file")
+            addOption(":avcodec-hw=any")
         }
     }
 }
