@@ -120,6 +120,7 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
     init {
         loadSessionData()
         AppStorage.setDismissedUpdateVersion(null)
+        // Check updates instantly on startup
         checkForUpdates(manual = true)
 
         // React when device comes back online or finishes validating network
@@ -134,15 +135,15 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
             }
         }
         
-        // Start background polling for updates (every 15 minutes) to ensure they appear without restarting
+        // Start background polling for updates (every 2 minutes) to ensure they appear instantly without restarting
         startUpdatePolling()
     }
 
     private fun startUpdatePolling() {
         viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                // Wait 15 minutes before checking again
-                kotlinx.coroutines.delay(15 * 60 * 1000L)
+                // Wait 2 minutes before checking again
+                kotlinx.coroutines.delay(2 * 60 * 1000L)
                 
                 // Only poll if no update is currently showing
                 if (AppUpdateManager.latestUpdateInfo.value == null) {
