@@ -206,70 +206,56 @@ class PlayerManager(val context: Context) {
     }
 
     @Synchronized
-    fun playStream(streamUrl: String) {
-        if (streamUrl.isBlank()) {
-            mainHandler.post {
-                onError?.invoke("URL de transmisión inválida")
-            }
-            return
-        }
+    fun changeChannelSafe(streamUrl: String) {
+        if (streamUrl.isBlank()) return
         try {
             currentUrl = streamUrl
-            pendingStartPositionMs = 0L
-            lastSeekTimestamp = 0L
-            isSeekingInProgress = false
-            Log.d("PlayerManager", "VLC playStream: $streamUrl")
-
-            if (mediaPlayer.isPlaying) {
-                mediaPlayer.stop()
-            }
-            val oldMedia = currentMedia
-            currentMedia = null
-            try {
-                if (oldMedia != null && !oldMedia.isReleased) {
-                    oldMedia.release()
+            mediaPlayer.let { player ->
+                if (player.isPlaying) {
+                    player.stop()
                 }
-            } catch (_: Throwable) {}
-
-            val cleanUri = try {
-                Uri.parse(streamUrl.trim())
-            } catch (_: Exception) {
-                Uri.EMPTY
-            }
-
-            val media = Media(libVLC, cleanUri).apply {
+                
+                val oldMedia = player.media
+                player.media = null
+                currentMedia = null
                 try {
-                    setHWDecoderEnabled(true, true)
+                    oldMedia?.release()
                 } catch (_: Throwable) {}
-                addOption(":network-caching=1000")
-                addOption(":clock-jitter=0")
-                addOption(":clock-synchro=0")
-                addOption(":no-ssl-verify")
-                addOption(":http-no-ssl-verify")
-                addOption(":http-reconnect")
-                addOption(":http-continuous")
-                addOption(":avcodec-hw=any")
+
+                val cleanUri = try {
+                    Uri.parse(streamUrl.trim())
+                } catch (_: Exception) {
+                    Uri.EMPTY
+                }
+
+                val newMedia = Media(libVLC, cleanUri).apply {
+                    try {
+                        setHWDecoderEnabled(true, false)
+                    } catch (_: Throwable) {}
+                    addOption(":network-caching=2000")
+                    addOption(":clock-jitter=0")
+                    addOption(":clock-synchro=0")
+                    addOption(":no-ssl-verify")
+                    addOption(":http-no-ssl-verify")
+                }
+
+                currentMedia = newMedia
+                player.media = newMedia
+                try {
+                    newMedia.release()
+                } catch (_: Throwable) {}
+
+                player.play()
             }
-
-            currentMedia = media
-            mediaPlayer.media = media
-            try {
-                media.release()
-            } catch (_: Throwable) {}
-
-            try {
-                targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
-                targetScale?.let { mediaPlayer.scale = it }
-            } catch (_: Throwable) {}
-
-            mediaPlayer.play()
         } catch (e: Exception) {
             e.printStackTrace()
-            Log.e("PlayerManager", "Error in playStream: ${e.message}")
-            mainHandler.post {
-                try { onError?.invoke(e.localizedMessage ?: "Error al reproducir") } catch (_: Throwable) {}
-            }
+            Log.e("PlayerManager", "Error in changeChannelSafe: ${e.message}")
         }
+    }
+
+    @Synchronized
+    fun playStream(streamUrl: String) {
+        changeChannelSafe(streamUrl)
     }
 
     @Synchronized

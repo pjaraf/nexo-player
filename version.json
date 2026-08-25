@@ -1,8 +1,8 @@
 {
-    "versionCode": 136,
-    "versionName": "1.2.25",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.25/app-debug.apk",
-    "changelog": "Versión 1.2.25: Configuración exacta de LibVLC con --avcodec-hw=any, --network-caching=2000 y prevención de crashes en Smart TVs Amlogic/Realtek.",
+    "versionCode": 137,
+    "versionName": "1.2.26",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.26/app-debug.apk",
+    "changelog": "Versión 1.2.26: Implementación exacta de changeChannelSafe con decodificación de hardware segura y buffer de 2000ms.",
     "isMandatory": true
 }
 
