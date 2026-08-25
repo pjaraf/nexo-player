@@ -13,10 +13,12 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
-                    // Evita crashes del decodificador de hardware en chips de TV (Amlogic/Realtek)
-                    add("--avcodec-hw=any") 
-                    add("--avcodec-skiploopfilter=4") // Reduce carga de CPU al cambiar canal
-                    add("--network-caching=2000")    // Buffer más estable para TV
+                    add("--avcodec-hw=any")
+                    add("--avcodec-skiploopfilter=4") // Omite filtros pesados de post-procesado
+                    add("--avcodec-threads=2")        // Limita hilos para no saturar CPUs de 4 núcleos de TV
+                    add("--network-caching=1500")
+                    add("--drop-late-frames")         // Descarta frames retrasados en lugar de congelar la app
+                    add("--skip-frames")
                     add("--no-stats")
                     add("--no-video-title-show")
                     add("--no-sub-autodetect-file")
