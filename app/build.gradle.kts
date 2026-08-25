@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexo.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 154
-        versionName = "1.2.43"
+        versionCode = 155
+        versionName = "1.2.44"
 
         ndk {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose)
+    implementation("io.coil-kt:coil-svg:2.6.0")
     // Media3 removed - replaced exclusively with VLC Player
     // implementation(libs.androidx.media3.exoplayer)
     // implementation(libs.androidx.media3.exoplayer.hls)

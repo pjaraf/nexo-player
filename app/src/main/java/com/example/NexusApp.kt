@@ -10,6 +10,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import coil.decode.SvgDecoder
 import okhttp3.OkHttpClient
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -63,6 +64,9 @@ class NexusApp : Application(), ImageLoaderFactory {
 
         val loader = ImageLoader.Builder(this)
             .okHttpClient(okHttpClient)
+            .components {
+                add(SvgDecoder.Factory())
+            }
             .bitmapConfig(Bitmap.Config.RGB_565) // 50% less RAM usage per poster/logo
             .allowRgb565(true)
             .allowHardware(!isLowRam) // Prevent GPU texture OOM on older Android/TV devices
