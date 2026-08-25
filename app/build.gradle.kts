@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexo.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 155
-        versionName = "1.2.44"
+        versionCode = 156
+        versionName = "1.2.45"
 
         ndk {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))

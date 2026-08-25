@@ -13,10 +13,11 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
-                    // Evita crashes del decodificador de hardware en chips de TV (Amlogic/Realtek)
-                    add("--avcodec-hw=any") 
-                    add("--avcodec-skiploopfilter=4") // Reduce carga de CPU al cambiar canal
-                    add("--network-caching=2000")    // Buffer más estable para TV
+                    add("--avcodec-hw=any")         // Hardware nativo rápido
+                    add("--network-caching=500")     // Carga instantánea (500ms en lugar de 2000ms)
+                    add("--live-caching=500")
+                    add("--drop-late-frames")        // Si hay lag, salta frames sin congelar
+                    add("--skip-frames")
                     add("--no-stats")
                     add("--no-video-title-show")
                     add("--no-sub-autodetect-file")
@@ -58,10 +59,12 @@ object VlcHelper {
             addOption(":http-no-ssl-verify")
             addOption(":clock-jitter=0")
             addOption(":clock-synchro=0")
-            addOption(":network-caching=2000")
-            addOption(":live-caching=2000")
-            addOption(":file-caching=2000")
-            addOption(":sout-mux-caching=2000")
+            addOption(":network-caching=500")
+            addOption(":live-caching=500")
+            addOption(":file-caching=500")
+            addOption(":sout-mux-caching=500")
+            addOption(":drop-late-frames")
+            addOption(":skip-frames")
             addOption(":http-reconnect")
             addOption(":http-continuous")
             addOption(":rtsp-tcp")
