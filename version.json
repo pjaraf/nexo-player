@@ -1,8 +1,8 @@
 {
-    "versionCode": 128,
-    "versionName": "1.2.17",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.17/app-release.apk",
-    "changelog": "Versión 1.2.17: Corrección total de reproducción de video y audio en TV en vivo, Películas y Series. Solución definitiva al corte de audio y falta de video, y optimización anti-cierre para Smart TV y TV Box.",
+    "versionCode": 130,
+    "versionName": "1.2.19",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.19/app-debug.apk",
+    "changelog": "Versión 1.2.19: Configuración optimizada de LibVLC. Activación de decodificación por hardware, buffer de 5 segundos, y prevención de cortes de audio/video en Smart TVs y TV Box.",
     "isMandatory": true
 }
 
