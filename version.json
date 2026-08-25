@@ -1,8 +1,8 @@
 {
-    "versionCode": 141,
-    "versionName": "1.2.30",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.30/app-debug.apk",
-    "changelog": "Versión 1.2.30: Optimización avanzada con R8/ProGuard, reducción de tamaño APK y filtrado de arquitecturas ARM para Smart TV.",
+    "versionCode": 142,
+    "versionName": "1.2.31",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.31/app-debug.apk",
+    "changelog": "Versión 1.2.31: Reglas ProGuard optimizadas y aseguradas para todas las clases y métodos nativos de LibVLC.",
     "isMandatory": true
 }
 
