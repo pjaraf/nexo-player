@@ -1,8 +1,8 @@
 {
-    "versionCode": 143,
-    "versionName": "1.2.32",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.32/app-debug.apk",
-    "changelog": "Versión 1.2.32: Optimización de hilos AVCodec, caché de red de 1500ms y descarte de frames retrasados para máxima fluidez en Smart TV.",
+    "versionCode": 144,
+    "versionName": "1.2.33",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.33/app-debug.apk",
+    "changelog": "Versión 1.2.33: Implementación de changeChannelCompletely con destrucción segura y limpieza de memoria en TV para canales en vivo.",
     "isMandatory": true
 }
 

@@ -23,8 +23,8 @@ data class VlcTrackInfo(
 class PlayerManager(val context: Context) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val libVLC: LibVLC = VlcHelper.getLibVLC(context)
-    val mediaPlayer: MediaPlayer = MediaPlayer(libVLC)
+    private var libVLC: LibVLC? = VlcHelper.getLibVLC(context)
+    var mediaPlayer: MediaPlayer = MediaPlayer(libVLC ?: VlcHelper.getLibVLC(context))
     private var attachedLayout: VLCVideoLayout? = null
 
     var onBuffering: ((Boolean, Float) -> Unit)? = null
@@ -67,7 +67,11 @@ class PlayerManager(val context: Context) {
         }
 
     init {
-        mediaPlayer.setEventListener { event ->
+        setupEventListener(mediaPlayer)
+    }
+
+    private fun setupEventListener(player: MediaPlayer) {
+        player.setEventListener { event ->
             try {
                 when (event.type) {
                     MediaPlayer.Event.Buffering -> {
@@ -206,51 +210,82 @@ class PlayerManager(val context: Context) {
     }
 
     @Synchronized
-    fun changeChannelSafe(streamUrl: String) {
-        if (streamUrl.isBlank()) return
+    fun changeChannelCompletely(newStreamUrl: String) {
+        if (newStreamUrl.isBlank()) return
         try {
-            currentUrl = streamUrl
-            mediaPlayer.let { player ->
-                if (player.isPlaying) {
-                    player.stop()
-                }
-                
-                val oldMedia = player.media
-                player.media = null
+            currentUrl = newStreamUrl
+            // 1. Destruir de forma segura el reproductor anterior para limpiar la memoria de la TV
+            try {
+                mediaPlayer.stop()
+                detachViews()
+                try {
+                    mediaPlayer.setEventListener(null)
+                } catch (_: Exception) {}
+                val oldMedia = currentMedia
                 currentMedia = null
-                try {
-                    oldMedia?.release()
-                } catch (_: Throwable) {}
-
-                val cleanUri = try {
-                    Uri.parse(streamUrl.trim())
-                } catch (_: Exception) {
-                    Uri.EMPTY
-                }
-
-                val newMedia = Media(libVLC, cleanUri).apply {
-                    try {
-                        setHWDecoderEnabled(true, false)
-                    } catch (_: Throwable) {}
-                    addOption(":network-caching=2000")
-                    addOption(":clock-jitter=0")
-                    addOption(":clock-synchro=0")
-                    addOption(":no-ssl-verify")
-                    addOption(":http-no-ssl-verify")
-                }
-
-                currentMedia = newMedia
-                player.media = newMedia
-                try {
-                    newMedia.release()
-                } catch (_: Throwable) {}
-
-                player.play()
+                oldMedia?.release()
+                mediaPlayer.release()
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
+
+            // 2. Volver a inicializar LibVLC y el MediaPlayer de forma limpia para el nuevo canal
+            if (libVLC == null) {
+                val options = ArrayList<String>().apply {
+                    add("--avcodec-hw=any")
+                    add("--network-caching=1500")
+                    add("--no-drop-late-frames")
+                }
+                libVLC = LibVLC(context.applicationContext, options)
+            }
+
+            val activeLibVLC = libVLC ?: VlcHelper.getLibVLC(context)
+            val newPlayer = MediaPlayer(activeLibVLC)
+            mediaPlayer = newPlayer
+            setupEventListener(newPlayer)
+
+            attachedLayout?.let { layout ->
+                try {
+                    newPlayer.attachViews(layout, null, false, false)
+                } catch (_: Exception) {}
+            }
+
+            val cleanUri = try {
+                Uri.parse(newStreamUrl.trim())
+            } catch (_: Exception) {
+                Uri.EMPTY
+            }
+
+            val media = Media(activeLibVLC, cleanUri).apply {
+                try {
+                    setHWDecoderEnabled(true, false)
+                } catch (_: Throwable) {}
+                addOption(":network-caching=1500")
+                addOption(":no-ssl-verify")
+                addOption(":http-no-ssl-verify")
+            }
+
+            currentMedia = media
+            newPlayer.media = media
+            try {
+                media.release()
+            } catch (_: Throwable) {}
+
+            try {
+                targetAspectRatio?.let { newPlayer.aspectRatio = it }
+                targetScale?.let { newPlayer.scale = it }
+            } catch (_: Throwable) {}
+
+            newPlayer.play()
         } catch (e: Exception) {
             e.printStackTrace()
-            Log.e("PlayerManager", "Error in changeChannelSafe: ${e.message}")
+            Log.e("PlayerManager", "Error in changeChannelCompletely: ${e.message}")
         }
+    }
+
+    @Synchronized
+    fun changeChannelSafe(streamUrl: String) {
+        changeChannelCompletely(streamUrl)
     }
 
     @Synchronized
@@ -287,7 +322,7 @@ class PlayerManager(val context: Context) {
                     }
                 } catch (_: Throwable) {}
 
-                val newMedia = VlcHelper.createMedia(libVLC, url)
+                val newMedia = VlcHelper.createMedia(libVLC ?: VlcHelper.getLibVLC(context), url)
                 currentMedia = newMedia
                 mediaPlayer.media = newMedia
 
