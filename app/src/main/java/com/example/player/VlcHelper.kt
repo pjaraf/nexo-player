@@ -45,24 +45,23 @@ object VlcHelper {
         }
         val isLiveStream = url.contains("/live/") || url.endsWith(".m3u8") || url.contains(".m3u8?") || url.endsWith(".ts") || url.contains(".ts?") || url.contains("m3u8")
         return Media(libVLC, cleanUri).apply {
-            // Enable HW decoding with software fallback so all IPTV & VOD codecs play smoothly without lag or crash
+            // Regla de oro para Android TV: forzar decodificación por software (false, false) para evitar cierres en HEVC/H.265
             try {
-                setHWDecoderEnabled(true, true)
+                setHWDecoderEnabled(false, false)
             } catch (_: Throwable) {}
             
             addOption(":no-ssl-verify")
             addOption(":http-no-ssl-verify")
             addOption(":clock-jitter=0")
             addOption(":clock-synchro=0")
-            addOption(":network-caching=5000")
-            addOption(":live-caching=5000")
-            addOption(":file-caching=5000")
-            addOption(":sout-mux-caching=5000")
+            addOption(":network-caching=2000")
+            addOption(":live-caching=2000")
+            addOption(":file-caching=2000")
+            addOption(":sout-mux-caching=2000")
             addOption(":http-reconnect")
             addOption(":http-continuous")
             addOption(":rtsp-tcp")
             addOption(":no-sub-autodetect-file")
-            addOption(":avcodec-hw=any")
         }
     }
 }

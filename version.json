@@ -1,8 +1,8 @@
 {
-    "versionCode": 139,
-    "versionName": "1.2.28",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.28/app-debug.apk",
-    "changelog": "Versión 1.2.28: Verificación instantánea de actualizaciones al iniciar la aplicación y sondeo automático cada 2 minutos.",
+    "versionCode": 140,
+    "versionName": "1.2.29",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.29/app-debug.apk",
+    "changelog": "Versión 1.2.29: Aplicación de la regla de oro para Android TV con setHWDecoderEnabled(false, false) para evitar cierres en canales HEVC/H.265.",
     "isMandatory": true
 }
 
