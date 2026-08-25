@@ -43,10 +43,15 @@ object VlcHelper {
         } catch (_: Exception) {
             Uri.EMPTY
         }
-        val isLiveStream = url.contains("/live/") || url.endsWith(".m3u8") || url.contains(".m3u8?") || url.endsWith(".ts") || url.contains(".ts?") || url.contains("m3u8")
+        val lowerUrl = url.lowercase()
+        val isHevcOrHeavy = lowerUrl.contains("hevc") || lowerUrl.contains("h265") || lowerUrl.contains("4k") || lowerUrl.contains("hevc/h265")
         return Media(libVLC, cleanUri).apply {
             try {
-                setHWDecoderEnabled(true, true)
+                if (isHevcOrHeavy) {
+                    setHWDecoderEnabled(false, false) // 100% Software para HEVC/H.265/4K para evitar crashes en TV Box
+                } else {
+                    setHWDecoderEnabled(true, false) // Hardware decoder seguro para streams estándar
+                }
             } catch (_: Throwable) {}
             
             addOption(":no-ssl-verify")

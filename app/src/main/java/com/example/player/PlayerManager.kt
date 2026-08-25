@@ -275,13 +275,9 @@ class PlayerManager(val context: Context) {
             // 3. Crear el nuevo Media
             val activeLibVLC = libVLC ?: VlcHelper.getLibVLC(context)
             libVLC = activeLibVLC
-            val newMedia = Media(activeLibVLC, Uri.parse(streamUrl)).apply {
-                setHWDecoderEnabled(true, false) // Hardware decoder seguro
-                addOption(":network-caching=2000")
+            val newMedia = VlcHelper.createMedia(activeLibVLC, streamUrl).apply {
                 addOption(":clock-jitter=0")
                 addOption(":clock-synchro=0")
-                addOption(":no-ssl-verify")
-                addOption(":http-no-ssl-verify")
             }
 
             // 4. Asignar y reproducir
