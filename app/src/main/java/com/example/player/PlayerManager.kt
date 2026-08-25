@@ -210,26 +210,10 @@ class PlayerManager(val context: Context) {
     }
 
     @Synchronized
-    fun changeChannelCompletely(newStreamUrl: String) {
+    fun playChannel(newStreamUrl: String) {
         if (newStreamUrl.isBlank()) return
         try {
             currentUrl = newStreamUrl
-            // 1. Limpiar reproductor anterior
-            try {
-                mediaPlayer.stop()
-                detachViews()
-                try {
-                    mediaPlayer.setEventListener(null)
-                } catch (_: Exception) {}
-                val oldMedia = currentMedia
-                currentMedia = null
-                oldMedia?.release()
-                mediaPlayer.release()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            // 2. Inicializar LibVLC si es nulo
             if (libVLC == null) {
                 val options = ArrayList<String>().apply {
                     add("--no-mediacodec-all")
@@ -242,52 +226,58 @@ class PlayerManager(val context: Context) {
                 }
                 libVLC = LibVLC(context.applicationContext, options)
             }
-
             val activeLibVLC = libVLC ?: VlcHelper.getLibVLC(context)
 
-            // 3. Crear nuevo MediaPlayer
-            val newPlayer = MediaPlayer(activeLibVLC).apply {
-                mediaPlayer = this
-                setupEventListener(this)
+            if (mediaPlayer == null) {
+                mediaPlayer = MediaPlayer(activeLibVLC).apply {
+                    setupEventListener(this)
+                }
+            }
 
+            mediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.stop()
+                }
+                player.detachViews() // Desconectar vista previa
+
+                // Reconectar a tu VLCVideoLayout
                 attachedLayout?.let { layout ->
                     try {
-                        attachViews(layout, null, false, false)
+                        player.attachViews(layout, null, false, false)
                     } catch (_: Exception) {}
                 }
 
-                val cleanUri = try {
-                    Uri.parse(newStreamUrl.trim())
-                } catch (_: Exception) {
-                    Uri.EMPTY
-                }
-
-                val media = Media(activeLibVLC, cleanUri).apply {
-                    setHWDecoderEnabled(false, false) // 100% Software: asegura imagen en cualquier TV Box
+                val media = Media(activeLibVLC, Uri.parse(newStreamUrl)).apply {
+                    setHWDecoderEnabled(false, false)
                     addOption(":network-caching=2000")
                     addOption(":clock-jitter=0")
                     addOption(":clock-synchro=0")
                     addOption(":no-ssl-verify")
                     addOption(":http-no-ssl-verify")
                 }
-                
+
                 currentMedia = media
-                this.media = media
+                player.media = media
                 try {
                     media.release()
                 } catch (_: Throwable) {}
 
                 try {
-                    targetAspectRatio?.let { aspectRatio = it }
-                    targetScale?.let { scale = it }
+                    targetAspectRatio?.let { player.aspectRatio = it }
+                    targetScale?.let { player.scale = it }
                 } catch (_: Throwable) {}
 
-                play()
+                player.play()
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            Log.e("PlayerManager", "Error in changeChannelCompletely: ${e.message}")
+            Log.e("PlayerManager", "Error in playChannel: ${e.message}")
         }
+    }
+
+    @Synchronized
+    fun changeChannelCompletely(newStreamUrl: String) {
+        playChannel(newStreamUrl)
     }
 
     @Synchronized

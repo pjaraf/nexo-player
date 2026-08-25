@@ -1,8 +1,8 @@
 {
-    "versionCode": 147,
-    "versionName": "1.2.36",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.36/app-debug.apk",
-    "changelog": "Versión 1.2.36: Configuración de setHWDecoderEnabled(false, false) con sincronización de reloj y caché de red de 2000ms para asegurar imagen perfecta en cualquier TV Box.",
+    "versionCode": 148,
+    "versionName": "1.2.37",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.37/app-debug.apk",
+    "changelog": "Versión 1.2.37: Implementación robusta de playChannel con reconexión de vista, decodificación 100% software y control de reloj para Smart TV.",
     "isMandatory": true
 }
 
