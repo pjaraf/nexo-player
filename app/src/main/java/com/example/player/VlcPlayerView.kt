@@ -22,6 +22,8 @@ fun VlcPlayerView(
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
                 keepScreenOn = true
+                isFocusable = false
+                isFocusableInTouchMode = false
                 playerManager.attachViews(this, enableSubtitles, useTextureView)
             }
         },
