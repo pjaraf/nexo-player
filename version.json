@@ -1,8 +1,8 @@
 {
-    "versionCode": 137,
-    "versionName": "1.2.26",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.26/app-debug.apk",
-    "changelog": "Versión 1.2.26: Implementación exacta de changeChannelSafe con decodificación de hardware segura y buffer de 2000ms.",
+    "versionCode": 138,
+    "versionName": "1.2.27",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.27/app-debug.apk",
+    "changelog": "Versión 1.2.27: Registro de PlayerActivity con aceleración por hardware y configuración de cambios de configuración en AndroidManifest.",
     "isMandatory": true
 }
 
