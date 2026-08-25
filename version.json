@@ -1,8 +1,8 @@
 {
-    "versionCode": 130,
-    "versionName": "1.2.19",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.19/app-debug.apk",
-    "changelog": "Versión 1.2.19: Configuración optimizada de LibVLC. Activación de decodificación por hardware, buffer de 5 segundos, y prevención de cortes de audio/video en Smart TVs y TV Box.",
+    "versionCode": 131,
+    "versionName": "1.2.20",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.20/app-debug.apk",
+    "changelog": "Versión 1.2.20: Sistema de actualizaciones en segundo plano. Ahora la aplicación detectará las actualizaciones automáticamente mientras la usas sin necesidad de reiniciarla.",
     "isMandatory": true
 }
 
