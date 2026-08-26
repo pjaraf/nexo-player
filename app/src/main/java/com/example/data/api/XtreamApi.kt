@@ -246,35 +246,7 @@ object XtreamApi {
     private suspend fun parseAndCacheLiveList(): List<LiveChannel> = withContext(Dispatchers.IO) {
         parsedLiveChannels?.let { return@withContext it }
 
-        val currentUrl = baseUrl
-        val isNexoFusion = currentUrl.contains("fusionx.cl", ignoreCase = true) || !currentUrl.contains("eliteplusec.com", ignoreCase = true)
-        val isM3uActive = AppStorage.isM3uMode()
-
-        // If Nexo Fusion or standard Xtream server (and not explicitly M3U mode), prioritize Xtream API directly
-        if (isNexoFusion && !isM3uActive && !AppStorage.isLocalM3uFile()) {
-            val xtreamJson = fetch(action = "get_live_streams")
-            if (!xtreamJson.isNullOrBlank()) {
-                try {
-                    val type = object : TypeToken<List<LiveChannel>>() {}.type
-                    val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
-                    if (list.isNotEmpty()) {
-                        val cats = getLiveCategories()
-                        val catMap = cats.associate { it.categoryId to it.categoryName }
-                        list.forEach { ch ->
-                            if (ch.groupName.isBlank()) {
-                                ch.groupName = catMap[ch.categoryId] ?: "GENERAL"
-                            }
-                        }
-                        parsedLiveChannels = list
-                        return@withContext list
-                    }
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Failed to parse xtream live streams for $currentUrl", e)
-                }
-            }
-        }
-
-        // Otherwise load custom M3U / Dropbox playlist if requested
+        // 1. Always try loading M3U / Dropbox playlist first (LIVE_PLAYLIST_URL or custom m3u_url)
         val targetUrl = AppStorage.getM3uUrl().ifBlank { LIVE_PLAYLIST_URL }
         val content = if (AppStorage.isLocalM3uFile() && targetUrl.startsWith("local://")) {
             AppStorage.getLocalM3uFileContent()
@@ -282,12 +254,35 @@ object XtreamApi {
             loadM3uContent(targetUrl)
         }
 
-        if (!content.isNullOrBlank() && content.contains("EXTINF", ignoreCase = true)) {
+        if (!content.isNullOrBlank() && (content.contains("EXTINF", ignoreCase = true) || content.contains("#EXT", ignoreCase = true))) {
             val (channels, categories) = parseM3uText(content)
             if (channels.isNotEmpty()) {
                 parsedLiveChannels = channels
                 parsedLiveCategories = categories
                 return@withContext channels
+            }
+        }
+
+        // 2. Fallback to Xtream API if M3U content failed or was empty
+        val currentUrl = baseUrl
+        val xtreamJson = fetch(action = "get_live_streams")
+        if (!xtreamJson.isNullOrBlank()) {
+            try {
+                val type = object : TypeToken<List<LiveChannel>>() {}.type
+                val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
+                if (list.isNotEmpty()) {
+                    val cats = getLiveCategories()
+                    val catMap = cats.associate { it.categoryId to it.categoryName }
+                    list.forEach { ch ->
+                        if (ch.groupName.isBlank()) {
+                            ch.groupName = catMap[ch.categoryId] ?: "GENERAL"
+                        }
+                    }
+                    parsedLiveChannels = list
+                    return@withContext list
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed to parse xtream live streams for $currentUrl", e)
             }
         }
 
@@ -297,15 +292,12 @@ object XtreamApi {
     suspend fun getLiveCategories(): List<LiveCategory> = withContext(Dispatchers.IO) {
         parsedLiveCategories?.let { return@withContext it }
 
+        // Try parsing M3U list first to populate categories
+        parseAndCacheLiveList()
+        parsedLiveCategories?.let { if (it.isNotEmpty()) return@withContext it }
+
+        // Fallback to Xtream API categories
         val currentUrl = baseUrl
-        val isM3uActive = AppStorage.isM3uMode()
-
-        if (isM3uActive && !currentUrl.contains("fusionx.cl", ignoreCase = true)) {
-            parseAndCacheLiveList()
-            return@withContext parsedLiveCategories ?: emptyList()
-        }
-
-        // Directly fetch live categories for Nexo Fusion (https://nexo.fusionx.cl) and standard servers
         val json = fetch(action = "get_live_categories")
         if (!json.isNullOrBlank()) {
             try {

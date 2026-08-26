@@ -1,8 +1,8 @@
 {
-    "versionCode": 165,
-    "versionName": "1.2.54",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.54/app-debug.apk",
-    "changelog": "Versión 1.2.54: Decodificación robusta por software optimizada para canales en vivo y HLS/TS para garantizar compatibilidad con el 100% de los canales y prevenir cierres inesperados en TV Box y dispositivos móviles.",
+    "versionCode": 166,
+    "versionName": "1.2.55",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.55/app-debug.apk",
+    "changelog": "Versión 1.2.55: Priorización absoluta y robusta de la lista M3U y Dropbox IPTV para asegurar la reproducción de todos los canales sin excepciones ni cierres.",
     "isMandatory": true
 }
 
