@@ -45,13 +45,13 @@ object VlcHelper {
             Uri.EMPTY
         }
         val lowerUrl = url.lowercase()
-        val isHevcOrHeavy = lowerUrl.contains("hevc") || lowerUrl.contains("h265") || lowerUrl.contains("4k") || lowerUrl.contains("hevc/h265")
+        val isHevcOrHeavy = lowerUrl.contains("hevc") || lowerUrl.contains("h265") || lowerUrl.contains("4k") || lowerUrl.contains("hevc/h265") || lowerUrl.contains("live") || lowerUrl.contains(".m3u8") || lowerUrl.contains(".ts")
         return Media(libVLC, cleanUri).apply {
             try {
                 if (isHevcOrHeavy) {
-                    setHWDecoderEnabled(false, false) // 100% Software para HEVC/H.265/4K para evitar crashes en TV Box
+                    setHWDecoderEnabled(false, false) // 100% Software para streams en vivo / HLS / TS para evitar crashes en TV Box
                 } else {
-                    setHWDecoderEnabled(true, false) // Hardware decoder seguro para streams estándar
+                    setHWDecoderEnabled(true, false)
                 }
             } catch (_: Throwable) {}
             

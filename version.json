@@ -1,8 +1,8 @@
 {
-    "versionCode": 164,
-    "versionName": "1.2.53",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.53/app-debug.apk",
-    "changelog": "Versión 1.2.53: Servidor https://nexo.fusionx.cl totalmente independiente y optimizado para mostrar todo su contenido sin mezclas, junto con protección robusta anti-cierre automático de la aplicación.",
+    "versionCode": 165,
+    "versionName": "1.2.54",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.54/app-debug.apk",
+    "changelog": "Versión 1.2.54: Decodificación robusta por software optimizada para canales en vivo y HLS/TS para garantizar compatibilidad con el 100% de los canales y prevenir cierres inesperados en TV Box y dispositivos móviles.",
     "isMandatory": true
 }
 
