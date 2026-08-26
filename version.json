@@ -1,8 +1,8 @@
 {
-    "versionCode": 163,
-    "versionName": "1.2.52",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.52/app-debug.apk",
-    "changelog": "Versión 1.2.52: Configuración avanzada de ExoPlayer con seek back increment de 10s, playWhenReady y manejo robusto de errores de reproducción con Toast.",
+    "versionCode": 164,
+    "versionName": "1.2.53",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.53/app-debug.apk",
+    "changelog": "Versión 1.2.53: Servidor https://nexo.fusionx.cl totalmente independiente y optimizado para mostrar todo su contenido sin mezclas, junto con protección robusta anti-cierre automático de la aplicación.",
     "isMandatory": true
 }
 
