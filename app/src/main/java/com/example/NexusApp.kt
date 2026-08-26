@@ -36,6 +36,16 @@ class NexusApp : Application(), ImageLoaderFactory {
                 return@setDefaultUncaughtExceptionHandler
             } catch (_: Throwable) {}
         }
+
+        // Pre-initialize LibVLC in the background to ensure data layer compatibility and faster playback
+        kotlin.concurrent.thread {
+            try {
+                com.example.player.VlcHelper.getLibVLC(this)
+                Log.i("NexusApp", "LibVLC pre-initialized successfully in data layer/app startup")
+            } catch (e: Throwable) {
+                Log.e("NexusApp", "Failed to pre-initialize LibVLC", e)
+            }
+        }
     }
 
     override fun newImageLoader(): ImageLoader {

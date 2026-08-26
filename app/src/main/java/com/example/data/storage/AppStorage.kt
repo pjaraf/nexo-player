@@ -123,6 +123,11 @@ object AppStorage {
         }
     }
 
+    fun getPlayerEngine(): Int = prefs.getInt("player_engine", 0) // 0 = VLC, 1 = ExoPlayer
+    fun setPlayerEngine(engine: Int) {
+        prefs.edit().putInt("player_engine", engine).apply()
+    }
+
     fun isM3uMode(): Boolean = prefs.getBoolean("is_m3u_mode", false)
     fun isLocalM3uFile(): Boolean = prefs.getBoolean("m3u_is_local_file", false)
     fun getM3uUrl(): String = prefs.getString("m3u_url", "") ?: ""

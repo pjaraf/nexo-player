@@ -215,13 +215,22 @@ fun ProfileScreen(
                         testTag = "profile_favorites_btn"
                     )
 
-                    // Link to TV / Transfer Session (Only shown on mobile devices, not on TV)
+                    // Transmitir a TV (Mobile only)
                     MenuOptionCard(
                         title = "Transmitir Pantalla a TV",
                         subtitle = "Proyectar en Smart TV (Samsung, LG, Android TV, Chromecast)",
                         icon = Icons.Default.Cast,
                         onClick = { showScreenCastDialog = true },
                         testTag = "profile_cast_screen_btn"
+                    )
+
+                    // Reproductor Activo
+                    MenuOptionCard(
+                        title = "Motor de Reproductor",
+                        subtitle = "VLC Player v3.6.0 (Optimizado)",
+                        icon = Icons.Outlined.Settings,
+                        onClick = { /* Solo informativo por ahora */ },
+                        testTag = "profile_player_info_btn"
                     )
 
                     MenuOptionCard(
@@ -680,6 +689,15 @@ private fun TvProfileScreenLayout(
                             onClick = onNavigateFavorites,
                             modifier = Modifier.focusRequester(firstFocusRequester),
                             testTag = "tv_profile_favorites_btn"
+                        )
+
+                        // Reproductor Activo
+                        TvMenuOptionCard(
+                            title = "Motor de Reproductor",
+                            subtitle = "VLC Player v3.6.0 (Optimizado)",
+                            icon = Icons.Outlined.Settings,
+                            onClick = { /* Solo informativo por ahora */ },
+                            testTag = "tv_profile_player_info_btn"
                         )
                     }
 
