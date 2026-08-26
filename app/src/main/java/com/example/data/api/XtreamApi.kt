@@ -51,6 +51,8 @@ object XtreamApi {
         OkHttpClient.Builder()
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
             .hostnameVerifier { _, _ -> true }
+            .followRedirects(true)
+            .followSslRedirects(true)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .build()
@@ -168,6 +170,85 @@ object XtreamApi {
     private suspend fun fetchLiveM3uContent(): String? = loadM3uContent(LIVE_PLAYLIST_URL)
 
     fun parseM3uText(content: String): Pair<List<LiveChannel>, List<LiveCategory>> {
+        val channels = mutableListOf<LiveChannel>()
+        val groupCategoriesMap = linkedMapOf<String, String>()
+
+        val logoRegex = Regex("""tvg-logo\s*=\s*(?:["']([^"']+)["']|([^\s\r\n,]+))""", RegexOption.IGNORE_CASE)
+        val groupRegex = Regex("""group-title\s*=\s*(?:["']([^"']+)["']|([^\s\r\n,]+))""", RegexOption.IGNORE_CASE)
+        val urlRegex = Regex("""(https?://[^\s\r\n"'<>]+|rtsp://[^\s\r\n"'<>]+|rtmp://[^\s\r\n"'<>]+)""", RegexOption.IGNORE_CASE)
+
+        val lines = content.lines()
+        var currentLogo = ""
+        var currentGroup = "GENERAL"
+        var currentName = ""
+
+        var idx = 0
+        for (i in lines.indices) {
+            val line = lines[i].trim()
+            if (line.startsWith("#EXTINF", ignoreCase = true)) {
+                currentLogo = logoRegex.find(line)?.let { it.groupValues[1].ifBlank { it.groupValues[2] } }?.trim().orEmpty()
+                val rawGroup = groupRegex.find(line)?.let { it.groupValues[1].ifBlank { it.groupValues[2] } }?.trim()
+                currentGroup = if (rawGroup.isNullOrBlank()) "GENERAL" else rawGroup
+
+                val commaIdx = line.lastIndexOf(',')
+                if (commaIdx != -1 && commaIdx < line.length - 1) {
+                    currentName = line.substring(commaIdx + 1).trim()
+                } else {
+                    currentName = ""
+                }
+            } else if (line.isNotBlank() && !line.startsWith("#")) {
+                val matchUrl = urlRegex.find(line)
+                val streamUrl = matchUrl?.groupValues?.get(1)?.trim() ?: if (line.startsWith("http://", ignoreCase = true) || line.startsWith("https://", ignoreCase = true)) line else ""
+                
+                if (streamUrl.isNotBlank()) {
+                    idx++
+                    if (currentName.isBlank()) {
+                        currentName = "Canal $idx"
+                    }
+                    currentName = currentName.replace(Regex("""[\r\n]+"""), " ").trim()
+
+                    val categorySlug = currentGroup.lowercase()
+                        .replace(" ", "_")
+                        .replace("/", "_")
+                        .replace("&", "_")
+                        .replace("á", "a")
+                        .replace("é", "e")
+                        .replace("í", "i")
+                        .replace("ó", "o")
+                        .replace("ú", "u")
+
+                    groupCategoriesMap[currentGroup] = categorySlug
+
+                    channels.add(
+                        LiveChannel(
+                            streamId = "live_$idx",
+                            num = idx,
+                            name = currentName,
+                            streamIcon = currentLogo.ifBlank { null },
+                            categoryId = categorySlug,
+                            groupName = currentGroup,
+                            directStreamUrl = streamUrl
+                        )
+                    )
+                    currentName = ""
+                    currentLogo = ""
+                    currentGroup = "GENERAL"
+                }
+            }
+        }
+
+        // Fallback to legacy split parser if line-by-line found nothing
+        if (channels.isEmpty() && content.contains("EXTINF", ignoreCase = true)) {
+            return parseM3uTextLegacy(content)
+        }
+
+        val cats = groupCategoriesMap.map { (grp, slug) ->
+            LiveCategory(categoryId = slug, categoryName = grp)
+        }
+        return Pair(channels, sortCategories(cats))
+    }
+
+    private fun parseM3uTextLegacy(content: String): Pair<List<LiveChannel>, List<LiveCategory>> {
         val entries = content.split(Regex("(?i)#EXTINF:"))
         val channels = mutableListOf<LiveChannel>()
         val groupCategoriesMap = linkedMapOf<String, String>()
