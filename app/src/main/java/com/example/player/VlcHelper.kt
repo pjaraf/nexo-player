@@ -13,10 +13,11 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
-                    add("--avcodec-hw=any")         // Hardware nativo rápido
-                    add("--network-caching=500")     // Carga instantánea (500ms en lugar de 2000ms)
-                    add("--live-caching=500")
-                    add("--drop-late-frames")        // Si hay lag, salta frames sin congelar
+                    add("--avcodec-hw=any")
+                    add("--avcodec-skiploopfilter=4") // Omite filtros pesados de post-procesado
+                    add("--avcodec-threads=2")        // Limita hilos para no saturar CPUs de 4 núcleos de TV
+                    add("--network-caching=1500")
+                    add("--drop-late-frames")         // Descarta frames retrasados en lugar de congelar la app
                     add("--skip-frames")
                     add("--no-stats")
                     add("--no-video-title-show")
@@ -44,27 +45,21 @@ object VlcHelper {
         } catch (_: Exception) {
             Uri.EMPTY
         }
-        val lowerUrl = url.lowercase()
-        val isHevcOrHeavy = lowerUrl.contains("hevc") || lowerUrl.contains("h265") || lowerUrl.contains("4k") || lowerUrl.contains("hevc/h265") || lowerUrl.contains("live") || lowerUrl.contains(".m3u8") || lowerUrl.contains(".ts")
+        val isLiveStream = url.contains("/live/") || url.endsWith(".m3u8") || url.contains(".m3u8?") || url.endsWith(".ts") || url.contains(".ts?") || url.contains("m3u8")
         return Media(libVLC, cleanUri).apply {
+            // Regla de oro para Android TV: forzar decodificación por software (false, false) para evitar cierres en HEVC/H.265
             try {
-                if (isHevcOrHeavy) {
-                    setHWDecoderEnabled(false, false) // 100% Software para streams en vivo / HLS / TS para evitar crashes en TV Box
-                } else {
-                    setHWDecoderEnabled(true, false)
-                }
+                setHWDecoderEnabled(false, false)
             } catch (_: Throwable) {}
             
             addOption(":no-ssl-verify")
             addOption(":http-no-ssl-verify")
             addOption(":clock-jitter=0")
             addOption(":clock-synchro=0")
-            addOption(":network-caching=500")
-            addOption(":live-caching=500")
-            addOption(":file-caching=500")
-            addOption(":sout-mux-caching=500")
-            addOption(":drop-late-frames")
-            addOption(":skip-frames")
+            addOption(":network-caching=2000")
+            addOption(":live-caching=2000")
+            addOption(":file-caching=2000")
+            addOption(":sout-mux-caching=2000")
             addOption(":http-reconnect")
             addOption(":http-continuous")
             addOption(":rtsp-tcp")

@@ -21,8 +21,6 @@ fun VlcPlayerView(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                fitsSystemWindows = false
                 keepScreenOn = true
                 isFocusable = false
                 isFocusableInTouchMode = false

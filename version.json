@@ -1,8 +1,8 @@
 {
-    "versionCode": 169,
-    "versionName": "1.2.58",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.58/app-debug.apk",
-    "changelog": "Versión 1.2.58: Pre-inicialización nativa de LibVLC en la capa base de la aplicación (background thread) para acelerar drásticamente el tiempo de inicio de los canales en vivo y mejorar la compatibilidad general.",
+    "versionCode": 171,
+    "versionName": "1.2.60",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.60/app-debug.apk",
+    "changelog": "Versión 1.2.60: Rollback a versión estable anterior y optimización de hilos AVCodec, caché de red de 1500ms y descarte de frames retrasados para máxima fluidez en Smart TV.",
     "isMandatory": true
 }
 
