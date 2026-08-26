@@ -145,26 +145,39 @@ object XtreamApi {
 
     // --- Live TV from Custom Playlist / M3U / Xtream Server ---
     suspend fun loadM3uContent(customUrl: String? = null): String? = withContext(Dispatchers.IO) {
-        var targetUrl = (customUrl ?: AppStorage.getM3uUrl()).ifBlank { LIVE_PLAYLIST_URL }
-        if (targetUrl.contains("dropbox.com")) {
-            targetUrl = targetUrl.replace("www.dropbox.com", "dl.dropboxusercontent.com")
+        val rawUrl = (customUrl ?: AppStorage.getM3uUrl()).ifBlank { LIVE_PLAYLIST_URL }
+        val candidates = mutableListOf<String>()
+        candidates.add(rawUrl)
+        if (rawUrl.contains("dropbox.com") || rawUrl.contains("dropboxusercontent.com")) {
+            val cleanBase = rawUrl.substringBefore("?").trim()
+            candidates.add("$cleanBase?dl=1")
+            candidates.add("https://dl.dropboxusercontent.com" + cleanBase.substringAfter("dropbox.com", ""))
+            candidates.add("https://dl.dropboxusercontent.com" + cleanBase.substringAfter("dropbox.com", "") + "?dl=1")
+            candidates.add(rawUrl.replace("www.dropbox.com", "dl.dropboxusercontent.com"))
         }
-        try {
-            val request = Request.Builder()
-                .url(targetUrl)
-                .header("User-Agent", DEFAULT_UA)
-                .build()
-            val response = httpClient.newCall(request).execute()
-            if (response.isSuccessful) {
-                response.body?.string()
-            } else {
-                Log.w(TAG, "Failed to download M3U live list code=${response.code} from $targetUrl")
-                null
+
+        for (url in candidates.distinct()) {
+            if (url.isBlank() || !url.startsWith("http")) continue
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .build()
+                val response = httpClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        Log.i(TAG, "Successfully downloaded M3U list from $url (length=${body.length})")
+                        return@withContext body
+                    }
+                } else {
+                    Log.w(TAG, "Failed to download M3U live list code=${response.code} from $url")
+                }
+            } catch (e: Throwable) {
+                Log.w(TAG, "Error downloading M3U live list from $url: ${e.message}")
             }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Error downloading M3U live list from $targetUrl", e)
-            null
         }
+        null
     }
 
     private suspend fun fetchLiveM3uContent(): String? = loadM3uContent(LIVE_PLAYLIST_URL)
@@ -335,7 +348,7 @@ object XtreamApi {
             loadM3uContent(targetUrl)
         }
 
-        if (!content.isNullOrBlank() && (content.contains("EXTINF", ignoreCase = true) || content.contains("#EXT", ignoreCase = true))) {
+        if (!content.isNullOrBlank()) {
             val (channels, categories) = parseM3uText(content)
             if (channels.isNotEmpty()) {
                 parsedLiveChannels = channels

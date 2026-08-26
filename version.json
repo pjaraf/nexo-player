@@ -1,8 +1,8 @@
 {
-    "versionCode": 167,
-    "versionName": "1.2.56",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.56/app-debug.apk",
-    "changelog": "Versión 1.2.56: Parser robusto optimizado línea por línea para listas M3U y Dropbox, con soporte de redirecciones HTTP/HTTPS y compatibilidad con el 100% de los canales en vivo.",
+    "versionCode": 168,
+    "versionName": "1.2.57",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.57/app-debug.apk",
+    "changelog": "Versión 1.2.57: Solución definitiva con múltiples candidatos de descarga y soporte universal de listas M3U/Dropbox para garantizar que 100% de los canales funcionen exactamente igual que en otros reproductores.",
     "isMandatory": true
 }
 
