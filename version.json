@@ -1,8 +1,8 @@
 {
-    "versionCode": 172,
-    "versionName": "1.2.61",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.61/app-debug.apk",
-    "changelog": "Versión 1.2.61: Detección y notificación instantánea de actualizaciones al abrir la app o en tiempo real en todos tus dispositivos y Smart TV.",
+    "versionCode": 174,
+    "versionName": "1.2.63",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.63/app-debug.apk",
+    "changelog": "Versión 1.2.63: Estabilidad total en Google TV, Android TV y Smart Box, con sistema de actualización instantánea optimizado.",
     "isMandatory": true
 }
 
