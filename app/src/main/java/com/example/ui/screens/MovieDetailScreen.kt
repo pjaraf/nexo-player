@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import com.example.ui.components.TvAudioSubtitleDialog
 import com.example.ui.components.TvMediaTrackOption
-import com.example.ui.components.ScreenCastDialog
 import com.example.ui.components.TvFullscreenPlayerOverlay
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -1078,7 +1077,6 @@ private fun MovieDetailPhoneScreen(
     var latestMovies by remember { mutableStateOf<List<VodStream>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var isFav by remember { mutableStateOf(viewModel.isFavorite("movies", movieId)) }
-    var showScreenCastDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(movieId) {
         loading = true
@@ -1409,25 +1407,6 @@ private fun MovieDetailPhoneScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         IconButton(
-                            onClick = { showScreenCastDialog = true },
-                            modifier = Modifier.testTag("movie_cast_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Cast,
-                                contentDescription = "Transmitir a TV",
-                                tint = Color.White
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.6f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        IconButton(
                             onClick = {
                                 isFav = viewModel.toggleFavorite("movies", movieId, title, image)
                             },
@@ -1441,15 +1420,6 @@ private fun MovieDetailPhoneScreen(
                         }
                     }
                 }
-            }
-
-            if (showScreenCastDialog) {
-                val streamUrl = XtreamApi.getVodStreamUrl(movieId, ext)
-                ScreenCastDialog(
-                    streamUrl = streamUrl,
-                    title = title,
-                    onDismiss = { showScreenCastDialog = false }
-                )
             }
         }
     }

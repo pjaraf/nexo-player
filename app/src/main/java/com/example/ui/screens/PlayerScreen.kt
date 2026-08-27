@@ -60,7 +60,6 @@ import com.example.data.models.ProgressItem
 import com.example.player.PlayerManager
 import com.example.player.VlcPlayerView
 import com.example.ui.components.BreakingNewsTvBanner
-import com.example.ui.components.ScreenCastDialog
 import com.example.ui.components.TvFullscreenPlayerOverlay
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
@@ -107,7 +106,6 @@ fun PlayerScreen(
     BackHandler(onBack = onClose)
 
     var isLandscape by remember { mutableStateOf(true) }
-    var showScreenCastDialog by remember { mutableStateOf(false) }
 
     // Immersive Fullscreen and Screen Orientation handling on phones/tablets
     DisposableEffect(context, isLandscape) {
@@ -905,25 +903,6 @@ fun PlayerScreen(
                             }
                         }
                     }
-
-                    // Cast Screen to TV button (Mobile only)
-                    if (!isTv) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.65f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            IconButton(
-                                onClick = { showScreenCastDialog = true },
-                                modifier = Modifier.testTag("player_live_cast_btn")
-                            ) {
-                                Icon(Icons.Default.Cast, contentDescription = "Transmitir Pantalla a TV", tint = Color.White)
-                            }
-                        }
-                    }
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -962,37 +941,8 @@ fun PlayerScreen(
                         } else null,
                         onAspectRatio = { cycleResizeMode() }
                     )
-
-                    // Cast Screen to TV button on phone for VOD / Movies / Series
-                    if (!isTv) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(24.dp)
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.65f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            IconButton(
-                                onClick = { showScreenCastDialog = true },
-                                modifier = Modifier.testTag("player_vod_cast_btn")
-                            ) {
-                                Icon(Icons.Default.Cast, contentDescription = "Transmitir Pantalla a TV", tint = Color.White)
-                            }
-                        }
-                    }
                 }
             }
-        }
-
-        // Screen Cast Dialog for Mobile
-        if (showScreenCastDialog) {
-            ScreenCastDialog(
-                streamUrl = streamUrl,
-                title = currentTitle,
-                onDismiss = { showScreenCastDialog = false }
-            )
         }
 
         // Audio & Subtitles Selection Dialog

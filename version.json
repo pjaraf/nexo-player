@@ -1,8 +1,8 @@
 {
-    "versionCode": 171,
-    "versionName": "1.2.60",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.60/app-debug.apk",
-    "changelog": "Versión 1.2.60: Rollback a versión estable anterior y optimización de hilos AVCodec, caché de red de 1500ms y descarte de frames retrasados para máxima fluidez en Smart TV.",
+    "versionCode": 172,
+    "versionName": "1.2.61",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.61/app-debug.apk",
+    "changelog": "Versión 1.2.61: Eliminado el diálogo y botón de transmisión de video a Smart TV.",
     "isMandatory": true
 }
 

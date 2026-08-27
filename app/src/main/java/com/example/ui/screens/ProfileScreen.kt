@@ -43,7 +43,6 @@ import com.example.data.models.Profile
 import com.example.data.models.UserInfo
 import com.example.data.storage.AppStorage
 import com.example.ui.components.PhoneLinkTvDialog
-import com.example.ui.components.ScreenCastDialog
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.MainViewModel
 import com.example.utils.DeviceUtils
@@ -64,7 +63,6 @@ fun ProfileScreen(
     val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
 
     var showPhoneLinkDialog by remember { mutableStateOf(false) }
-    var showScreenCastDialog by remember { mutableStateOf(false) }
 
     val avatarColor = try {
         Color(android.graphics.Color.parseColor(activeProfile?.color ?: "#E50914"))
@@ -213,15 +211,6 @@ fun ProfileScreen(
                         icon = Icons.Outlined.FavoriteBorder,
                         onClick = onNavigateFavorites,
                         testTag = "profile_favorites_btn"
-                    )
-
-                    // Link to TV / Transfer Session (Only shown on mobile devices, not on TV)
-                    MenuOptionCard(
-                        title = "Transmitir Pantalla a TV",
-                        subtitle = "Proyectar en Smart TV (Samsung, LG, Android TV, Chromecast)",
-                        icon = Icons.Default.Cast,
-                        onClick = { showScreenCastDialog = true },
-                        testTag = "profile_cast_screen_btn"
                     )
 
                     MenuOptionCard(
@@ -401,12 +390,6 @@ fun ProfileScreen(
             if (showPhoneLinkDialog) {
                 PhoneLinkTvDialog(
                     onDismiss = { showPhoneLinkDialog = false }
-                )
-            }
-
-            if (showScreenCastDialog) {
-                ScreenCastDialog(
-                    onDismiss = { showScreenCastDialog = false }
                 )
             }
         }

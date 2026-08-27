@@ -43,7 +43,6 @@ import com.example.data.models.LiveChannel
 import com.example.player.PlayerManager
 import com.example.player.VlcPlayerView
 import com.example.ui.components.CHANNEL_FALLBACK
-import com.example.ui.components.ScreenCastDialog
 import com.example.ui.viewmodels.MainViewModel
 import com.example.utils.DeviceUtils
 import kotlinx.coroutines.delay
@@ -886,7 +885,6 @@ private fun PhoneLiveScreen(
     var selectedChannel by remember { mutableStateOf<LiveChannel?>(null) }
     var isPlayerBuffering by remember { mutableStateOf(false) }
     var playerHasError by remember { mutableStateOf(false) }
-    var showScreenCastDialog by remember { mutableStateOf(false) }
     var candidateIndex by remember { mutableIntStateOf(0) }
     var channelCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
     var retryTrigger by remember { mutableIntStateOf(0) }
@@ -1128,12 +1126,6 @@ private fun PhoneLiveScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(color = Color.Black.copy(alpha = 0.6f), shape = CircleShape) {
-                        IconButton(onClick = { showScreenCastDialog = true }, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Cast, contentDescription = "Transmitir a TV", tint = Color.White, modifier = Modifier.size(20.dp))
-                        }
-                    }
-
-                    Surface(color = Color.Black.copy(alpha = 0.6f), shape = CircleShape) {
                         IconButton(
                             onClick = {
                                 selectedChannel?.let { ch ->
@@ -1325,15 +1317,6 @@ private fun PhoneLiveScreen(
                     }
                 }
             }
-        }
-
-        if (showScreenCastDialog) {
-            val castUrl = selectedChannel?.let { XtreamApi.getLiveStreamCandidates(it.id).firstOrNull() }
-            ScreenCastDialog(
-                streamUrl = castUrl,
-                title = selectedChannel?.name ?: "Canal en Vivo",
-                onDismiss = { showScreenCastDialog = false }
-            )
         }
     }
 }
