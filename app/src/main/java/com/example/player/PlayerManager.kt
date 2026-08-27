@@ -211,10 +211,16 @@ class PlayerManager(val context: Context) {
         try {
             currentUrl = streamUrl
             mediaPlayer.let { player ->
-                if (player.isPlaying) {
-                    player.stop()
-                }
+                try {
+                    if (player.isPlaying) {
+                        player.stop()
+                    }
+                } catch (_: Throwable) {}
                 
+                try {
+                    player.media = null
+                } catch (_: Throwable) {}
+
                 val oldMedia = currentMedia
                 currentMedia = null
                 try {
@@ -234,9 +240,8 @@ class PlayerManager(val context: Context) {
 
                 player.play()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Log.e("PlayerManager", "Error in changeChannelSafe: ${e.message}")
+        } catch (e: Throwable) {
+            Log.e("PlayerManager", "Error in changeChannelSafe: ${e.message}", e)
         }
     }
 

@@ -234,7 +234,7 @@ object XtreamApi {
     }
 
     private suspend fun parseAndCacheLiveList(): List<LiveChannel> = withContext(Dispatchers.IO) {
-        parsedLiveChannels?.let { return@withContext it }
+        parsedLiveChannels?.takeIf { it.isNotEmpty() }?.let { return@withContext it }
 
         if (AppStorage.isM3uMode()) {
             val content = if (AppStorage.isLocalM3uFile()) {
@@ -244,71 +244,60 @@ object XtreamApi {
             }
             if (!content.isNullOrBlank()) {
                 val (channels, categories) = parseM3uText(content)
-                parsedLiveChannels = channels
-                parsedLiveCategories = categories
-                return@withContext channels
+                if (channels.isNotEmpty()) {
+                    parsedLiveChannels = channels
+                    parsedLiveCategories = categories
+                    return@withContext channels
+                }
             }
             return@withContext emptyList()
         }
 
         val currentUrl = baseUrl
-        val isLegacyDropboxServer = currentUrl.contains("eliteplusec.com", ignoreCase = true)
 
-        // For Nexo Fusion (https://nexo.fusionx.cl) and any other server:
-        // Use purely its own Xtream live channels to prevent mixing lists or showing unassociated channels
-        if (!isLegacyDropboxServer) {
+        // 1. Try Xtream get_live_streams from current server
+        try {
             val xtreamJson = fetch(action = "get_live_streams")
             if (!xtreamJson.isNullOrBlank()) {
-                try {
-                    val type = object : TypeToken<List<LiveChannel>>() {}.type
-                    val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
-                    if (list.isNotEmpty()) {
-                        // Ensure categories are cached to match group names
-                        val cats = getLiveCategories()
-                        val catMap = cats.associate { it.categoryId to it.categoryName }
-                        list.forEach { ch ->
-                            if (ch.groupName.isBlank()) {
-                                ch.groupName = catMap[ch.categoryId] ?: "GENERAL"
-                            }
+                val type = object : TypeToken<List<LiveChannel>>() {}.type
+                val list: List<LiveChannel>? = gson.fromJson(xtreamJson, type)
+                if (!list.isNullOrEmpty()) {
+                    // Ensure categories are cached to match group names
+                    val cats = getLiveCategories()
+                    val catMap = cats.associate { it.categoryId to it.categoryName }
+                    list.forEach { ch ->
+                        if (ch.groupName.isBlank()) {
+                            ch.groupName = catMap[ch.categoryId] ?: "GENERAL"
                         }
-                        parsedLiveChannels = list
-                        return@withContext list
                     }
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Failed to parse xtream live streams for $currentUrl", e)
+                    parsedLiveChannels = list
+                    return@withContext list
                 }
             }
-            return@withContext emptyList()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Failed to parse xtream live streams for $currentUrl, using live playlist fallback", e)
         }
 
-        // Fallback for legacy Elite Plus server with custom dropbox list
-        val content = fetchLiveM3uContent()
-        if (content.isNullOrBlank()) {
-            val xtreamJson = fetch(action = "get_live_streams")
-            if (!xtreamJson.isNullOrBlank()) {
-                try {
-                    val type = object : TypeToken<List<LiveChannel>>() {}.type
-                    val list: List<LiveChannel> = gson.fromJson(xtreamJson, type) ?: emptyList()
-                    if (list.isNotEmpty()) {
-                        parsedLiveChannels = list
-                        return@withContext list
-                    }
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Failed to parse xtream live streams", e)
+        // 2. Comprehensive fallback (as in v1.2.60): Load all live channels from Dropbox M3U playlist
+        try {
+            val content = fetchLiveM3uContent()
+            if (!content.isNullOrBlank()) {
+                val (channels, categories) = parseM3uText(content)
+                if (channels.isNotEmpty()) {
+                    parsedLiveChannels = channels
+                    parsedLiveCategories = categories
+                    return@withContext channels
                 }
             }
-            return@withContext emptyList()
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to parse live fallback M3U playlist", e)
         }
 
-        val (channels, categories) = parseM3uText(content)
-        parsedLiveChannels = channels
-        parsedLiveCategories = categories
-
-        return@withContext channels
+        return@withContext emptyList()
     }
 
     suspend fun getLiveCategories(): List<LiveCategory> = withContext(Dispatchers.IO) {
-        parsedLiveCategories?.let { return@withContext it }
+        parsedLiveCategories?.takeIf { it.isNotEmpty() }?.let { return@withContext it }
 
         if (AppStorage.isM3uMode()) {
             parseAndCacheLiveList()
@@ -316,27 +305,25 @@ object XtreamApi {
         }
 
         val currentUrl = baseUrl
-        val isLegacyDropboxServer = currentUrl.contains("eliteplusec.com", ignoreCase = true)
 
-        // Directly fetch live categories for Nexo Fusion (https://nexo.fusionx.cl) and any standard server
-        val json = fetch(action = "get_live_categories")
-        if (!json.isNullOrBlank()) {
-            try {
+        // 1. Try get_live_categories from Xtream server
+        try {
+            val json = fetch(action = "get_live_categories")
+            if (!json.isNullOrBlank()) {
                 val type = object : TypeToken<List<LiveCategory>>() {}.type
-                val list: List<LiveCategory> = gson.fromJson(json, type) ?: emptyList()
-                if (list.isNotEmpty()) {
+                val list: List<LiveCategory>? = gson.fromJson(json, type)
+                if (!list.isNullOrEmpty()) {
                     val sorted = sortCategories(list)
                     parsedLiveCategories = sorted
                     return@withContext sorted
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to parse live categories for $currentUrl", e)
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse live categories for $currentUrl from server", e)
         }
 
-        if (isLegacyDropboxServer) {
-            parseAndCacheLiveList()
-        }
+        // 2. Fallback to categories from Live list
+        parseAndCacheLiveList()
         return@withContext parsedLiveCategories ?: emptyList()
     }
 

@@ -43,6 +43,17 @@ class NexusApp : Application(), ImageLoaderFactory {
                 defaultHandler?.uncaughtException(thread, throwable)
             } catch (_: Throwable) {}
         }
+
+        // Install resilient Main Looper crash protection
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            while (true) {
+                try {
+                    android.os.Looper.loop()
+                } catch (t: Throwable) {
+                    Log.e("NexusApp", "Handled main looper exception to prevent app close: ${t.message}", t)
+                }
+            }
+        }
     }
 
     override fun newImageLoader(): ImageLoader {
