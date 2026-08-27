@@ -28,12 +28,16 @@ class NexusApp : Application(), ImageLoaderFactory {
 
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            Log.e("NexusApp", "Prevented app crash on thread: ${thread.name}", throwable)
+            Log.e("NexusApp", "Uncaught exception on thread: ${thread.name}", throwable)
             try {
-                // If it's a non-fatal or player/network/render exception, prevent crash
-                val msg = throwable.message ?: ""
-                if (msg.contains("vlc") || msg.contains("mediaplayer") || msg.contains("libvlc") || msg.contains("surface") || msg.contains("texture")) {
-                    Log.w("NexusApp", "Ignored non-fatal player exception to prevent closure")
+                val msg = (throwable.message ?: "").lowercase()
+                val stack = Log.getStackTraceString(throwable).lowercase()
+                if (msg.contains("vlc") || msg.contains("mediaplayer") || msg.contains("libvlc") ||
+                    msg.contains("surface") || msg.contains("texture") || msg.contains("focus") ||
+                    stack.contains("focus") || stack.contains("videolayout") || stack.contains("vlc") ||
+                    stack.contains("libvlc")
+                ) {
+                    Log.w("NexusApp", "Suppressed non-fatal TV/player/focus exception to keep app running")
                     return@setDefaultUncaughtExceptionHandler
                 }
                 defaultHandler?.uncaughtException(thread, throwable)

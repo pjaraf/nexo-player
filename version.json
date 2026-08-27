@@ -1,8 +1,8 @@
 {
-    "versionCode": 172,
-    "versionName": "1.2.61",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.61/app-debug.apk",
-    "changelog": "Versión 1.2.61: Eliminado el diálogo y botón de transmisión de video a Smart TV.",
+    "versionCode": 173,
+    "versionName": "1.2.62",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.62/app-debug.apk",
+    "changelog": "Versión 1.2.62: Corrección integral de estabilidad para Google TV, Android TV y TV Box (optimización de renderizado SurfaceView, compatibilidad con todas las arquitecturas de CPU, gestión robusta de foco D-pad y splash optimizado).",
     "isMandatory": true
 }
 

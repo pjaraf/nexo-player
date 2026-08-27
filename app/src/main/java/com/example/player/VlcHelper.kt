@@ -13,15 +13,16 @@ object VlcHelper {
         return libVLCInstance ?: synchronized(this) {
             libVLCInstance ?: try {
                 val options = ArrayList<String>().apply {
-                    add("--avcodec-hw=any")
-                    add("--avcodec-skiploopfilter=4") // Omite filtros pesados de post-procesado
-                    add("--avcodec-threads=2")        // Limita hilos para no saturar CPUs de 4 núcleos de TV
-                    add("--network-caching=1500")
-                    add("--drop-late-frames")         // Descarta frames retrasados en lugar de congelar la app
-                    add("--skip-frames")
                     add("--no-stats")
                     add("--no-video-title-show")
                     add("--no-sub-autodetect-file")
+                    add("--audio-time-stretch")
+                    add("--network-caching=2000")
+                    add("--live-caching=2000")
+                    add("--file-caching=2000")
+                    add("--sout-mux-caching=2000")
+                    add("--http-reconnect")
+                    add("--http-continuous")
                     add("--http-user-agent=Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.5.4")
                 }
                 LibVLC(context.applicationContext, options)

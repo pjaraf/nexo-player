@@ -13,30 +13,36 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 object NetworkMonitor {
 
     fun isOnline(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return false
-        val activeNetwork = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        return try {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return true
+            val activeNetwork = connectivityManager.activeNetwork ?: return true
+            val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return true
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (_: Throwable) {
+            true // Fail open to allow playback rather than crashing or blocking
+        }
     }
 
     fun observeNetworkState(context: Context): Flow<Boolean> = callbackFlow {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
         if (connectivityManager == null) {
-            trySend(false)
+            trySend(true)
             close()
             return@callbackFlow
         }
 
-        val initialConnected = isOnline(context)
-        trySend(initialConnected)
+        trySend(isOnline(context))
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                val caps = connectivityManager.getNetworkCapabilities(network)
-                val hasInternet = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-                trySend(hasInternet)
+                try {
+                    val caps = connectivityManager.getNetworkCapabilities(network)
+                    val hasInternet = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ?: true
+                    trySend(hasInternet)
+                } catch (_: Throwable) {
+                    trySend(true)
+                }
             }
 
             override fun onLost(network: Network) {
@@ -44,22 +50,31 @@ object NetworkMonitor {
             }
 
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                trySend(hasInternet)
+                try {
+                    val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    trySend(hasInternet)
+                } catch (_: Throwable) {
+                    trySend(true)
+                }
             }
         }
 
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-
-        connectivityManager.registerNetworkCallback(request, callback)
+        val registered = try {
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            connectivityManager.registerNetworkCallback(request, callback)
+            true
+        } catch (_: Throwable) {
+            false
+        }
 
         awaitClose {
-            try {
-                connectivityManager.unregisterNetworkCallback(callback)
-            } catch (_: Exception) {}
+            if (registered) {
+                try {
+                    connectivityManager.unregisterNetworkCallback(callback)
+                } catch (_: Exception) {}
+            }
         }
     }.distinctUntilChanged()
 }

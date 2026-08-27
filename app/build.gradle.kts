@@ -13,11 +13,11 @@ android {
         applicationId = "com.nexo.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 172
-        versionName = "1.2.61"
+        versionCode = 173
+        versionName = "1.2.62"
 
         ndk {
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
