@@ -13,12 +13,10 @@ fun VlcPlayerView(
     playerManager: PlayerManager,
     modifier: Modifier = Modifier,
     enableSubtitles: Boolean = true,
-    useTextureView: Boolean = false
+    useTextureView: Boolean = true
 ) {
     AndroidView(
         factory = { ctx ->
-            val isTv = DeviceUtils.isTelevision(ctx)
-            val actualUseTexture = if (isTv) false else useTextureView
             VLCVideoLayout(ctx).apply {
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -27,14 +25,12 @@ fun VlcPlayerView(
                 keepScreenOn = true
                 isFocusable = false
                 isFocusableInTouchMode = false
-                playerManager.attachViews(this, enableSubtitles, actualUseTexture)
+                playerManager.attachViews(this, enableSubtitles, useTextureView)
             }
         },
         update = { layout ->
-            val isTv = DeviceUtils.isTelevision(layout.context)
-            val actualUseTexture = if (isTv) false else useTextureView
             layout.keepScreenOn = true
-            playerManager.attachViews(layout, enableSubtitles, actualUseTexture)
+            playerManager.attachViews(layout, enableSubtitles, useTextureView)
         },
         onRelease = {
             playerManager.detachViews()

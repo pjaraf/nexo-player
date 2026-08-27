@@ -46,11 +46,9 @@ object VlcHelper {
         } catch (_: Exception) {
             Uri.EMPTY
         }
-        val isLiveStream = url.contains("/live/") || url.endsWith(".m3u8") || url.contains(".m3u8?") || url.endsWith(".ts") || url.contains(".ts?") || url.contains("m3u8")
         return Media(libVLC, cleanUri).apply {
-            // Regla de oro para Android TV: forzar decodificación por software (false, false) para evitar cierres en HEVC/H.265
             try {
-                setHWDecoderEnabled(false, false)
+                setHWDecoderEnabled(true, false)
             } catch (_: Throwable) {}
             
             addOption(":no-ssl-verify")

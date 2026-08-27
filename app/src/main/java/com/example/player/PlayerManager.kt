@@ -215,34 +215,21 @@ class PlayerManager(val context: Context) {
                     player.stop()
                 }
                 
-                val oldMedia = player.media
-                player.media = null
+                val oldMedia = currentMedia
                 currentMedia = null
                 try {
-                    oldMedia?.release()
+                    if (oldMedia != null && !oldMedia.isReleased) {
+                        oldMedia.release()
+                    }
                 } catch (_: Throwable) {}
 
-                val cleanUri = try {
-                    Uri.parse(streamUrl.trim())
-                } catch (_: Exception) {
-                    Uri.EMPTY
-                }
-
-                val newMedia = Media(libVLC, cleanUri).apply {
-                    try {
-                        setHWDecoderEnabled(true, false)
-                    } catch (_: Throwable) {}
-                    addOption(":network-caching=2000")
-                    addOption(":clock-jitter=0")
-                    addOption(":clock-synchro=0")
-                    addOption(":no-ssl-verify")
-                    addOption(":http-no-ssl-verify")
-                }
-
+                val newMedia = VlcHelper.createMedia(libVLC, streamUrl)
                 currentMedia = newMedia
                 player.media = newMedia
+
                 try {
-                    newMedia.release()
+                    targetAspectRatio?.let { player.aspectRatio = it }
+                    targetScale?.let { player.scale = it }
                 } catch (_: Throwable) {}
 
                 player.play()
