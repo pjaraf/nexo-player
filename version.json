@@ -1,8 +1,8 @@
 {
-    "versionCode": 170,
-    "versionName": "1.2.60",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.60/app-debug.apk",
-    "changelog": "Versión 1.2.60",
+    "versionCode": 172,
+    "versionName": "1.2.61",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.61/app-debug.apk",
+    "changelog": "Versión 1.2.61: Detección y notificación instantánea de actualizaciones al abrir la app o en tiempo real en todos tus dispositivos y Smart TV.",
     "isMandatory": true
 }
 

@@ -127,7 +127,7 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
         viewModelScope.launch {
             isOnline.collect { online ->
                 if (online) {
-                    checkForUpdates(manual = false)
+                    checkForUpdates(manual = true)
                     if (_isLoggedIn.value) {
                         loadHomeContent()
                     }
@@ -135,17 +135,14 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
             }
         }
         
-        // Start background polling for updates (every 2 minutes) to ensure they appear instantly without restarting
+        // Start background polling for updates (every 30 seconds) to ensure they appear instantly without restarting
         startUpdatePolling()
     }
 
     private fun startUpdatePolling() {
         viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                // Wait 2 minutes before checking again
-                kotlinx.coroutines.delay(2 * 60 * 1000L)
-                
-                // Only poll if no update is currently showing
+                kotlinx.coroutines.delay(30 * 1000L)
                 if (AppUpdateManager.latestUpdateInfo.value == null) {
                     checkForUpdates(manual = false)
                 }
