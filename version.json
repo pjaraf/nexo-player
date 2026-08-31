@@ -1,8 +1,8 @@
 {
-    "versionCode": 185,
-    "versionName": "1.2.74",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.74/app-debug.apk",
-    "changelog": "Versión 1.2.74: Despliegue y notificación masiva e instantánea en todos los dispositivos en paralelo.",
+    "versionCode": 186,
+    "versionName": "1.2.75",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.75/app-debug.apk",
+    "changelog": "Versión 1.2.75: Corrección de estabilidad en TV Box genéricas y Google TV. Optimización de memoria y rendimiento.",
     "isMandatory": true
 }
 

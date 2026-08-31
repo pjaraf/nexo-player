@@ -29,20 +29,11 @@ class NexusApp : Application(), ImageLoaderFactory {
         super.onCreate()
         instance = this
 
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            Log.e("NexusApp", "Uncaught exception caught safely on thread: ${thread.name}", throwable)
-            // Suppress all unhandled exceptions to prevent the application from closing unexpectedly
-        }
-
-        // Install resilient Main Looper crash protection
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            while (true) {
-                try {
-                    android.os.Looper.loop()
-                } catch (t: Throwable) {
-                    Log.e("NexusApp", "Handled main looper exception to prevent app close: ${t.message}", t)
-                }
-            }
+            Log.e("NexusApp", "Uncaught exception on thread: ${thread.name}", throwable)
+            // Call default handler or log gracefully so system doesn't freeze in undefined loop state
+            defaultHandler?.uncaughtException(thread, throwable)
         }
     }
 
