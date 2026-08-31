@@ -10,8 +10,7 @@ import com.example.data.storage.AppStorage
 import com.example.data.updater.AppUpdateManager
 import com.example.utils.NetworkMonitor
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 
 class MainViewModel(application: Application = NexusApp.instance) : AndroidViewModel(application) {
 
@@ -230,11 +229,6 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
             return
         }
 
-        if (!isOnline.value) {
-            _loginError.value = "Sin conexión a internet. Conéctate a una red para iniciar sesión."
-            return
-        }
-
         viewModelScope.launch {
             _loginLoading.value = true
             _loginError.value = null
@@ -269,17 +263,30 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
 
                 var authenticatedResult: Pair<String, UserInfo>? = null
 
-                for (server in candidateServers) {
-                    try {
-                        AppStorage.setServerUrl(server)
-                        XtreamApi.clearCache()
-                        val res = XtreamApi.login(trimmedUser, trimmedPass, customBaseUrl = server)
-                        if (res != null && res.userInfo != null) {
-                            authenticatedResult = Pair(server, res.userInfo)
-                            break
+                // Fast path: Try primary server first
+                val primaryServer = candidateServers.first()
+                try {
+                    val directRes = XtreamApi.login(trimmedUser, trimmedPass, customBaseUrl = primaryServer)
+                    if (directRes?.userInfo != null) {
+                        authenticatedResult = Pair(primaryServer, directRes.userInfo)
+                    }
+                } catch (_: Throwable) {}
+
+                // If not authenticated, check all servers in parallel
+                if (authenticatedResult == null && candidateServers.size > 1) {
+                    val remaining = candidateServers.drop(1)
+                    authenticatedResult = coroutineScope {
+                        val deferredList = remaining.map { server ->
+                            async(Dispatchers.IO) {
+                                try {
+                                    val res = XtreamApi.login(trimmedUser, trimmedPass, customBaseUrl = server)
+                                    if (res?.userInfo != null) Pair(server, res.userInfo) else null
+                                } catch (_: Throwable) {
+                                    null
+                                }
+                            }
                         }
-                    } catch (_: Throwable) {
-                        // Continue checking other servers
+                        deferredList.awaitAll().firstOrNull { it != null }
                     }
                 }
 

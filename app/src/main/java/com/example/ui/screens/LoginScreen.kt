@@ -209,6 +209,8 @@ fun LoginScreen(
 
                     // Username input field
                     var isUsernameFocused by remember { mutableStateOf(false) }
+                    val passwordFocusRequester = remember { FocusRequester() }
+
                     TextField(
                         value = username,
                         onValueChange = { username = it },
@@ -234,13 +236,20 @@ fun LoginScreen(
                             keyboardType = KeyboardType.Text,
                             imeAction = ImeAction.Next
                         ),
+                        keyboardActions = KeyboardActions(
+                            onNext = {
+                                try {
+                                    passwordFocusRequester.requestFocus()
+                                } catch (_: Exception) {}
+                            }
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(if (isLargeTv) 50.dp else 56.dp)
                             .focusRequester(initialFocusRequester)
                             .onFocusChanged { isUsernameFocused = it.isFocused }
                             .border(
-                                width = if (isUsernameFocused) 2.dp else 1.dp,
+                                width = if (isUsernameFocused) 2.5.dp else 1.dp,
                                 color = if (isUsernameFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
                                 shape = RoundedCornerShape(6.dp)
                             )
@@ -296,9 +305,10 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(if (isLargeTv) 50.dp else 56.dp)
+                            .focusRequester(passwordFocusRequester)
                             .onFocusChanged { isPasswordFocused = it.isFocused }
                             .border(
-                                width = if (isPasswordFocused) 2.dp else 1.dp,
+                                width = if (isPasswordFocused) 2.5.dp else 1.dp,
                                 color = if (isPasswordFocused) TvFocusBlue else Color.White.copy(alpha = 0.15f),
                                 shape = RoundedCornerShape(6.dp)
                             )
