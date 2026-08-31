@@ -33,8 +33,14 @@ object AppStorage {
     const val SERVER_ELITE_PLUS = "http://eliteplusec.com:8080"
 
     val AUTO_DETECT_SERVERS = listOf(
-        SERVER_NEXO_FUSION,
-        SERVER_ELITE_PLUS
+        "https://nexo.fusionx.cl",
+        "http://nexo.fusionx.cl",
+        "http://nexo.fusionx.cl:8080",
+        "https://nexo.fusionx.cl:8080",
+        "https://nexo.fusionx.cl:8443",
+        "http://eliteplusec.com:8080",
+        "https://eliteplusec.com:8080",
+        "http://eliteplusec.com"
     )
 
     val SERVER_PRESETS = listOf(

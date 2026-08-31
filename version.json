@@ -1,8 +1,8 @@
 {
-    "versionCode": 180,
-    "versionName": "1.2.69",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.69/app-debug.apk",
-    "changelog": "Versión 1.2.69: Servidores protegidos e invisibles con conexión y detección automática por usuario y contraseña.",
+    "versionCode": 181,
+    "versionName": "1.2.70",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.70/app-debug.apk",
+    "changelog": "Versión 1.2.70: Compatibilidad total y soporte de red/TLS y puertos para televisores Android TV y TV Box en nexo.fusionx.cl.",
     "isMandatory": true
 }
 

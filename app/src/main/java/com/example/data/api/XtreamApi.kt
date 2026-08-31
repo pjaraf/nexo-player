@@ -8,9 +8,12 @@ import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionSpec
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.TlsVersion
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
@@ -34,7 +37,7 @@ object XtreamApi {
             return AppStorage.SERVER_NEXO_FUSION
         }
 
-    private const val DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 VLC/3.0.18 LibVLC/3.0.18"
+    private const val DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.5.4"
 
     private val gson = Gson()
 
@@ -45,13 +48,33 @@ object XtreamApi {
             override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
         })
 
-        val sslContext = SSLContext.getInstance("SSL")
-        sslContext.init(null, trustAllCerts, SecureRandom())
+        val sslContext = try {
+            SSLContext.getInstance("TLS").apply {
+                init(null, trustAllCerts, SecureRandom())
+            }
+        } catch (_: Exception) {
+            SSLContext.getInstance("SSL").apply {
+                init(null, trustAllCerts, SecureRandom())
+            }
+        }
+
+        val modernTlsSpec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+            .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1, TlsVersion.TLS_1_0)
+            .build()
+
+        val compatibleTlsSpec = ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
+            .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1, TlsVersion.TLS_1_0)
+            .build()
 
         OkHttpClient.Builder()
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
             .hostnameVerifier { _, _ -> true }
-            .connectTimeout(15, TimeUnit.SECONDS)
+            .connectionSpecs(listOf(modernTlsSpec, compatibleTlsSpec, ConnectionSpec.CLEARTEXT))
+            .protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2))
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .retryOnConnectionFailure(true)
+            .connectTimeout(12, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .build()
     }
@@ -74,7 +97,8 @@ object XtreamApi {
         action: String? = null,
         extraParams: Map<String, String> = emptyMap(),
         customUser: String? = null,
-        customPass: String? = null
+        customPass: String? = null,
+        customBaseUrl: String? = null
     ): String? = withContext(Dispatchers.IO) {
         val username = customUser ?: AppStorage.getUsername()
         val password = customPass ?: AppStorage.getPassword()
@@ -83,7 +107,8 @@ object XtreamApi {
             return@withContext null
         }
 
-        val urlBuilder = "$baseUrl/player_api.php".toHttpUrlOrNull()?.newBuilder()
+        val effectiveBase = (customBaseUrl ?: baseUrl).trimEnd('/')
+        val urlBuilder = "$effectiveBase/player_api.php".toHttpUrlOrNull()?.newBuilder()
             ?: return@withContext null
 
         urlBuilder.addQueryParameter("username", username)
@@ -102,17 +127,17 @@ object XtreamApi {
             if (response.isSuccessful) {
                 response.body?.string()
             } else {
-                Log.w(TAG, "Fetch failed for action=$action code=${response.code}")
+                Log.w(TAG, "Fetch failed for action=$action code=${response.code} from $effectiveBase")
                 null
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "Network error for action=$action: ${e.message}")
+            Log.w(TAG, "Network error for action=$action on $effectiveBase: ${e.message}")
             null
         }
     }
 
-    suspend fun login(username: String, pass: String): LoginResponse? {
-        val json = fetch(customUser = username, customPass = pass) ?: return null
+    suspend fun login(username: String, pass: String, customBaseUrl: String? = null): LoginResponse? {
+        val json = fetch(customUser = username, customPass = pass, customBaseUrl = customBaseUrl) ?: return null
         return try {
             val res = gson.fromJson(json, LoginResponse::class.java)
             val userInfo = res.userInfo
@@ -568,6 +593,28 @@ object XtreamApi {
         return ""
     }
 
+    private fun getHostCandidates(base: String): List<String> {
+        val list = mutableListOf<String>()
+        list.add(base)
+        if (base.startsWith("https://", ignoreCase = true)) {
+            val noScheme = base.substring(8).trimEnd('/')
+            val hostOnly = noScheme.substringBefore(':')
+            list.add("http://$noScheme")
+            if (!noScheme.contains(":")) {
+                list.add("http://$hostOnly:8080")
+                list.add("https://$hostOnly:8080")
+            }
+        } else if (base.startsWith("http://", ignoreCase = true)) {
+            val noScheme = base.substring(7).trimEnd('/')
+            val hostOnly = noScheme.substringBefore(':')
+            list.add("https://$noScheme")
+            if (!noScheme.contains(":")) {
+                list.add("http://$hostOnly:8080")
+            }
+        }
+        return list.distinct()
+    }
+
     fun getLiveStreamCandidates(channelId: String): List<String> {
         val cid = cleanId(channelId)
         val ch = parsedLiveChannels?.find { it.id == cid || it.streamId?.toString() == cid || it.name == cid }
@@ -578,23 +625,13 @@ object XtreamApi {
         val u = AppStorage.getUsername()
         val p = AppStorage.getPassword()
         if (u.isNotBlank() && p.isNotBlank() && cid.isNotBlank()) {
-            val base = baseUrl
-            val httpBase = if (base.startsWith("https://", ignoreCase = true)) {
-                "http://" + base.substring(8)
-            } else null
-
-            // TS format (default and most reliable IPTV container)
-            list.add("$base/live/$u/$p/$cid.ts")
-            httpBase?.let { list.add("$it/live/$u/$p/$cid.ts") }
-
-            // M3U8 HLS format
-            list.add("$base/live/$u/$p/$cid.m3u8")
-            httpBase?.let { list.add("$it/live/$u/$p/$cid.m3u8") }
-
-            // Direct stream without extension
-            list.add("$base/$u/$p/$cid")
-            list.add("$base/live/$u/$p/$cid")
-            httpBase?.let { list.add("$it/$u/$p/$cid") }
+            val hosts = getHostCandidates(baseUrl)
+            for (h in hosts) {
+                list.add("$h/live/$u/$p/$cid.ts")
+                list.add("$h/live/$u/$p/$cid.m3u8")
+                list.add("$h/$u/$p/$cid")
+                list.add("$h/live/$u/$p/$cid")
+            }
         }
         return list.distinct()
     }
@@ -616,25 +653,13 @@ object XtreamApi {
         val p = AppStorage.getPassword()
         if (u.isBlank() || p.isBlank() || sid.isBlank()) return emptyList()
         val ext = extension.ifBlank { "mp4" }
-        val base = baseUrl
-        val httpBase = if (base.startsWith("https://", ignoreCase = true)) {
-            "http://" + base.substring(8)
-        } else null
-
         val list = mutableListOf<String>()
-        list.add("$base/movie/$u/$p/$sid.$ext")
-        httpBase?.let { list.add("$it/movie/$u/$p/$sid.$ext") }
-        if (ext != "mp4") {
-            list.add("$base/movie/$u/$p/$sid.mp4")
-            httpBase?.let { list.add("$it/movie/$u/$p/$sid.mp4") }
-        }
-        if (ext != "mkv") {
-            list.add("$base/movie/$u/$p/$sid.mkv")
-            httpBase?.let { list.add("$it/movie/$u/$p/$sid.mkv") }
-        }
-        if (ext != "ts") {
-            list.add("$base/movie/$u/$p/$sid.ts")
-            httpBase?.let { list.add("$it/movie/$u/$p/$sid.ts") }
+        val hosts = getHostCandidates(baseUrl)
+        for (h in hosts) {
+            list.add("$h/movie/$u/$p/$sid.$ext")
+            if (ext != "mp4") list.add("$h/movie/$u/$p/$sid.mp4")
+            if (ext != "mkv") list.add("$h/movie/$u/$p/$sid.mkv")
+            if (ext != "ts") list.add("$h/movie/$u/$p/$sid.ts")
         }
         return list.distinct()
     }
@@ -656,21 +681,12 @@ object XtreamApi {
         val p = AppStorage.getPassword()
         if (u.isBlank() || p.isBlank() || eid.isBlank()) return emptyList()
         val ext = extension.ifBlank { "mp4" }
-        val base = baseUrl
-        val httpBase = if (base.startsWith("https://", ignoreCase = true)) {
-            "http://" + base.substring(8)
-        } else null
-
         val list = mutableListOf<String>()
-        list.add("$base/series/$u/$p/$eid.$ext")
-        httpBase?.let { list.add("$it/series/$u/$p/$eid.$ext") }
-        if (ext != "mp4") {
-            list.add("$base/series/$u/$p/$eid.mp4")
-            httpBase?.let { list.add("$it/series/$u/$p/$eid.mp4") }
-        }
-        if (ext != "mkv") {
-            list.add("$base/series/$u/$p/$eid.mkv")
-            httpBase?.let { list.add("$it/series/$u/$p/$eid.mkv") }
+        val hosts = getHostCandidates(baseUrl)
+        for (h in hosts) {
+            list.add("$h/series/$u/$p/$eid.$ext")
+            if (ext != "mp4") list.add("$h/series/$u/$p/$eid.mp4")
+            if (ext != "mkv") list.add("$h/series/$u/$p/$eid.mkv")
         }
         return list.distinct()
     }
