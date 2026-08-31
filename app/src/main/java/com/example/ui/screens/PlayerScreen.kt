@@ -544,6 +544,12 @@ fun PlayerScreen(
         if (!isLive || liveChannels.isEmpty() || liveIndex < 0) return
         val nextIdx = (liveIndex + delta + liveChannels.size) % liveChannels.size
         val target = liveChannels[nextIdx]
+
+        // Mata inmediatamente el canal anterior para evitar solapamientos
+        try {
+            playerManager.killPlayback()
+        } catch (_: Throwable) {}
+
         liveIndex = nextIdx
         currentChannelId = target.id
         currentTitle = target.name

@@ -1,8 +1,8 @@
 {
-    "versionCode": 176,
-    "versionName": "1.2.65",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.65/app-debug.apk",
-    "changelog": "Versión 1.2.65: Restauración total de lista completa de canales en vivo y protección contra cierres inesperados.",
+    "versionCode": 177,
+    "versionName": "1.2.66",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.66/app-debug.apk",
+    "changelog": "Versión 1.2.66: Eliminación instantánea del canal anterior al cambiar rápido y blindaje total contra cierres de la app.",
     "isMandatory": true
 }
 

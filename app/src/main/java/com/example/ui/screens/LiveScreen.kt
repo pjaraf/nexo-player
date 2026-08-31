@@ -202,6 +202,9 @@ private fun TvLiveScreen(
     LaunchedEffect(selectedChannel) {
         val ch = selectedChannel
         if (ch != null) {
+            try {
+                playerManager.killPlayback()
+            } catch (_: Throwable) {}
             isBuffering = true
             hasError = false
             candidateIndex = 0
@@ -945,6 +948,9 @@ private fun PhoneLiveScreen(
     LaunchedEffect(selectedChannel, retryTrigger) {
         val ch = selectedChannel
         if (ch != null) {
+            try {
+                playerManager.killPlayback()
+            } catch (_: Throwable) {}
             isPlayerBuffering = true
             playerHasError = false
             candidateIndex = 0

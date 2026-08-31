@@ -17,12 +17,11 @@ object VlcHelper {
                     add("--no-video-title-show")
                     add("--no-sub-autodetect-file")
                     add("--audio-time-stretch")
-                    add("--network-caching=2000")
-                    add("--live-caching=2000")
-                    add("--file-caching=2000")
-                    add("--sout-mux-caching=2000")
+                    add("--network-caching=1200")
+                    add("--live-caching=1200")
+                    add("--file-caching=1200")
+                    add("--sout-mux-caching=1200")
                     add("--http-reconnect")
-                    add("--http-continuous")
                     add("--http-user-agent=Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VLC/3.0.18 LibVLC/3.5.4")
                 }
                 LibVLC(context.applicationContext, options)
@@ -55,17 +54,17 @@ object VlcHelper {
             addOption(":http-no-ssl-verify")
             addOption(":clock-jitter=0")
             addOption(":clock-synchro=0")
-            addOption(":network-caching=2000")
-            addOption(":live-caching=2000")
-            addOption(":file-caching=2000")
-            addOption(":sout-mux-caching=2000")
+            addOption(":network-caching=1200")
+            addOption(":live-caching=1200")
+            addOption(":file-caching=1200")
+            addOption(":sout-mux-caching=1200")
             addOption(":http-reconnect")
-            addOption(":http-continuous")
             addOption(":rtsp-tcp")
             addOption(":no-sub-autodetect-file")
         }
     }
 }
+
 
 
 

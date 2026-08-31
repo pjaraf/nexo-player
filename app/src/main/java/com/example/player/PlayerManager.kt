@@ -36,7 +36,6 @@ class PlayerManager(val context: Context) {
     var onTracksChanged: (() -> Unit)? = null
 
     private var currentUrl: String? = null
-    private var currentMedia: Media? = null
 
     private var targetAspectRatio: String? = null
     private var targetScale: Float? = null
@@ -206,99 +205,74 @@ class PlayerManager(val context: Context) {
     }
 
     @Synchronized
-    fun changeChannelSafe(streamUrl: String) {
-        if (streamUrl.isBlank()) return
+    fun killPlayback() {
         try {
-            currentUrl = streamUrl
-            mediaPlayer.let { player ->
-                try {
-                    if (player.isPlaying) {
-                        player.stop()
-                    }
-                } catch (_: Throwable) {}
-                
-                try {
-                    player.media = null
-                } catch (_: Throwable) {}
-
-                val oldMedia = currentMedia
-                currentMedia = null
-                try {
-                    if (oldMedia != null && !oldMedia.isReleased) {
-                        oldMedia.release()
-                    }
-                } catch (_: Throwable) {}
-
-                val newMedia = VlcHelper.createMedia(libVLC, streamUrl)
-                currentMedia = newMedia
-                player.media = newMedia
-
-                try {
-                    targetAspectRatio?.let { player.aspectRatio = it }
-                    targetScale?.let { player.scale = it }
-                } catch (_: Throwable) {}
-
-                player.play()
+            pendingStartPositionMs = 0L
+            if (mediaPlayer.isPlaying) {
+                mediaPlayer.stop()
             }
-        } catch (e: Throwable) {
-            Log.e("PlayerManager", "Error in changeChannelSafe: ${e.message}", e)
+        } catch (t: Throwable) {
+            Log.w("PlayerManager", "Error in killPlayback", t)
         }
+    }
+
+    @Synchronized
+    fun changeChannelSafe(streamUrl: String) {
+        killAndPlay(streamUrl, 0L)
     }
 
     @Synchronized
     fun playStream(streamUrl: String) {
-        changeChannelSafe(streamUrl)
+        killAndPlay(streamUrl, 0L)
+    }
+
+    @Synchronized
+    fun killAndPlay(url: String, startPositionMs: Long = 0L) {
+        if (url.isBlank()) {
+            mainHandler.post { onError?.invoke("URL de transmisión inválida") }
+            return
+        }
+        try {
+            currentUrl = url
+            pendingStartPositionMs = startPositionMs.coerceAtLeast(0L)
+            lastSeekTimestamp = 0L
+            isSeekingInProgress = false
+
+            // 1. Inmediatamente mata el canal anterior
+            try {
+                if (mediaPlayer.isPlaying) {
+                    mediaPlayer.stop()
+                }
+            } catch (_: Throwable) {}
+
+            // 2. Crea el nuevo Media optimizado con aceleración por hardware
+            val newMedia = VlcHelper.createMedia(libVLC, url)
+            
+            // 3. Asigna al reproductor y libera el puntero Java (LibVLC C++ retiene su propia referencia segura)
+            mediaPlayer.media = newMedia
+            try {
+                newMedia.release()
+            } catch (_: Throwable) {}
+
+            // 4. Aplica aspecto y escala
+            try {
+                targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
+                targetScale?.let { mediaPlayer.scale = it }
+            } catch (_: Throwable) {}
+
+            // 5. Inicia reproducción inmediatamente
+            mediaPlayer.play()
+        } catch (e: Throwable) {
+            Log.e("PlayerManager", "Error en killAndPlay: $url", e)
+            mainHandler.post {
+                onError?.invoke(e.localizedMessage ?: "Error al reproducir")
+            }
+        }
     }
 
     @Synchronized
     fun play(url: String, startPositionMs: Long = 0L) {
-        if (startPositionMs > 0L) {
-            // For VOD / resume positions, use standard play with startPositionMs
-            if (url.isBlank()) {
-                mainHandler.post { onError?.invoke("URL de transmisión inválida") }
-                return
-            }
-            try {
-                currentUrl = url
-                pendingStartPositionMs = startPositionMs.coerceAtLeast(0L)
-                lastSeekTimestamp = 0L
-                isSeekingInProgress = false
-                Log.d("PlayerManager", "VLC Reproduciendo (VOD): $url (startPos=$startPositionMs)")
-
-                try {
-                    if (mediaPlayer.isPlaying) {
-                        mediaPlayer.stop()
-                    }
-                } catch (_: Throwable) {}
-
-                val oldMedia = currentMedia
-                currentMedia = null
-                try {
-                    if (oldMedia != null && !oldMedia.isReleased) {
-                        oldMedia.release()
-                    }
-                } catch (_: Throwable) {}
-
-                val newMedia = VlcHelper.createMedia(libVLC, url)
-                currentMedia = newMedia
-                mediaPlayer.media = newMedia
-
-                try {
-                    targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
-                    targetScale?.let { mediaPlayer.scale = it }
-                } catch (_: Throwable) {}
-
-                mediaPlayer.play()
-            } catch (e: Throwable) {
-                Log.e("PlayerManager", "Error al reproducir con VLC: $url", e)
-                mainHandler.post {
-                    onError?.invoke(e.localizedMessage ?: "Error al reproducir")
-                }
-            }
-        } else {
-            // For live streams and instant playback, use playStream with user-requested 1000ms caching and clock-jitter=0 / clock-synchro=0
-            playStream(url)
-        }
+        killAndPlay(url, startPositionMs)
     }
 
     @Synchronized
@@ -417,20 +391,17 @@ class PlayerManager(val context: Context) {
             detachViews()
             try {
                 mediaPlayer.setEventListener(null)
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
             try {
-                mediaPlayer.stop()
-            } catch (_: Exception) {}
-            try {
-                val mediaToRelease = currentMedia
-                currentMedia = null
-                mediaPlayer.media = null
-                if (mediaToRelease != null && !mediaToRelease.isReleased) {
-                    mediaToRelease.release()
+                if (mediaPlayer.isPlaying) {
+                    mediaPlayer.stop()
                 }
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
+            try {
+                mediaPlayer.media = null
+            } catch (_: Throwable) {}
             mediaPlayer.release()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("PlayerManager", "Error al liberar VLC MediaPlayer", e)
         }
     }
