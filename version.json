@@ -1,8 +1,8 @@
 {
-    "versionCode": 178,
-    "versionName": "1.2.67",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.67/app-debug.apk",
-    "changelog": "Versión 1.2.67: Zapping ultra-rápido instantáneo (300ms de búfer), cancelación inmediata del canal previo y máxima velocidad de carga.",
+    "versionCode": 179,
+    "versionName": "1.2.68",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.68/app-debug.apk",
+    "changelog": "Versión 1.2.68: Integración completa y selector de servidor oficial Nexo Fusion (https://nexo.fusionx.cl).",
     "isMandatory": true
 }
 

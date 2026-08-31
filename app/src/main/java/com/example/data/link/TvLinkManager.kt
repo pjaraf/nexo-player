@@ -525,8 +525,8 @@ object TvLinkManager {
                     <!-- Xtream Form -->
                     <form id="xtreamForm" style="display: none;" onsubmit="submitXtreamForm(event)">
                         <div class="field">
-                            <label>Servidor / URL (Opcional)</label>
-                            <input type="text" id="serverUrlInput" placeholder="http://servidor.com:8080" />
+                            <label>Servidor / URL (Opcional - Nexo Fusion por defecto)</label>
+                            <input type="text" id="serverUrlInput" placeholder="https://nexo.fusionx.cl" value="https://nexo.fusionx.cl" />
                         </div>
                         <div class="field">
                             <label>Usuario</label>

@@ -70,6 +70,9 @@ fun LoginScreen(
     val isLargeTv = isTv || configuration.screenWidthDp >= 900
     var username by remember { mutableStateOf(AppStorage.getUsername()) }
     var password by remember { mutableStateOf(AppStorage.getPassword()) }
+    var selectedServerUrl by remember { mutableStateOf(AppStorage.getServerUrl().ifBlank { AppStorage.SERVER_NEXO_FUSION }) }
+    var showServerSelector by remember { mutableStateOf(false) }
+    var customServerInput by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(true) }
     var showSubscribeDialog by remember { mutableStateOf(false) }
@@ -290,7 +293,7 @@ fun LoginScreen(
                         ),
                         keyboardActions = KeyboardActions(
                             onDone = {
-                                viewModel.login(username, password, onSuccess = onLoginSuccess)
+                                viewModel.login(username, password, selectedServerUrl, onSuccess = onLoginSuccess)
                             }
                         ),
                         modifier = Modifier
@@ -305,13 +308,149 @@ fun LoginScreen(
                             .testTag("login_input_password")
                     )
 
+                    // Server Selector (Nexo Fusion, Elite Plus, Custom)
+                    var isServerBtnFocused by remember { mutableStateOf(false) }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (isServerBtnFocused) TvFocusBlue.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.35f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = if (isServerBtnFocused) 2.dp else 1.dp,
+                            color = if (isServerBtnFocused) TvFocusBlue else Color.White.copy(alpha = 0.12f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showServerSelector = !showServerSelector }
+                            .onFocusChanged { isServerBtnFocused = it.isFocused }
+                            .focusable()
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown && (keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER || keyEvent.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_ENTER)) {
+                                    showServerSelector = !showServerSelector
+                                    true
+                                } else false
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Dns,
+                                    contentDescription = "Servidor",
+                                    tint = if (selectedServerUrl.contains("fusionx", ignoreCase = true)) Color(0xFFE50914) else Color(0xFF00E5FF),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Servidor IPTV",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF9E9E9E)
+                                    )
+                                    Text(
+                                        text = when {
+                                            selectedServerUrl == AppStorage.SERVER_NEXO_FUSION -> "Nexo Fusion (nexo.fusionx.cl)"
+                                            selectedServerUrl == AppStorage.SERVER_ELITE_PLUS -> "Elite Plus (eliteplusec.com)"
+                                            else -> selectedServerUrl.ifBlank { "Nexo Fusion (nexo.fusionx.cl)" }
+                                        },
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                            Icon(
+                                if (showServerSelector) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    if (showServerSelector) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF14141E), RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            // Nexo Fusion (Predefinido)
+                            var isNexoOptFocused by remember { mutableStateOf(false) }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (selectedServerUrl == AppStorage.SERVER_NEXO_FUSION) Color(0xFFE50914).copy(alpha = 0.25f) else if (isNexoOptFocused) TvFocusBlue else Color.Transparent,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedServerUrl == AppStorage.SERVER_NEXO_FUSION) Color(0xFFE50914) else Color.Transparent),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedServerUrl = AppStorage.SERVER_NEXO_FUSION
+                                        AppStorage.setServerUrl(AppStorage.SERVER_NEXO_FUSION)
+                                        showServerSelector = false
+                                    }
+                                    .onFocusChanged { isNexoOptFocused = it.isFocused }
+                                    .focusable()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Nexo Fusion (Recomendado)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text("https://nexo.fusionx.cl", color = Color(0xFFAAAAAA), fontSize = 11.sp)
+                                    }
+                                    if (selectedServerUrl == AppStorage.SERVER_NEXO_FUSION) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFFE50914), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+
+                            // Elite Plus
+                            var isEliteOptFocused by remember { mutableStateOf(false) }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (selectedServerUrl == AppStorage.SERVER_ELITE_PLUS) Color(0xFF00E5FF).copy(alpha = 0.2f) else if (isEliteOptFocused) TvFocusBlue else Color.Transparent,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedServerUrl == AppStorage.SERVER_ELITE_PLUS) Color(0xFF00E5FF) else Color.Transparent),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedServerUrl = AppStorage.SERVER_ELITE_PLUS
+                                        AppStorage.setServerUrl(AppStorage.SERVER_ELITE_PLUS)
+                                        showServerSelector = false
+                                    }
+                                    .onFocusChanged { isEliteOptFocused = it.isFocused }
+                                    .focusable()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Elite Plus", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text("http://eliteplusec.com:8080", color = Color(0xFFAAAAAA), fontSize = 11.sp)
+                                    }
+                                    if (selectedServerUrl == AppStorage.SERVER_ELITE_PLUS) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(if (isLargeTv) 4.dp else 8.dp))
 
                     // Primary Login Button (Blue on Focus, Red on select / normal)
                     var isLoginBtnFocused by remember { mutableStateOf(false) }
                     Button(
                         onClick = {
-                            viewModel.login(username, password, onSuccess = onLoginSuccess)
+                            viewModel.login(username, password, selectedServerUrl, onSuccess = onLoginSuccess)
                         },
                         enabled = !loading,
                         shape = RoundedCornerShape(6.dp),
@@ -331,7 +470,7 @@ fun LoginScreen(
                                         AndroidKeyEvent.KEYCODE_ENTER,
                                         AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
                                         AndroidKeyEvent.KEYCODE_BUTTON_A -> {
-                                            viewModel.login(username, password, onSuccess = onLoginSuccess)
+                                            viewModel.login(username, password, selectedServerUrl, onSuccess = onLoginSuccess)
                                             true
                                         }
                                         else -> false
