@@ -1,8 +1,8 @@
 {
-    "versionCode": 182,
-    "versionName": "1.2.71",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.71/app-debug.apk",
-    "changelog": "Versión 1.2.71: Conexión HTTPS directa y optimizada a nexo.fusionx.cl (puerto 443 / player_api.php).",
+    "versionCode": 183,
+    "versionName": "1.2.72",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.72/app-debug.apk",
+    "changelog": "Versión 1.2.72: Detección y notificación instantánea y simultánea de actualizaciones en todos los dispositivos (Smart TV, TV Box y Móviles).",
     "isMandatory": true
 }
 

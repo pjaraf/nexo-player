@@ -20,24 +20,62 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.TlsVersion
 import java.io.File
 import java.io.FileOutputStream
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 object AppUpdateManager {
     private const val TAG = "AppUpdateManager"
     private val gson = Gson()
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .retryOnConnectionFailure(true)
-        .build()
+    private val httpClient: OkHttpClient by lazy {
+        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        })
+
+        val sslContext = try {
+            SSLContext.getInstance("TLS").apply {
+                init(null, trustAllCerts, SecureRandom())
+            }
+        } catch (_: Exception) {
+            SSLContext.getInstance("SSL").apply {
+                init(null, trustAllCerts, SecureRandom())
+            }
+        }
+
+        val modernTlsSpec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+            .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1, TlsVersion.TLS_1_0)
+            .build()
+
+        val compatibleTlsSpec = ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
+            .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1, TlsVersion.TLS_1_0)
+            .build()
+
+        OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+            .hostnameVerifier { _, _ -> true }
+            .connectionSpecs(listOf(modernTlsSpec, compatibleTlsSpec, ConnectionSpec.CLEARTEXT))
+            .protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2))
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .retryOnConnectionFailure(true)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
 
     private val _downloadState = MutableStateFlow<UpdateDownloadState>(UpdateDownloadState.Idle)
     val downloadState: StateFlow<UpdateDownloadState> = _downloadState.asStateFlow()
@@ -156,15 +194,10 @@ object AppUpdateManager {
                 )
 
                 if (isNewer) {
-                    val dismissed = AppStorage.getDismissedUpdateVersion()
-                    if (!force && !candidate.isMandatory && dismissed == candidate.versionName) {
-                        Log.d(TAG, "Update v${candidate.versionName} was previously dismissed")
-                    } else {
-                        Log.i(TAG, "New update found instantly: v${candidate.versionName} (code=${candidate.versionCode})")
-                        _latestUpdateInfo.value = candidate
-                        AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
-                        return@withContext candidate
-                    }
+                    Log.i(TAG, "New update found instantly for all devices: v${candidate.versionName} (code=${candidate.versionCode})")
+                    _latestUpdateInfo.value = candidate
+                    AppStorage.setLastUpdateCheckTime(System.currentTimeMillis())
+                    return@withContext candidate
                 }
             }
 
@@ -182,13 +215,22 @@ object AppUpdateManager {
     private suspend fun fetchFromVersionJson(customUrl: String?): UpdateInfo? = coroutineScope {
         val configuredUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
         val candidateUrls = mutableListOf<String>()
-        // 1. Direct raw github user content with unique timestamp cache-buster
+        val ts = System.currentTimeMillis()
+        val nonce = (1000..9999).random()
+
+        // 1. Direct raw github user content with unique timestamp + nonce cache-buster
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/master/version.json")
-        // 2. Direct GitHub Contents API
-        candidateUrls.add("https://api.github.com/repos/pjaraf/nexo-player/contents/version.json")
-        candidateUrls.add(configuredUrl)
+        // 2. High-speed jsDelivr CDN mirrors
         candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
+        candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@master/version.json")
+        candidateUrls.add("https://fastly.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
+        // 3. User configured / Custom URL
+        if (!configuredUrl.isNullOrBlank()) {
+            candidateUrls.add(configuredUrl)
+        }
+        // 4. GitHub API Contents endpoint
+        candidateUrls.add("https://api.github.com/repos/pjaraf/nexo-player/contents/version.json")
 
         val distinctUrls = candidateUrls.distinct()
         val deferredList = distinctUrls.map { url ->
@@ -196,16 +238,15 @@ object AppUpdateManager {
                 try {
                     val isGitHubApi = url.contains("api.github.com")
                     val targetUrl = if (isGitHubApi) {
-                        url
+                        if (url.contains("?")) "$url&_t=${ts}_$nonce" else "$url?_t=${ts}_$nonce"
                     } else {
                         val normalized = normalizeUrl(url)
-                        val cacheBuster = if (normalized.contains("?")) "&_t=${System.currentTimeMillis()}" else "?_t=${System.currentTimeMillis()}"
-                        "$normalized$cacheBuster"
+                        if (normalized.contains("?")) "$normalized&_t=${ts}_$nonce" else "$normalized?_t=${ts}_$nonce"
                     }
 
                     val reqBuilder = Request.Builder()
                         .url(targetUrl)
-                        .header("User-Agent", "Nexo-Updater/${currentVersionName}")
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 Nexo-Updater/${currentVersionName}")
                         .header("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
                         .header("Pragma", "no-cache")
                         .header("Expires", "0")
@@ -236,9 +277,9 @@ object AppUpdateManager {
                                 val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
                                     normalizeUrl(update.apkUrl)
                                 } else {
-                                    "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-release.apk"
+                                    "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-debug.apk"
                                 }
-                                return@async update.copy(apkUrl = resolvedApkUrl)
+                                return@async update.copy(apkUrl = resolvedApkUrl, isMandatory = true)
                             }
                         }
                     }
@@ -259,11 +300,14 @@ object AppUpdateManager {
 
     private fun fetchFromGitHubReleases(): UpdateInfo? {
         return try {
-            val apiUrl = "https://api.github.com/repos/pjaraf/nexo-player/releases/latest"
+            val ts = System.currentTimeMillis()
+            val apiUrl = "https://api.github.com/repos/pjaraf/nexo-player/releases/latest?_t=$ts"
             val request = Request.Builder()
                 .url(apiUrl)
-                .header("User-Agent", "Nexo-Updater/${currentVersionName}")
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) Nexo-Updater/${currentVersionName}")
                 .header("Accept", "application/vnd.github.v3+json")
+                .header("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
+                .header("Pragma", "no-cache")
                 .build()
 
             val response = httpClient.newCall(request).execute()
