@@ -1,8 +1,8 @@
 {
-    "versionCode": 179,
-    "versionName": "1.2.68",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.68/app-debug.apk",
-    "changelog": "Versión 1.2.68: Integración completa y selector de servidor oficial Nexo Fusion (https://nexo.fusionx.cl).",
+    "versionCode": 180,
+    "versionName": "1.2.69",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.69/app-debug.apk",
+    "changelog": "Versión 1.2.69: Servidores protegidos e invisibles con conexión y detección automática por usuario y contraseña.",
     "isMandatory": true
 }
 
