@@ -107,7 +107,7 @@ object XtreamApi {
             return@withContext null
         }
 
-        val effectiveBase = (customBaseUrl ?: baseUrl).trimEnd('/')
+        val effectiveBase = (customBaseUrl ?: baseUrl).trim().trimEnd('/')
         val urlBuilder = "$effectiveBase/player_api.php".toHttpUrlOrNull()?.newBuilder()
             ?: return@withContext null
 
@@ -120,12 +120,15 @@ object XtreamApi {
         val request = Request.Builder()
             .url(urlBuilder.build())
             .header("User-Agent", DEFAULT_UA)
+            .header("Accept", "*/*")
             .build()
 
         try {
             val response = httpClient.newCall(request).execute()
             if (response.isSuccessful) {
-                response.body?.string()
+                val bodyStr = response.body?.string()
+                Log.d(TAG, "Fetch success ($effectiveBase, action=$action): length=${bodyStr?.length}")
+                bodyStr
             } else {
                 Log.w(TAG, "Fetch failed for action=$action code=${response.code} from $effectiveBase")
                 null
@@ -148,13 +151,12 @@ object XtreamApi {
             val user = userInfo.username?.trim()
 
             // Verify authentication explicitly
-            val isAuthPositive = authRaw == "1" || authRaw == "1.0" || authRaw.equals("true", ignoreCase = true)
             val isAuthNegative = authRaw == "0" || authRaw == "0.0" || authRaw.equals("false", ignoreCase = true)
             val isStatusDisabled = status.equals("Disabled", ignoreCase = true) ||
                     status.equals("Banned", ignoreCase = true) ||
                     status.equals("Expired", ignoreCase = true)
 
-            if (!isAuthNegative && !isStatusDisabled && !user.isNullOrBlank() && (isAuthPositive || status.equals("Active", ignoreCase = true) || status.equals("Trial", ignoreCase = true))) {
+            if (!isAuthNegative && !isStatusDisabled) {
                 res
             } else {
                 Log.w(TAG, "Login rejected by server validation. auth=$authRaw, status=$status, user=$user")

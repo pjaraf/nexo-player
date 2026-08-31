@@ -256,7 +256,15 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
                 val candidateServers: List<String> = if (!customServerUrl.isNullOrBlank()) {
                     listOf(customServerUrl.trim().trimEnd('/'))
                 } else {
-                    AppStorage.AUTO_DETECT_SERVERS
+                    listOf(
+                        "https://nexo.fusionx.cl",
+                        "http://nexo.fusionx.cl",
+                        "https://nexo.fusionx.cl:443",
+                        "http://nexo.fusionx.cl:8080",
+                        "https://nexo.fusionx.cl:8080",
+                        "http://eliteplusec.com:8080",
+                        "https://eliteplusec.com:8080"
+                    )
                 }
 
                 var authenticatedResult: Pair<String, UserInfo>? = null
@@ -265,7 +273,7 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
                     try {
                         AppStorage.setServerUrl(server)
                         XtreamApi.clearCache()
-                        val res = XtreamApi.login(trimmedUser, trimmedPass)
+                        val res = XtreamApi.login(trimmedUser, trimmedPass, customBaseUrl = server)
                         if (res != null && res.userInfo != null) {
                             authenticatedResult = Pair(server, res.userInfo)
                             break
