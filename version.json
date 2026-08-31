@@ -1,8 +1,8 @@
 {
-    "versionCode": 184,
-    "versionName": "1.2.73",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.73/app-debug.apk",
-    "changelog": "Versión 1.2.73: Inicio de sesión idéntico e instantáneo en TV Box, Smart TV y teléfonos con soporte completo para Ethernet/LAN y D-Pad.",
+    "versionCode": 185,
+    "versionName": "1.2.74",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.74/app-debug.apk",
+    "changelog": "Versión 1.2.74: Despliegue y notificación masiva e instantánea en todos los dispositivos en paralelo.",
     "isMandatory": true
 }
 

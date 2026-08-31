@@ -134,14 +134,14 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
             }
         }
         
-        // Start background polling for updates (every 15 seconds) to ensure they appear instantly across all devices without restarting
+        // Start background polling for updates (every 5 seconds) to ensure they appear instantly across all devices without restarting
         startUpdatePolling()
     }
 
     private fun startUpdatePolling() {
         viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                kotlinx.coroutines.delay(15 * 1000L)
+                kotlinx.coroutines.delay(5 * 1000L)
                 if (AppUpdateManager.latestUpdateInfo.value == null) {
                     checkForUpdates(manual = true)
                 }

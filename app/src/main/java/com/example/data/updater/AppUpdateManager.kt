@@ -72,8 +72,8 @@ object AppUpdateManager {
             .followRedirects(true)
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
             .build()
     }
 
@@ -216,20 +216,24 @@ object AppUpdateManager {
         val configuredUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
         val candidateUrls = mutableListOf<String>()
         val ts = System.currentTimeMillis()
-        val nonce = (1000..9999).random()
+        val nonce = (10000..99999).random()
 
         // 1. Direct raw github user content with unique timestamp + nonce cache-buster
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/master/version.json")
-        // 2. High-speed jsDelivr CDN mirrors
+        // 2. High-speed jsDelivr CDN mirrors with forced purge & cache bypass
         candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
         candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@master/version.json")
         candidateUrls.add("https://fastly.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
-        // 3. User configured / Custom URL
+        candidateUrls.add("https://gcore.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
+        // 3. Statically CDN mirrors
+        candidateUrls.add("https://cdn.statically.io/gh/pjaraf/nexo-player/main/version.json")
+        candidateUrls.add("https://cdn.statically.io/gh/pjaraf/nexo-player/master/version.json")
+        // 4. User configured / Custom URL
         if (!configuredUrl.isNullOrBlank()) {
             candidateUrls.add(configuredUrl)
         }
-        // 4. GitHub API Contents endpoint
+        // 5. GitHub API Contents endpoint
         candidateUrls.add("https://api.github.com/repos/pjaraf/nexo-player/contents/version.json")
 
         val distinctUrls = candidateUrls.distinct()

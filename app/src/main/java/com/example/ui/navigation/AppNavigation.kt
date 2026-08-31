@@ -90,9 +90,9 @@ fun AppNavigation(
                 break
             }
         }
-        // Continuous background check every 10 seconds so update notification appears immediately when released
+        // Continuous background check every 5 seconds so update notification appears immediately when released
         while (true) {
-            kotlinx.coroutines.delay(10000L)
+            kotlinx.coroutines.delay(5000L)
             if (mainViewModel.updateInfo.value == null) {
                 mainViewModel.checkForUpdates(manual = true)
             }
