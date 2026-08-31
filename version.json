@@ -1,8 +1,8 @@
 {
-    "versionCode": 177,
-    "versionName": "1.2.66",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.66/app-debug.apk",
-    "changelog": "Versión 1.2.66: Eliminación instantánea del canal anterior al cambiar rápido y blindaje total contra cierres de la app.",
+    "versionCode": 178,
+    "versionName": "1.2.67",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.67/app-debug.apk",
+    "changelog": "Versión 1.2.67: Zapping ultra-rápido instantáneo (300ms de búfer), cancelación inmediata del canal previo y máxima velocidad de carga.",
     "isMandatory": true
 }
 

@@ -275,7 +275,11 @@ private fun TvLiveScreen(
         } else {
             (currentIndex + delta + displayChannels.size) % displayChannels.size
         }
-        selectedChannel = displayChannels[nextIndex]
+        val nextCh = displayChannels[nextIndex]
+        try {
+            playerManager.killPlayback()
+        } catch (_: Throwable) {}
+        selectedChannel = nextCh
         directionLabel = label
         showOsdBanner = true
         lastZapTime = System.currentTimeMillis()

@@ -452,10 +452,6 @@ fun PlayerScreen(
     LaunchedEffect(streamUrl) {
         isLoading = true
         errorMsg = null
-        if (isLive) {
-            // Give smooth debounce on live channel zap
-            delay(150)
-        }
         try {
             val startPos = if (candidateIndex == 0) resumeMs else 0L
             playerManager.play(streamUrl, startPos)
@@ -557,6 +553,12 @@ fun PlayerScreen(
         bannerChannelNumber = (target.num?.toString()?.takeIf { it.isNotBlank() }) ?: "${nextIdx + 1}"
         bannerCategoryName = target.groupName.ifBlank { "TRANSMISIÓN EN VIVO HD" }
         candidateIndex = 0
+        val targetUrl = target.directStreamUrl?.takeIf { it.isNotBlank() }
+            ?: XtreamApi.getLiveStreamCandidates(target.id).firstOrNull()
+            ?: XtreamApi.getLiveStreamUrl(target.id)
+        if (targetUrl.isNotBlank()) {
+            streamUrl = targetUrl
+        }
         swipeBannerDirection = if (delta > 0) "▲ Siguiente canal" else "▼ Canal anterior"
         showLiveChannelBanner = true
         showControls = true
