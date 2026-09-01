@@ -450,6 +450,10 @@ fun PlayerScreen(
 
     // Play/Update stream URL in VLC
     LaunchedEffect(streamUrl) {
+        if (streamUrl.isBlank()) return@LaunchedEffect
+        if (isLive) {
+            delay(120L)
+        }
         isLoading = true
         errorMsg = null
         try {

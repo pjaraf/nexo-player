@@ -18,14 +18,13 @@ object VlcHelper {
                     add("--no-sub-autodetect-file")
                     add("--no-audio-time-stretch")
                     add("--avcodec-fast")
-                    add("--avcodec-skiploopfilter=4")
-                    add("--network-caching=300")
-                    add("--live-caching=300")
-                    add("--file-caching=300")
-                    add("--sout-mux-caching=400")
-                    add("--network-caching=400")
-                    add("--live-caching=400")
-                    add("--file-caching=400")
+                    add("--avcodec-skiploopfilter=0")
+                    add("--network-caching=800")
+                    add("--live-caching=800")
+                    add("--file-caching=800")
+                    add("--sout-mux-caching=800")
+                    add("--drop-late-frames")
+                    add("--skip-frames")
                     add("--http-reconnect")
                     add("--no-ssl-verify")
                     add("--http-no-ssl-verify")
@@ -56,6 +55,7 @@ object VlcHelper {
         }
         return Media(libVLC, cleanUri).apply {
             try {
+                // Enable hardware decoding with software fallback (force = false)
                 setHWDecoderEnabled(true, false)
             } catch (_: Throwable) {}
             
@@ -65,18 +65,19 @@ object VlcHelper {
             addOption(":gnutls-system-trust=0")
             addOption(":clock-jitter=0")
             addOption(":clock-synchro=0")
-            addOption(":network-caching=300")
-            addOption(":live-caching=300")
-            addOption(":file-caching=300")
-            addOption(":sout-mux-caching=300")
+            addOption(":network-caching=800")
+            addOption(":live-caching=800")
+            addOption(":file-caching=800")
+            addOption(":sout-mux-caching=800")
             addOption(":avcodec-fast")
-            addOption(":avcodec-skiploopfilter=4")
+            addOption(":avcodec-skiploopfilter=0")
             addOption(":http-reconnect")
             addOption(":rtsp-tcp")
             addOption(":no-sub-autodetect-file")
         }
     }
 }
+
 
 
 

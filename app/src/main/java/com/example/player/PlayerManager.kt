@@ -36,6 +36,7 @@ class PlayerManager(val context: Context) {
     var onTracksChanged: (() -> Unit)? = null
 
     private var currentUrl: String? = null
+    private var activeMedia: Media? = null
 
     private var targetAspectRatio: String? = null
     private var targetScale: Float? = null
@@ -238,29 +239,36 @@ class PlayerManager(val context: Context) {
             lastSeekTimestamp = 0L
             isSeekingInProgress = false
 
-            // 1. Inmediatamente mata el canal anterior
+            // 1. Detiene la reproducción previa de manera ordenada
             try {
                 if (mediaPlayer.isPlaying) {
                     mediaPlayer.stop()
                 }
             } catch (_: Throwable) {}
 
-            // 2. Crea el nuevo Media optimizado con aceleración por hardware
-            val newMedia = VlcHelper.createMedia(libVLC, url)
-            
-            // 3. Asigna al reproductor y libera el puntero Java (LibVLC C++ retiene su propia referencia segura)
-            mediaPlayer.media = newMedia
+            // 2. Desasocia el media anterior de LibVLC y libera su memoria nativa
             try {
-                newMedia.release()
+                mediaPlayer.media = null
+            } catch (_: Throwable) {}
+            try {
+                activeMedia?.release()
+                activeMedia = null
             } catch (_: Throwable) {}
 
-            // 4. Aplica aspecto y escala
+            // 3. Crea el nuevo Media optimizado
+            val newMedia = VlcHelper.createMedia(libVLC, url)
+            activeMedia = newMedia
+            
+            // 4. Asigna al reproductor reteniendo la referencia activa en Java
+            mediaPlayer.media = newMedia
+
+            // 5. Aplica aspecto y escala
             try {
                 targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
                 targetScale?.let { mediaPlayer.scale = it }
             } catch (_: Throwable) {}
 
-            // 5. Inicia reproducción inmediatamente
+            // 6. Inicia reproducción inmediatamente
             mediaPlayer.play()
         } catch (e: Throwable) {
             Log.e("PlayerManager", "Error en killAndPlay: $url", e)
@@ -399,6 +407,10 @@ class PlayerManager(val context: Context) {
             } catch (_: Throwable) {}
             try {
                 mediaPlayer.media = null
+            } catch (_: Throwable) {}
+            try {
+                activeMedia?.release()
+                activeMedia = null
             } catch (_: Throwable) {}
             mediaPlayer.release()
         } catch (e: Throwable) {

@@ -202,9 +202,8 @@ private fun TvLiveScreen(
     LaunchedEffect(selectedChannel) {
         val ch = selectedChannel
         if (ch != null) {
-            try {
-                playerManager.killPlayback()
-            } catch (_: Throwable) {}
+            // Breve debounce de 120ms para permitir zapping ultra fluido en control remoto sin sobrecargar el decodificador nativo
+            delay(120L)
             isBuffering = true
             hasError = false
             candidateIndex = 0
