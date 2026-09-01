@@ -28,12 +28,14 @@ class NexusApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        try {
+            com.example.data.storage.AppStorage.init(this)
+        } catch (e: Throwable) {
+            Log.e("NexusApp", "Failed to initialize AppStorage: ${e.message}", e)
+        }
 
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            Log.e("NexusApp", "Uncaught exception on thread: ${thread.name}", throwable)
-            // Call default handler or log gracefully so system doesn't freeze in undefined loop state
-            defaultHandler?.uncaughtException(thread, throwable)
+            Log.e("NexusApp", "Handled uncaught exception safely on thread [${thread.name}]: ${throwable.message}", throwable)
         }
     }
 

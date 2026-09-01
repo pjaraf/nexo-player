@@ -1,8 +1,8 @@
 {
-    "versionCode": 187,
-    "versionName": "1.2.76",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.76/app-debug.apk",
-    "changelog": "Versión 1.2.76: Solución definitiva al cambio de canal en vivo. Eliminación de Use-After-Free y migración a SurfaceView HW.",
+    "versionCode": 190,
+    "versionName": "1.2.79",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.79/app-debug.apk",
+    "changelog": "Versión 1.2.79: Optimización del decodificador LibVLC NDK para procesadores ARMv7 de TV Box. Corrección de error de memoria y estabilidad nativa.",
     "isMandatory": true
 }
 

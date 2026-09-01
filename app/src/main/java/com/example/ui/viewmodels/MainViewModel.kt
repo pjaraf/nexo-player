@@ -12,7 +12,9 @@ import com.example.utils.NetworkMonitor
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.*
 
-class MainViewModel(application: Application = NexusApp.instance) : AndroidViewModel(application) {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    constructor() : this(NexusApp.instance)
 
     // --- Network Connectivity Flow ---
     val isOnline: StateFlow<Boolean> = NetworkMonitor.observeNetworkState(application)
@@ -141,9 +143,9 @@ class MainViewModel(application: Application = NexusApp.instance) : AndroidViewM
     private fun startUpdatePolling() {
         viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                kotlinx.coroutines.delay(5 * 1000L)
+                kotlinx.coroutines.delay(15 * 60 * 1000L) // Safe periodic check every 15 minutes
                 if (AppUpdateManager.latestUpdateInfo.value == null) {
-                    checkForUpdates(manual = true)
+                    checkForUpdates(manual = false)
                 }
             }
         }

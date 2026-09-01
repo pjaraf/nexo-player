@@ -127,13 +127,18 @@ fun NexusTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as? Activity)?.window
-            if (window != null) {
-                window.statusBarColor = NexusBackground.toArgb()
-                window.navigationBarColor = NexusBackground.toArgb()
-                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-                WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
-            }
+            try {
+                val window = (view.context as? Activity)?.window
+                if (window != null) {
+                    window.statusBarColor = NexusBackground.toArgb()
+                    window.navigationBarColor = NexusBackground.toArgb()
+                    try {
+                        val controller = WindowCompat.getInsetsController(window, view)
+                        controller.isAppearanceLightStatusBars = false
+                        controller.isAppearanceLightNavigationBars = false
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {}
         }
     }
 

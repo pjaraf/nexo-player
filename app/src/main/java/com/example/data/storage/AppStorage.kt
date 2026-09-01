@@ -18,8 +18,17 @@ import java.util.UUID
 
 object AppStorage {
 
+    private var appContext: Context? = null
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+        refreshActiveProfile()
+    }
+
     private val prefs: SharedPreferences by lazy {
-        NexusApp.instance.getSharedPreferences("nexo_prefs", Context.MODE_PRIVATE)
+        val ctx = appContext ?: try { NexusApp.instance } catch (_: Throwable) { null }
+        ctx?.getSharedPreferences("nexo_prefs", Context.MODE_PRIVATE)
+            ?: throw IllegalStateException("AppStorage not initialized")
     }
 
     private val gson = Gson()
@@ -51,8 +60,10 @@ object AppStorage {
     private val _activeProfileFlow = MutableStateFlow<Profile?>(null)
     val activeProfileFlow: StateFlow<Profile?> = _activeProfileFlow.asStateFlow()
 
-    init {
-        _activeProfileFlow.value = getActiveProfile()
+    fun refreshActiveProfile() {
+        try {
+            _activeProfileFlow.value = getActiveProfile()
+        } catch (_: Throwable) {}
     }
 
     // --- Session ---

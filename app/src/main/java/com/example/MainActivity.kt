@@ -19,15 +19,22 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Prevent app from going into sleep / ambient mode / screensaver on Android TV & devices
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        try {
+            // Prevent app from going into sleep / ambient mode / screensaver on Android TV & devices
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } catch (_: Throwable) {}
         
-        // Ensure default highlight is disabled on API 26+ so custom TV focus borders display cleanly
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            window.decorView.defaultFocusHighlightEnabled = false
-        }
+        try {
+            // Ensure default highlight is disabled on API 26+ so custom TV focus borders display cleanly
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                window.decorView.defaultFocusHighlightEnabled = false
+            }
+        } catch (_: Throwable) {}
         
-        enableEdgeToEdge()
+        try {
+            enableEdgeToEdge()
+        } catch (_: Throwable) {}
+
         setContent {
             NexusTheme {
                 Surface(

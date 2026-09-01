@@ -36,7 +36,6 @@ class PlayerManager(val context: Context) {
     var onTracksChanged: (() -> Unit)? = null
 
     private var currentUrl: String? = null
-    private var activeMedia: Media? = null
 
     private var targetAspectRatio: String? = null
     private var targetScale: Float? = null
@@ -246,30 +245,29 @@ class PlayerManager(val context: Context) {
                 }
             } catch (_: Throwable) {}
 
-            // 2. Desasocia el media anterior de LibVLC y libera su memoria nativa
+            // 2. Crea y asigna el nuevo Media optimizado
             try {
-                mediaPlayer.media = null
-            } catch (_: Throwable) {}
-            try {
-                activeMedia?.release()
-                activeMedia = null
-            } catch (_: Throwable) {}
+                val newMedia = VlcHelper.createMedia(libVLC, url)
+                mediaPlayer.media = newMedia
+                try {
+                    newMedia.release()
+                } catch (_: Throwable) {}
+            } catch (e: Throwable) {
+                Log.e("PlayerManager", "Error creating VLC media: $url", e)
+            }
 
-            // 3. Crea el nuevo Media optimizado
-            val newMedia = VlcHelper.createMedia(libVLC, url)
-            activeMedia = newMedia
-            
-            // 4. Asigna al reproductor reteniendo la referencia activa en Java
-            mediaPlayer.media = newMedia
-
-            // 5. Aplica aspecto y escala
+            // 3. Aplica aspecto y escala
             try {
                 targetAspectRatio?.let { mediaPlayer.aspectRatio = it }
                 targetScale?.let { mediaPlayer.scale = it }
             } catch (_: Throwable) {}
 
-            // 6. Inicia reproducción inmediatamente
-            mediaPlayer.play()
+            // 4. Inicia reproducción inmediatamente
+            try {
+                mediaPlayer.play()
+            } catch (e: Throwable) {
+                Log.e("PlayerManager", "Error starting playback in VLC", e)
+            }
         } catch (e: Throwable) {
             Log.e("PlayerManager", "Error en killAndPlay: $url", e)
             mainHandler.post {
@@ -407,10 +405,6 @@ class PlayerManager(val context: Context) {
             } catch (_: Throwable) {}
             try {
                 mediaPlayer.media = null
-            } catch (_: Throwable) {}
-            try {
-                activeMedia?.release()
-                activeMedia = null
             } catch (_: Throwable) {}
             mediaPlayer.release()
         } catch (e: Throwable) {

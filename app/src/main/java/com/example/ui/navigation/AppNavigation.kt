@@ -79,24 +79,8 @@ fun AppNavigation(
 
     LaunchedEffect(Unit) {
         AppStorage.setDismissedUpdateVersion(null)
-        // Instant check at launch (0ms) and quick follow-ups (500ms, 1.5s, 3s, 6s)
+        // Check update at launch
         mainViewModel.checkForUpdates(manual = true)
-        val retryDelays = listOf(500L, 1500L, 3000L, 6000L)
-        for (delayMs in retryDelays) {
-            kotlinx.coroutines.delay(delayMs)
-            if (mainViewModel.updateInfo.value == null) {
-                mainViewModel.checkForUpdates(manual = true)
-            } else {
-                break
-            }
-        }
-        // Continuous background check every 5 seconds so update notification appears immediately when released
-        while (true) {
-            kotlinx.coroutines.delay(5000L)
-            if (mainViewModel.updateInfo.value == null) {
-                mainViewModel.checkForUpdates(manual = true)
-            }
-        }
     }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current

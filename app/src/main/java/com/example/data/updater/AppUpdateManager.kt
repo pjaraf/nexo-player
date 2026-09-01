@@ -212,94 +212,48 @@ object AppUpdateManager {
         }
     }
 
-    private suspend fun fetchFromVersionJson(customUrl: String?): UpdateInfo? = coroutineScope {
+    private suspend fun fetchFromVersionJson(customUrl: String?): UpdateInfo? = withContext(Dispatchers.IO) {
         val configuredUrl = customUrl?.ifBlank { null } ?: AppStorage.getUpdateCheckUrl()
         val candidateUrls = mutableListOf<String>()
         val ts = System.currentTimeMillis()
-        val nonce = (10000..99999).random()
 
-        // 1. Direct raw github user content with unique timestamp + nonce cache-buster
-        candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
-        candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/master/version.json")
-        // 2. High-speed jsDelivr CDN mirrors with forced purge & cache bypass
-        candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
-        candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@master/version.json")
-        candidateUrls.add("https://fastly.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
-        candidateUrls.add("https://gcore.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
-        // 3. Statically CDN mirrors
-        candidateUrls.add("https://cdn.statically.io/gh/pjaraf/nexo-player/main/version.json")
-        candidateUrls.add("https://cdn.statically.io/gh/pjaraf/nexo-player/master/version.json")
-        // 4. User configured / Custom URL
         if (!configuredUrl.isNullOrBlank()) {
             candidateUrls.add(configuredUrl)
         }
-        // 5. GitHub API Contents endpoint
-        candidateUrls.add("https://api.github.com/repos/pjaraf/nexo-player/contents/version.json")
+        candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
+        candidateUrls.add("https://cdn.jsdelivr.net/gh/pjaraf/nexo-player@main/version.json")
 
-        val distinctUrls = candidateUrls.distinct()
-        val deferredList = distinctUrls.map { url ->
-            async(Dispatchers.IO) {
-                try {
-                    val isGitHubApi = url.contains("api.github.com")
-                    val targetUrl = if (isGitHubApi) {
-                        if (url.contains("?")) "$url&_t=${ts}_$nonce" else "$url?_t=${ts}_$nonce"
-                    } else {
-                        val normalized = normalizeUrl(url)
-                        if (normalized.contains("?")) "$normalized&_t=${ts}_$nonce" else "$normalized?_t=${ts}_$nonce"
-                    }
+        for (url in candidateUrls.distinct()) {
+            try {
+                val normalized = normalizeUrl(url)
+                val targetUrl = if (normalized.contains("?")) "$normalized&_t=$ts" else "$normalized?_t=$ts"
 
-                    val reqBuilder = Request.Builder()
-                        .url(targetUrl)
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 Nexo-Updater/${currentVersionName}")
-                        .header("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
-                        .header("Pragma", "no-cache")
-                        .header("Expires", "0")
+                val request = Request.Builder()
+                    .url(targetUrl)
+                    .header("User-Agent", "Nexo-Updater/${currentVersionName}")
+                    .header("Cache-Control", "no-cache")
+                    .build()
 
-                    if (isGitHubApi) {
-                        reqBuilder.header("Accept", "application/vnd.github.v3.raw")
-                    }
-
-                    val request = reqBuilder.build()
-                    val response = httpClient.newCall(request).execute()
-                    if (response.isSuccessful) {
-                        val body = response.body?.string()
-                        if (!body.isNullOrBlank()) {
-                            var jsonToParse = body
-                            // Handle GitHub API base64 fallback wrapper
-                            if (body.contains("\"content\":") && body.contains("\"encoding\":")) {
-                                try {
-                                    val gitHubObj = gson.fromJson(body, JsonObject::class.java)
-                                    val contentBase64 = gitHubObj.get("content")?.asString?.replace("\n", "")?.replace("\r", "")
-                                    if (!contentBase64.isNullOrBlank()) {
-                                        jsonToParse = String(android.util.Base64.decode(contentBase64, android.util.Base64.DEFAULT), Charsets.UTF_8)
-                                    }
-                                } catch (_: Throwable) {}
+                val response = httpClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        val update = gson.fromJson(body, UpdateInfo::class.java)
+                        if (update != null && update.versionName.isNotBlank()) {
+                            val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
+                                normalizeUrl(update.apkUrl)
+                            } else {
+                                "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-debug.apk"
                             }
-
-                            val update = gson.fromJson(jsonToParse, UpdateInfo::class.java)
-                            if (update != null && update.versionName.isNotBlank()) {
-                                val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
-                                    normalizeUrl(update.apkUrl)
-                                } else {
-                                    "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-debug.apk"
-                                }
-                                return@async update.copy(apkUrl = resolvedApkUrl, isMandatory = true)
-                            }
+                            return@withContext update.copy(apkUrl = resolvedApkUrl, isMandatory = true)
                         }
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to fetch from version.json ($url): ${e.message}")
                 }
-                null
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to fetch from version.json ($url): ${e.message}")
             }
         }
-
-        // Collect all results and pick the newest
-        val results = deferredList.mapNotNull { it.await() }
-        results.maxWithOrNull { a, b ->
-            val cmp = compareVersions(a.versionName, b.versionName)
-            if (cmp != 0) cmp else a.versionCode.compareTo(b.versionCode)
-        }
+        return@withContext null
     }
 
     private fun fetchFromGitHubReleases(): UpdateInfo? {
