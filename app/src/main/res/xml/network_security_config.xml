@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- IPTV streams and LAN TV pairing often require cleartext HTTP -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">nexo.fusionx.cl</domain>
         <domain includeSubdomains="true">fusionx.cl</domain>
         <domain includeSubdomains="true">eliteplusec.com</domain>
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </domain-config>
 </network-security-config>

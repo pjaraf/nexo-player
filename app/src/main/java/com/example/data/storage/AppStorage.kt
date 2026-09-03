@@ -3,6 +3,8 @@ package com.example.data.storage
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.example.NexusApp
 import com.example.data.models.FavItem
 import com.example.data.models.Profile
@@ -22,6 +24,7 @@ object AppStorage {
 
     fun init(context: Context) {
         appContext = context.applicationContext
+        migrateSensitiveDataIfNeeded()
         refreshActiveProfile()
     }
 
@@ -29,6 +32,63 @@ object AppStorage {
         val ctx = appContext ?: try { NexusApp.instance } catch (_: Throwable) { null }
         ctx?.getSharedPreferences("nexo_prefs", Context.MODE_PRIVATE)
             ?: throw IllegalStateException("AppStorage not initialized")
+    }
+
+    private val securePrefs: SharedPreferences by lazy {
+        val ctx = appContext ?: try { NexusApp.instance } catch (_: Throwable) { null }
+            ?: throw IllegalStateException("AppStorage not initialized")
+        val masterKey = MasterKey.Builder(ctx)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            ctx,
+            "nexo_secure_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+
+    private fun migrateSensitiveDataIfNeeded() {
+        try {
+            val ctx = appContext ?: return
+            val legacy = ctx.getSharedPreferences("nexo_prefs", Context.MODE_PRIVATE)
+            if (!legacy.getBoolean("secure_migration_done", false)) {
+                val masterKey = MasterKey.Builder(ctx)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                val secure = EncryptedSharedPreferences.create(
+                    ctx,
+                    "nexo_secure_prefs",
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+                val editor = secure.edit()
+                listOf("username", "password", "adult_pin").forEach { key ->
+                    legacy.getString(key, null)?.let { value ->
+                        editor.putString(key, value)
+                        legacy.edit().remove(key).apply()
+                    }
+                }
+                editor.apply()
+                legacy.edit().putBoolean("secure_migration_done", true).apply()
+            }
+        } catch (e: Exception) {
+            Log.e("AppStorage", "Secure migration failed", e)
+        }
+    }
+
+    private fun putSecureString(key: String, value: String) {
+        securePrefs.edit().putString(key, value).apply()
+    }
+
+    private fun getSecureString(key: String, default: String = ""): String {
+        return securePrefs.getString(key, default) ?: default
+    }
+
+    private fun removeSecureString(key: String) {
+        securePrefs.edit().remove(key).apply()
     }
 
     private val gson = Gson()
@@ -69,9 +129,9 @@ object AppStorage {
     // --- Session ---
     fun saveSession(username: String, pass: String, user: UserInfo?, serverUrl: String = "") {
         val targetServer = if (serverUrl.isNotBlank()) serverUrl else getServerUrl()
+        putSecureString("username", username)
+        putSecureString("password", pass)
         prefs.edit()
-            .putString("username", username)
-            .putString("password", pass)
             .putString("server_url", targetServer)
             .putString("user_json", user?.let { gson.toJson(it) } ?: "")
             .putBoolean("is_logged_in", true)
@@ -89,9 +149,9 @@ object AppStorage {
             expDate = "Ilimitado",
             auth = 1
         )
+        putSecureString("username", name)
+        putSecureString("password", "m3u_direct")
         prefs.edit()
-            .putString("username", name)
-            .putString("password", "m3u_direct")
             .putString("server_url", cleanUrl)
             .putString("m3u_url", cleanUrl)
             .putBoolean("m3u_is_local_file", false)
@@ -113,9 +173,9 @@ object AppStorage {
                 expDate = "Ilimitado",
                 auth = 1
             )
+            putSecureString("username", name)
+            putSecureString("password", "m3u_local_file")
             prefs.edit()
-                .putString("username", name)
-                .putString("password", "m3u_local_file")
                 .putString("server_url", "local://custom_playlist.m3u")
                 .putString("m3u_url", "local://custom_playlist.m3u")
                 .putString("m3u_file_name", name)
@@ -144,8 +204,8 @@ object AppStorage {
     fun isLocalM3uFile(): Boolean = prefs.getBoolean("m3u_is_local_file", false)
     fun getM3uUrl(): String = prefs.getString("m3u_url", "") ?: ""
 
-    fun getUsername(): String = prefs.getString("username", "") ?: ""
-    fun getPassword(): String = prefs.getString("password", "") ?: ""
+    fun getUsername(): String = getSecureString("username")
+    fun getPassword(): String = getSecureString("password")
     fun getServerUrl(): String = prefs.getString("server_url", SERVER_NEXO_FUSION)?.ifBlank { SERVER_NEXO_FUSION } ?: SERVER_NEXO_FUSION
     fun setServerUrl(url: String) {
         val clean = url.trim().trimEnd('/')
@@ -168,9 +228,9 @@ object AppStorage {
             val file = File(NexusApp.instance.filesDir, "custom_playlist.m3u")
             if (file.exists()) file.delete()
         } catch (_: Exception) {}
+        removeSecureString("username")
+        removeSecureString("password")
         prefs.edit()
-            .remove("username")
-            .remove("password")
             .remove("user_json")
             .remove("is_m3u_mode")
             .remove("m3u_url")
@@ -255,14 +315,14 @@ object AppStorage {
     }
 
     // --- PIN ---
-    fun getPin(): String = prefs.getString("adult_pin", "") ?: ""
+    fun getPin(): String = getSecureString("adult_pin")
 
     fun setPin(pin: String) {
-        prefs.edit().putString("adult_pin", pin).apply()
+        putSecureString("adult_pin", pin)
     }
 
     fun clearPin() {
-        prefs.edit().remove("adult_pin").apply()
+        removeSecureString("adult_pin")
     }
 
     fun hasPin(): Boolean = getPin().isNotBlank()

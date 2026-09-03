@@ -3,6 +3,7 @@ package com.example.ui.viewmodels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.NexusApp
 import com.example.data.api.XtreamApi
 import com.example.data.models.*
@@ -193,6 +194,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun simulateUpdate() {
+        if (!BuildConfig.DEBUG) return
         val mockUpdate = UpdateInfo(
             versionCode = 36,
             versionName = "1.1.25",

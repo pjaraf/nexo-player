@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="nexo_prefs.xml" />
+        <exclude domain="sharedpref" path="nexo_secure_prefs.xml" />
+        <exclude domain="file" path="custom_playlist.m3u" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="nexo_prefs.xml" />
+        <exclude domain="sharedpref" path="nexo_secure_prefs.xml" />
+        <exclude domain="file" path="custom_playlist.m3u" />
+    </device-transfer>
+</data-extraction-rules>

@@ -36,6 +36,10 @@
 -keep class org.seamless.** { *; }
 -dontwarn org.seamless.**
 
+# AndroidX Security Crypto
+-keep class androidx.security.crypto.** { *; }
+-dontwarn androidx.security.crypto.**
+
 # AndroidX Datastore
 -keep class androidx.datastore.** { *; }
 -dontwarn androidx.datastore.**

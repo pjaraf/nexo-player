@@ -8,18 +8,10 @@ import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.ConnectionSpec
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
-import okhttp3.Protocol
 import okhttp3.Request
-import okhttp3.TlsVersion
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
-import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
+import com.example.utils.NetworkClients
 
 object XtreamApi {
     private const val TAG = "XtreamApi"
@@ -41,49 +33,10 @@ object XtreamApi {
 
     private val gson = Gson()
 
-    private val httpClient: OkHttpClient by lazy {
-        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        })
-
-        val sslContext = try {
-            SSLContext.getInstance("TLS").apply {
-                init(null, trustAllCerts, SecureRandom())
-            }
-        } catch (_: Exception) {
-            SSLContext.getInstance("SSL").apply {
-                init(null, trustAllCerts, SecureRandom())
-            }
-        }
-
-        val modernTlsSpec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
-            .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1, TlsVersion.TLS_1_0)
-            .build()
-
-        val compatibleTlsSpec = ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
-            .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1, TlsVersion.TLS_1_0)
-            .build()
-
-        OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-            .hostnameVerifier { _, _ -> true }
-            .connectionSpecs(listOf(modernTlsSpec, compatibleTlsSpec, ConnectionSpec.CLEARTEXT))
-            .protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2))
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .retryOnConnectionFailure(true)
-            .connectTimeout(12, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .build()
-    }
+    private val httpClient: OkHttpClient by lazy { NetworkClients.iptv }
 
     // In-memory caching for faster screen transitions
     private val memoryCache = mutableMapOf<String, Any>()
-
-    // Dedicated M3U Playlist for Legacy Live TV Server only
-    const val LIVE_PLAYLIST_URL = "https://www.dropbox.com/scl/fi/c13v3nfgw2x81qfy0v1i6/CLIENTES.txt?rlkey=ge7xlg9kew1iaslgj68cgn59h&st=18m5wcdh&dl=1"
     private var parsedLiveChannels: List<LiveChannel>? = null
     private var parsedLiveCategories: List<LiveCategory>? = null
 
@@ -170,7 +123,11 @@ object XtreamApi {
 
     // --- Live TV from Custom Playlist / M3U / Xtream Server ---
     suspend fun loadM3uContent(customUrl: String? = null): String? = withContext(Dispatchers.IO) {
-        val targetUrl = (customUrl ?: AppStorage.getM3uUrl()).ifBlank { LIVE_PLAYLIST_URL }
+        val targetUrl = (customUrl ?: AppStorage.getM3uUrl()).trim()
+        if (targetUrl.isBlank()) {
+            Log.w(TAG, "No M3U URL configured")
+            return@withContext null
+        }
         try {
             val request = Request.Builder()
                 .url(targetUrl)
@@ -188,8 +145,6 @@ object XtreamApi {
             null
         }
     }
-
-    private suspend fun fetchLiveM3uContent(): String? = loadM3uContent(LIVE_PLAYLIST_URL)
 
     fun parseM3uText(content: String): Pair<List<LiveChannel>, List<LiveCategory>> {
         val entries = content.split("#EXTINF:")
@@ -302,22 +257,7 @@ object XtreamApi {
                 }
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "Failed to parse xtream live streams for $currentUrl, using live playlist fallback", e)
-        }
-
-        // 2. Comprehensive fallback (as in v1.2.60): Load all live channels from Dropbox M3U playlist
-        try {
-            val content = fetchLiveM3uContent()
-            if (!content.isNullOrBlank()) {
-                val (channels, categories) = parseM3uText(content)
-                if (channels.isNotEmpty()) {
-                    parsedLiveChannels = channels
-                    parsedLiveCategories = categories
-                    return@withContext channels
-                }
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed to parse live fallback M3U playlist", e)
+            Log.w(TAG, "Failed to parse xtream live streams for $currentUrl", e)
         }
 
         return@withContext emptyList()

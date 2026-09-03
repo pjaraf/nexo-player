@@ -53,7 +53,9 @@ import kotlinx.coroutines.delay
 fun ProfileScreen(
     viewModel: MainViewModel,
     onNavigateFavorites: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigatePin: (String) -> Unit = {},
+    onSwitchProfile: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val isTv = remember { DeviceUtils.isTelevision(context) }
@@ -80,6 +82,8 @@ fun ProfileScreen(
             updateStatusMessage = updateStatusMessage,
             onCheckUpdates = { viewModel.checkForUpdates(manual = true) },
             onNavigateFavorites = onNavigateFavorites,
+            onNavigatePin = onNavigatePin,
+            onSwitchProfile = onSwitchProfile,
             onLogout = {
                 viewModel.logout()
                 onLogout()
@@ -219,6 +223,22 @@ fun ProfileScreen(
                         icon = Icons.Default.Tv,
                         onClick = { showPhoneLinkDialog = true },
                         testTag = "profile_link_tv_btn"
+                    )
+
+                    MenuOptionCard(
+                        title = if (AppStorage.hasPin()) "Cambiar PIN parental" else "Configurar PIN parental",
+                        subtitle = if (AppStorage.hasPin()) "Modificar o quitar el PIN de acceso" else "Protege perfiles adultos con un PIN",
+                        icon = Icons.Outlined.Lock,
+                        onClick = { onNavigatePin(if (AppStorage.hasPin()) "set" else "set") },
+                        testTag = "profile_pin_btn"
+                    )
+
+                    MenuOptionCard(
+                        title = "Cambiar perfil",
+                        subtitle = "Seleccionar otro perfil de usuario",
+                        icon = Icons.Outlined.People,
+                        onClick = onSwitchProfile,
+                        testTag = "profile_switch_btn"
                     )
                 }
 
@@ -410,6 +430,8 @@ private fun TvProfileScreenLayout(
     updateStatusMessage: String?,
     onCheckUpdates: () -> Unit,
     onNavigateFavorites: () -> Unit,
+    onNavigatePin: (String) -> Unit,
+    onSwitchProfile: () -> Unit,
     onLogout: () -> Unit
 ) {
     val firstFocusRequester = remember { FocusRequester() }
@@ -663,6 +685,22 @@ private fun TvProfileScreenLayout(
                             onClick = onNavigateFavorites,
                             modifier = Modifier.focusRequester(firstFocusRequester),
                             testTag = "tv_profile_favorites_btn"
+                        )
+
+                        TvMenuOptionCard(
+                            title = if (AppStorage.hasPin()) "Cambiar PIN parental" else "Configurar PIN parental",
+                            subtitle = "Protege perfiles adultos",
+                            icon = Icons.Outlined.Lock,
+                            onClick = { onNavigatePin("set") },
+                            testTag = "tv_profile_pin_btn"
+                        )
+
+                        TvMenuOptionCard(
+                            title = "Cambiar perfil",
+                            subtitle = "Seleccionar otro perfil",
+                            icon = Icons.Outlined.People,
+                            onClick = onSwitchProfile,
+                            testTag = "tv_profile_switch_btn"
                         )
                     }
 

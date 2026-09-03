@@ -11,6 +11,7 @@ import com.example.BuildConfig
 import com.example.data.models.UpdateDownloadState
 import com.example.data.models.UpdateInfo
 import com.example.data.storage.AppStorage
+import com.example.utils.NetworkClients
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -20,62 +21,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
-import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
-import okhttp3.TlsVersion
 import java.io.File
 import java.io.FileOutputStream
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
-import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 
 object AppUpdateManager {
     private const val TAG = "AppUpdateManager"
     private val gson = Gson()
 
-    private val httpClient: OkHttpClient by lazy {
-        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        })
-
-        val sslContext = try {
-            SSLContext.getInstance("TLS").apply {
-                init(null, trustAllCerts, SecureRandom())
-            }
-        } catch (_: Exception) {
-            SSLContext.getInstance("SSL").apply {
-                init(null, trustAllCerts, SecureRandom())
-            }
-        }
-
-        val modernTlsSpec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
-            .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1, TlsVersion.TLS_1_0)
-            .build()
-
-        val compatibleTlsSpec = ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
-            .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1, TlsVersion.TLS_1_0)
-            .build()
-
-        OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-            .hostnameVerifier { _, _ -> true }
-            .connectionSpecs(listOf(modernTlsSpec, compatibleTlsSpec, ConnectionSpec.CLEARTEXT))
-            .protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2))
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .retryOnConnectionFailure(true)
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(8, TimeUnit.SECONDS)
-            .build()
-    }
+    private val httpClient: OkHttpClient by lazy { NetworkClients.strict }
 
     private val _downloadState = MutableStateFlow<UpdateDownloadState>(UpdateDownloadState.Idle)
     val downloadState: StateFlow<UpdateDownloadState> = _downloadState.asStateFlow()
@@ -217,7 +173,7 @@ object AppUpdateManager {
         val candidateUrls = mutableListOf<String>()
         val ts = System.currentTimeMillis()
 
-        if (!configuredUrl.isNullOrBlank()) {
+        if (!configuredUrl.isNullOrBlank() && NetworkClients.isTrustedUpdateUrl(configuredUrl)) {
             candidateUrls.add(configuredUrl)
         }
         candidateUrls.add("https://raw.githubusercontent.com/pjaraf/nexo-player/main/version.json")
@@ -243,9 +199,13 @@ object AppUpdateManager {
                             val resolvedApkUrl = if (update.apkUrl.isNotBlank()) {
                                 normalizeUrl(update.apkUrl)
                             } else {
-                                "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-debug.apk"
+                                "https://github.com/pjaraf/nexo-player/releases/download/v${update.versionName}/app-release.apk"
                             }
-                            return@withContext update.copy(apkUrl = resolvedApkUrl, isMandatory = true)
+                            if (!NetworkClients.isTrustedUpdateUrl(resolvedApkUrl)) {
+                                Log.w(TAG, "Rejected untrusted APK URL: $resolvedApkUrl")
+                                continue
+                            }
+                            return@withContext update.copy(apkUrl = resolvedApkUrl, isMandatory = update.isMandatory)
                         }
                     }
                 }
@@ -290,10 +250,10 @@ object AppUpdateManager {
                     }
 
                     if (downloadUrl.isBlank() && tagName.isNotBlank()) {
-                        downloadUrl = "https://github.com/pjaraf/nexo-player/releases/download/v$tagName/app-debug.apk"
+                        downloadUrl = "https://github.com/pjaraf/nexo-player/releases/download/v$tagName/app-release.apk"
                     }
 
-                    if (tagName.isNotBlank()) {
+                    if (tagName.isNotBlank() && NetworkClients.isTrustedUpdateUrl(downloadUrl)) {
                         return UpdateInfo(
                             versionCode = 0,
                             versionName = tagName,
@@ -326,17 +286,17 @@ object AppUpdateManager {
             val cleanVersion = update.versionName.removePrefix("v").removePrefix("V")
             val candidateUrls = mutableListOf<String>()
 
-            if (update.apkUrl.isNotBlank()) {
+            if (update.apkUrl.isNotBlank() && NetworkClients.isTrustedUpdateUrl(normalizeUrl(update.apkUrl))) {
                 candidateUrls.add(normalizeUrl(update.apkUrl))
             }
+            candidateUrls.add("https://github.com/pjaraf/nexo-player/releases/download/v$cleanVersion/app-release.apk")
             candidateUrls.add("https://github.com/pjaraf/nexo-player/releases/download/v$cleanVersion/app-debug.apk")
-            candidateUrls.add("https://github.com/pjaraf/nexo-player/releases/download/$cleanVersion/app-debug.apk")
-            candidateUrls.add("https://github.com/pjaraf/nexo-player/releases/latest/download/app-debug.apk")
 
             var successfulResponse: Response? = null
             var lastErrorMessage = ""
 
             for (url in candidateUrls.distinct()) {
+                if (!NetworkClients.isTrustedUpdateUrl(url)) continue
                 try {
                     Log.d(TAG, "Attempting APK download from: $url")
                     val request = Request.Builder()

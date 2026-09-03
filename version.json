@@ -1,9 +1,7 @@
 {
-    "versionCode": 190,
-    "versionName": "1.2.79",
-    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.79/app-debug.apk",
-    "changelog": "Versión 1.2.79: Optimización del decodificador LibVLC NDK para procesadores ARMv7 de TV Box. Corrección de error de memoria y estabilidad nativa.",
-    "isMandatory": true
+    "versionCode": 191,
+    "versionName": "1.2.80",
+    "apkUrl": "https://github.com/pjaraf/nexo-player/releases/download/v1.2.80/app-release.apk",
+    "changelog": "Versión 1.2.80: Auditoría de seguridad — credenciales cifradas, TLS reforzado para actualizaciones, PIN parental activo, selección de perfiles, servidor TV más seguro y eliminación de dependencias externas.",
+    "isMandatory": false
 }
-
-

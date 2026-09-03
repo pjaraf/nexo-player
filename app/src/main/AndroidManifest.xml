@@ -53,7 +53,9 @@
 
     <application
         android:name=".NexusApp"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:extractNativeLibs="true"
         android:largeHeap="true"
         android:hardwareAccelerated="true"

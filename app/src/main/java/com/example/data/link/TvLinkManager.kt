@@ -51,6 +51,11 @@ object TvLinkManager {
     var currentTvUrl: String = ""
         private set
 
+    private var failedPinAttempts = 0
+    private var lastFailedAttemptMs = 0L
+    private const val MAX_PIN_ATTEMPTS = 5
+    private const val PIN_LOCKOUT_MS = 60_000L
+
     private var onLoginReceivedCallback: ((payload: TvLinkPayload) -> Unit)? = null
 
     /**
@@ -72,9 +77,9 @@ object TvLinkManager {
             try {
                 serverSocket = ServerSocket().apply {
                     reuseAddress = true
-                    bind(InetSocketAddress(DEFAULT_PORT))
+                    bind(InetSocketAddress(localIp, DEFAULT_PORT))
                 }
-                Log.d(TAG, "TV Pairing Server listening on port $DEFAULT_PORT, IP: $localIp, PIN: $currentPin")
+                Log.d(TAG, "TV Pairing Server listening on $localIp:$DEFAULT_PORT")
 
                 while (isActive && serverSocket?.isClosed == false) {
                     try {
@@ -185,7 +190,7 @@ object TvLinkManager {
                 output.write(htmlBytes)
                 output.flush()
             } else if (method == "GET" && path.startsWith("/api/status")) {
-                val json = """{"status":"ready","pin":"$currentPin"}"""
+                val json = """{"status":"ready","device":"nexo-tv"}"""
                 val jsonBytes = json.toByteArray(Charsets.UTF_8)
                 val response = "HTTP/1.1 200 OK\r\n" +
                         "Content-Type: application/json\r\n" +
@@ -234,7 +239,22 @@ object TvLinkManager {
                     val isValidM3u = isM3uDetected && (cleanM3uUrl.isNotBlank() || !m3uContent.isNullOrBlank())
                     val isValidXtream = username.isNotBlank() && password.isNotBlank()
 
+                    val now = System.currentTimeMillis()
+                    if (failedPinAttempts >= MAX_PIN_ATTEMPTS && now - lastFailedAttemptMs < PIN_LOCKOUT_MS) {
+                        val respJson = """{"success":false,"message":"Demasiados intentos. Espera un minuto."}"""
+                        val respBytes = respJson.toByteArray(Charsets.UTF_8)
+                        val response = "HTTP/1.1 429 Too Many Requests\r\n" +
+                                "Content-Type: application/json\r\n" +
+                                "Content-Length: ${respBytes.size}\r\n" +
+                                "Access-Control-Allow-Origin: *\r\n" +
+                                "\r\n" + respJson
+                        output.write(response.toByteArray(Charsets.UTF_8))
+                        output.flush()
+                        return
+                    }
+
                     if (pin == currentPin && (isValidM3u || isValidXtream)) {
+                        failedPinAttempts = 0
                         val respJson = """{"success":true,"message":"Vinculación exitosa. Iniciando en la TV..."}"""
                         val respBytes = respJson.toByteArray(Charsets.UTF_8)
                         val response = "HTTP/1.1 200 OK\r\n" +
@@ -260,6 +280,8 @@ object TvLinkManager {
                             onLoginReceivedCallback?.invoke(payload)
                         }
                     } else {
+                        failedPinAttempts++
+                        lastFailedAttemptMs = System.currentTimeMillis()
                         val respJson = """{"success":false,"message":"Código PIN inválido o datos incompletos"}"""
                         val respBytes = respJson.toByteArray(Charsets.UTF_8)
                         val response = "HTTP/1.1 400 Bad Request\r\n" +
@@ -395,9 +417,11 @@ object TvLinkManager {
                         if (response.isSuccessful) {
                             val body = response.body?.string().orEmpty()
                             val json = gson.fromJson(body, JsonObject::class.java)
-                            val pin = json.get("pin")?.asString ?: ""
-                            synchronized(discovered) {
-                                discovered.add(DiscoveredTv(ip = testIp, pin = pin))
+                            val status = json.get("status")?.asString ?: ""
+                            if (status == "ready") {
+                                synchronized(discovered) {
+                                    discovered.add(DiscoveredTv(ip = testIp))
+                                }
                             }
                         }
                     }
@@ -410,7 +434,7 @@ object TvLinkManager {
         discovered
     }
 
-    data class DiscoveredTv(val ip: String, val pin: String)
+    data class DiscoveredTv(val ip: String, val pin: String = "")
 
     /**
      * Generates a high-contrast QR code bitmap using ZXing.

@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets
 object Routes {
     const val SPLASH = "splash"
     const val LOGIN = "login"
+    const val PROFILE_SELECT = "profile-select"
     const val PIN = "pin/{action}"
     const val TABS = "tabs"
     const val MOVIE_DETAIL = "movie?id={id}"
@@ -124,7 +125,10 @@ fun AppNavigation(
         composable(Routes.SPLASH) {
             SplashScreen(
                 onSplashFinished = {
-                    val nextScreen = if (!AppStorage.isLoggedIn()) Routes.LOGIN else Routes.TABS
+                    val nextScreen = when {
+                        !AppStorage.isLoggedIn() -> Routes.LOGIN
+                        else -> Routes.PROFILE_SELECT
+                    }
                     navController.navigate(nextScreen) {
                         popUpTo(Routes.SPLASH) { inclusive = true }
                     }
@@ -135,8 +139,35 @@ fun AppNavigation(
             LoginScreen(
                 viewModel = mainViewModel,
                 onLoginSuccess = {
-                    navController.navigate(Routes.TABS) {
+                    navController.navigate(Routes.PROFILE_SELECT) {
                         popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Routes.PROFILE_SELECT) {
+            ProfileSelectScreen(
+                viewModel = mainViewModel,
+                onProfileSelected = { profile ->
+                    val destination = when {
+                        profile.isKids -> Routes.TABS
+                        AppStorage.hasPin() -> Routes.pin("enter")
+                        else -> Routes.TABS
+                    }
+                    navController.navigate(destination) {
+                        popUpTo(Routes.PROFILE_SELECT) { inclusive = true }
+                    }
+                },
+                onManageProfiles = {
+                    navController.navigate(Routes.TABS) {
+                        popUpTo(Routes.PROFILE_SELECT) { inclusive = true }
+                    }
+                },
+                onLogout = {
+                    mainViewModel.logout()
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(0) { inclusive = true }
                     }
                 }
             )
@@ -152,7 +183,7 @@ fun AppNavigation(
                 onSuccess = {
                     if (action == "enter") {
                         navController.navigate(Routes.TABS) {
-                            popUpTo(Routes.LOGIN) { inclusive = true }
+                            popUpTo(Routes.PROFILE_SELECT) { inclusive = true }
                         }
                     } else {
                         navController.popBackStack()
@@ -204,6 +235,14 @@ fun AppNavigation(
                 onLogout = {
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(0) { inclusive = true }
+                    }
+                },
+                onNavigatePin = { action ->
+                    navController.navigate(Routes.pin(action))
+                },
+                onSwitchProfile = {
+                    navController.navigate(Routes.PROFILE_SELECT) {
+                        popUpTo(Routes.TABS) { inclusive = false }
                     }
                 }
             )

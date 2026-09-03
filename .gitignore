@@ -78,6 +78,14 @@ agenthub/agents/youtube/db
 
 memory/test_credentials.md
 
+# Android local build artifacts
+local.properties
+*.keystore
+*.jks
+.gradle/
+app/build/
+build/
+
 # Mobile development
 android-sdk/
 .env

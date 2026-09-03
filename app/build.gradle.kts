@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexo.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 190
-        versionName = "1.2.79"
+        versionCode = 191
+        versionName = "1.2.80"
 
         ndk {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
@@ -48,8 +48,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
@@ -94,4 +98,5 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.zxing.core)
     implementation(libs.libvlc.all)
+    implementation(libs.androidx.security.crypto)
 }
